@@ -49,7 +49,7 @@ export function compilePrompts(config: PromptConfig): { promptA: string; promptB
 
   // Brand overrides
   const brandOverride = (config.primaryColor || config.secondaryColor || config.primaryFont)
-    ? `\n\n${'═'.repeat(40)}\nBRAND OVERRIDE\n${'═'.repeat(40)}\n\n${brandOverridesBlock}\n\nApplied Values:\n${config.primaryColor ? `Primary Color: ${config.primaryColor}\n` : ''}${config.secondaryColor ? `Secondary Color: ${config.secondaryColor}\n` : ''}${config.primaryFont ? `Primary Font: ${config.primaryFont}` : ''}`
+    ? `\n\n${'═'.repeat(40)}\nBRAND OVERRIDE\n${'═'.repeat(40)}\n\n${brandColorsBlock}\n\n${brandFontBlock}\n\nApplied Values:\n${config.primaryColor ? `Primary Color: ${config.primaryColor}\n` : ''}${config.secondaryColor ? `Secondary Color: ${config.secondaryColor}\n` : ''}${config.primaryFont ? `Primary Font: ${config.primaryFont}` : ''}`
     : '';
 
   // Simulated scraped content
