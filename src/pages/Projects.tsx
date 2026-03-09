@@ -1,18 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { getProjects } from '@/lib/store';
+import { getProjects, deleteProject } from '@/lib/store';
 import { SavedProject, contentModules } from '@/lib/mockData';
 import { compilePrompts } from '@/lib/promptCompiler';
 import { saveProject } from '@/lib/store';
 import logo from '@/assets/swiftlift-logo.svg';
-import { ArrowLeft, Copy, Check, Files, Settings, BookOpen, Library, FolderOpen } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Files, Settings, BookOpen, Library, FolderOpen, Search, Trash2 } from 'lucide-react';
 
 const moduleLabel = (id: string) => contentModules.find(m => m.id === id)?.label || id;
+
+type SortOption = 'recent' | 'updated' | 'az' | 'tier';
 
 export default function Projects() {
   const [projects, setProjects] = useState<SavedProject[]>([]);
   const [selected, setSelected] = useState<SavedProject | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<SortOption>('recent');
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   useEffect(() => { setProjects(getProjects()); }, []);
 
@@ -33,10 +38,31 @@ export default function Projects() {
     setProjects(getProjects());
   };
 
+  const handleDelete = (id: string) => {
+    deleteProject(id);
+    setProjects(getProjects());
+    setDeleteConfirm(null);
+    if (selected?.id === id) setSelected(null);
+  };
+
   const getPrompts = (p: SavedProject) => {
     if (p.promptA && p.promptB) return { promptA: p.promptA, promptB: p.promptB };
     return compilePrompts(p);
   };
+
+  const filtered = useMemo(() => {
+    let items = projects.filter(p => {
+      const q = searchQuery.toLowerCase();
+      return !q || p.name.toLowerCase().includes(q) || p.sourceUrl.toLowerCase().includes(q);
+    });
+    switch (sortBy) {
+      case 'recent': items.sort((a, b) => b.dateCreated.localeCompare(a.dateCreated)); break;
+      case 'updated': items.sort((a, b) => b.dateCreated.localeCompare(a.dateCreated)); break;
+      case 'az': items.sort((a, b) => a.name.localeCompare(b.name)); break;
+      case 'tier': items.sort((a, b) => a.packageTier.localeCompare(b.packageTier)); break;
+    }
+    return items;
+  }, [projects, searchQuery, sortBy]);
 
   const navHeader = (
     <header className="console-header flex items-center justify-between px-6 py-3 shrink-0">
@@ -104,34 +130,84 @@ export default function Projects() {
     <div className="flex flex-col h-screen">
       {navHeader}
       <div className="flex-1 overflow-y-auto p-6 max-w-5xl mx-auto w-full">
-        <h2 className="text-2xl font-bold text-foreground mb-6">Project Archive</h2>
-        {projects.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No projects saved yet.</p>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-foreground">Project Archive</h2>
+        </div>
+
+        {/* Search & Sort */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search projects..."
+              className="control-input pl-9"
+            />
+          </div>
+          <select
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value as SortOption)}
+            className="control-input w-auto text-xs"
+          >
+            <option value="recent">Recently Created</option>
+            <option value="updated">Recently Updated</option>
+            <option value="az">A–Z</option>
+            <option value="tier">Package Tier</option>
+          </select>
+        </div>
+
+        {filtered.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No projects found.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {projects.map(p => (
-              <button
-                key={p.id}
-                onClick={() => setSelected(p)}
-                className="text-left panel-section hover:shadow-md transition-shadow cursor-pointer"
-              >
-                <h3 className="text-base font-semibold text-foreground">{p.name}</h3>
-                <p className="text-xs text-muted-foreground mt-1 truncate">{p.sourceUrl}</p>
-                <div className="flex items-center gap-2 mt-3 flex-wrap">
-                  <span className="px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
-                    {p.packageTier}
-                  </span>
-                  {p.modules.slice(0, 3).map(m => (
-                    <span key={m} className="px-2 py-0.5 rounded text-xs bg-muted text-muted-foreground">
-                      {moduleLabel(m)}
+            {filtered.map(p => (
+              <div key={p.id} className="panel-section hover:shadow-md transition-shadow relative group">
+                <button
+                  onClick={() => setSelected(p)}
+                  className="text-left w-full"
+                >
+                  <h3 className="text-base font-semibold text-foreground">{p.name}</h3>
+                  <p className="text-xs text-muted-foreground mt-1 truncate">{p.sourceUrl}</p>
+                  <div className="flex items-center gap-2 mt-3 flex-wrap">
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
+                      {p.packageTier}
                     </span>
-                  ))}
-                  {p.modules.length > 3 && (
-                    <span className="text-xs text-muted-foreground">+{p.modules.length - 3}</span>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground mt-3">{p.dateCreated}</p>
-              </button>
+                    {p.modules.slice(0, 3).map(m => (
+                      <span key={m} className="px-2 py-0.5 rounded text-xs bg-muted text-muted-foreground">
+                        {moduleLabel(m)}
+                      </span>
+                    ))}
+                    {p.modules.length > 3 && (
+                      <span className="text-xs text-muted-foreground">+{p.modules.length - 3}</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-3">{p.dateCreated}</p>
+                </button>
+
+                {/* Delete button */}
+                {deleteConfirm === p.id ? (
+                  <div className="absolute top-3 right-3 flex items-center gap-1.5 bg-card border border-border rounded-lg px-2 py-1.5 shadow-lg">
+                    <span className="text-xs text-muted-foreground">Delete?</span>
+                    <button onClick={() => handleDelete(p.id)}
+                      className="px-2 py-0.5 rounded text-xs font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors">
+                      Yes
+                    </button>
+                    <button onClick={() => setDeleteConfirm(null)}
+                      className="px-2 py-0.5 rounded text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
+                      No
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setDeleteConfirm(p.id); }}
+                    className="absolute top-3 right-3 p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         )}
