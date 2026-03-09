@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import logo from '@/assets/swiftlift-logo.svg';
 import ControlPanel from '@/components/ControlPanel';
 import PromptOutputPanel from '@/components/PromptOutputPanel';
-import { FolderOpen } from 'lucide-react';
+import { Settings, BookOpen, Library, FolderOpen } from 'lucide-react';
 
 const Index = () => {
   const [promptA, setPromptA] = useState('');
@@ -33,10 +33,12 @@ const Index = () => {
             Prompt Generator Console
           </h1>
         </div>
-        <Link to="/projects"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-[hsl(var(--console-header-foreground)/0.1)] text-[hsl(var(--console-header-foreground))] hover:bg-[hsl(var(--console-header-foreground)/0.15)] transition-colors">
-          <FolderOpen size={14} /> Projects
-        </Link>
+        <nav className="flex items-center gap-2">
+          <Link to="/" className="nav-link active"><Settings size={14} /> Generator</Link>
+          <Link to="/prompt-library" className="nav-link"><BookOpen size={14} /> Library</Link>
+          <Link to="/references" className="nav-link"><Library size={14} /> References</Link>
+          <Link to="/projects" className="nav-link"><FolderOpen size={14} /> Archive</Link>
+        </nav>
       </header>
 
       {/* Main Content */}
