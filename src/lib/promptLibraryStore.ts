@@ -1,19 +1,22 @@
 // Prompt Library Store - manages editable prompt blocks
 
-const STORAGE_KEY = 'swiftlift_prompt_library';
+const STORAGE_KEY = 'swiftlift_prompt_library_v2';
+
+export type PromptSection = 'lovable' | 'claude';
 
 export interface PromptBlock {
   id: string;
   name: string;
-  category: 'base' | 'packages' | 'upgrades' | 'modules' | 'reference_rules' | 'brand_overrides' | 'scraping';
+  section: PromptSection;
   content: string;
 }
 
 const defaultPrompts: PromptBlock[] = [
+  // === FOR LOVABLE ===
   {
     id: 'base_core_engine',
     name: 'Base Core Engine',
-    category: 'base',
+    section: 'lovable',
     content: `You are a deterministic website builder operating in PRODUCTION MODE.
 
 Your goal is to generate a COMPLETE, CLIENT-READY WEBSITE in a single build.
@@ -101,7 +104,7 @@ FOOTER CREDIT
   {
     id: 'pkg_350_standard',
     name: '$350 Standard Package',
-    category: 'packages',
+    section: 'lovable',
     content: `PACKAGE MODE: LAUNCH
 
 1–2 pages maximum.
@@ -115,7 +118,7 @@ Focus on simplicity and clarity.`
   {
     id: 'pkg_550_standard',
     name: '$550 Standard Package',
-    category: 'packages',
+    section: 'lovable',
     content: `PACKAGE MODE: GROWTH
 
 3–7 pages.
@@ -132,7 +135,7 @@ Typical pages:
   {
     id: 'fake_conversion_layout_upgrade',
     name: 'Conversion Layout Upgrade',
-    category: 'upgrades',
+    section: 'lovable',
     content: `Enhance layout to feel visually conversion-oriented.
 
 Do NOT perform deep conversion analysis.
@@ -147,9 +150,73 @@ Enhancements may include:
 The goal is visual persuasion only.`
   },
   {
+    id: 'ref_use_reference_url',
+    name: 'Use Reference URL',
+    section: 'lovable',
+    content: `REFERENCE SOURCE: DIRECT URL
+
+A Reference URL has been provided directly.
+
+Use this URL as the primary design reference.
+
+Analyze the page layout, section structure, visual hierarchy, color application, typography, and animation patterns.
+
+Apply the extracted design skeleton to the new website build.`
+  },
+  {
+    id: 'ref_use_reference_library',
+    name: 'Use Reference Library',
+    section: 'lovable',
+    content: `REFERENCE SOURCE: LIBRARY SELECTION
+
+A reference layout has been selected from the Reference Library.
+
+Use the stored Reference URL as the design reference.
+
+Follow the same analysis process:
+- Extract layout skeleton
+- Lock section order
+- Apply visual patterns
+- Maintain design rhythm
+
+The Reference Library entry may include industry context to guide design decisions.`
+  },
+  {
+    id: 'brand_override_colors',
+    name: 'Brand Override – Colors',
+    section: 'lovable',
+    content: `BRAND COLOR OVERRIDE
+
+When brand colors are specified:
+- Replace all primary brand colors with the provided Primary Color
+- Replace all secondary/accent colors with the provided Secondary Color
+- Maintain proper contrast ratios for accessibility
+- Update hover states, active states, and focus rings
+- Apply consistently across all pages and components
+- Ensure buttons, links, and CTAs reflect the brand palette
+
+If no colors are specified, use colors detected from the Source URL.`
+  },
+  {
+    id: 'brand_override_font',
+    name: 'Brand Override – Font',
+    section: 'lovable',
+    content: `BRAND FONT OVERRIDE
+
+When a primary font is specified:
+- Apply to all headings (h1–h6)
+- Apply to body text and paragraphs
+- Ensure proper font weights are loaded (400, 500, 600, 700 minimum)
+- Maintain readability at all sizes
+- Load font via Google Fonts or appropriate CDN
+- Set appropriate fallback font stack
+
+If no font is specified, use the font detected from the Source URL.`
+  },
+  {
     id: 'mod_team',
     name: 'Team Module',
-    category: 'modules',
+    section: 'lovable',
     content: `TEAM MODULE
 
 Display team members with:
@@ -165,7 +232,7 @@ Include social links if available.`
   {
     id: 'mod_testimonials',
     name: 'Testimonials Module',
-    category: 'modules',
+    section: 'lovable',
     content: `TESTIMONIALS MODULE
 
 Display client testimonials with:
@@ -181,7 +248,7 @@ Maintain consistent card styling.`
   {
     id: 'mod_faq',
     name: 'FAQ Module',
-    category: 'modules',
+    section: 'lovable',
     content: `FAQ MODULE
 
 Implement an accordion-style FAQ section.
@@ -194,9 +261,9 @@ Smooth expand/collapse animations.
 Clear visual hierarchy between question and answer.`
   },
   {
-    id: 'mod_portfolio',
-    name: 'Portfolio Module',
-    category: 'modules',
+    id: 'mod_portfolio_projects',
+    name: 'Portfolio / Projects Module',
+    section: 'lovable',
     content: `PORTFOLIO / PROJECTS MODULE
 
 Create a filterable portfolio gallery.
@@ -214,7 +281,7 @@ Include lightbox functionality for images.`
   {
     id: 'mod_multilanguage',
     name: 'Multi-language Module',
-    category: 'modules',
+    section: 'lovable',
     content: `MULTI-LANGUAGE MODULE
 
 Implement language switching capability.
@@ -230,7 +297,7 @@ Seamless switching without page reload preferred.`
   {
     id: 'mod_blog',
     name: 'Blog Module',
-    category: 'modules',
+    section: 'lovable',
     content: `BLOG MODULE
 
 Create a blog listing page with:
@@ -247,50 +314,11 @@ Individual blog post pages should include:
 - Related posts
 - Social sharing buttons`
   },
-  {
-    id: 'reference_rules',
-    name: 'Reference Rules',
-    category: 'reference_rules',
-    content: `REFERENCE LAYOUT RULES
-
-The Reference URL defines ALL visual design decisions.
-
-Follow the Reference for:
-- Overall page structure
-- Section ordering
-- Component styles
-- Spacing and rhythm
-- Color application patterns
-- Typography hierarchy
-- Animation patterns
-
-Do NOT deviate from Reference layout structure.
-Source content fills the Reference skeleton.`
-  },
-  {
-    id: 'brand_overrides',
-    name: 'Brand Override Rules',
-    category: 'brand_overrides',
-    content: `BRAND OVERRIDE RULES
-
-When brand colors are specified:
-- Replace all primary brand colors
-- Replace all secondary/accent colors
-- Maintain proper contrast ratios
-- Update hover and active states
-
-When primary font is specified:
-- Apply to all headings
-- Apply to body text
-- Ensure proper font weights are loaded
-- Maintain readability at all sizes
-
-Brand consistency must be maintained across all pages.`
-  },
+  // === FOR CLAUDE ===
   {
     id: 'scraping_engine_prompt',
     name: 'Scraping Engine Prompt',
-    category: 'scraping',
+    section: 'claude',
     content: `You are a professional website content extraction engine.
 
 Extract ALL usable business information from the Source URL.
@@ -320,10 +348,18 @@ Return results as a structured content database in JSON format.`
 function getStoredLibrary(): PromptBlock[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return JSON.parse(stored);
+    if (stored) {
+      const parsed: PromptBlock[] = JSON.parse(stored);
+      // Ensure all default prompts exist (merge new ones)
+      const ids = new Set(parsed.map(p => p.id));
+      for (const dp of defaultPrompts) {
+        if (!ids.has(dp.id)) parsed.push(dp);
+      }
+      return parsed;
+    }
   } catch {}
   localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultPrompts));
-  return defaultPrompts;
+  return [...defaultPrompts];
 }
 
 export function getPromptLibrary(): PromptBlock[] {
@@ -345,11 +381,17 @@ export function savePromptBlock(block: PromptBlock): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
 }
 
-export function getPromptsByCategory(category: PromptBlock['category']): PromptBlock[] {
-  return getStoredLibrary().filter(p => p.category === category);
+export function getPromptsBySection(section: PromptSection): PromptBlock[] {
+  return getStoredLibrary().filter(p => p.section === section);
 }
 
-export const categoryLabels: Record<PromptBlock['category'], string> = {
+export const sectionLabels: Record<PromptSection, string> = {
+  lovable: 'For Lovable',
+  claude: 'For Claude'
+};
+
+// Keep backward compat
+export const categoryLabels: Record<string, string> = {
   base: 'Base Engine',
   packages: 'Packages',
   upgrades: 'Upgrades',

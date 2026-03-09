@@ -1,16 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import logo from '@/assets/swiftlift-logo.svg';
-import { getPromptLibrary, savePromptBlock, categoryLabels, PromptBlock } from '@/lib/promptLibraryStore';
-import { Save, Check, BookOpen, FolderOpen, Library, Settings } from 'lucide-react';
-
-type Category = PromptBlock['category'];
-
-const categoryOrder: Category[] = ['base', 'packages', 'upgrades', 'modules', 'reference_rules', 'brand_overrides', 'scraping'];
+import { getPromptLibrary, savePromptBlock, getPromptsBySection, sectionLabels, PromptBlock, PromptSection } from '@/lib/promptLibraryStore';
+import { Save, Check, BookOpen, FolderOpen, Library, Settings, Cpu, Bot } from 'lucide-react';
 
 export default function PromptLibrary() {
   const [library, setLibrary] = useState<PromptBlock[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<Category>('base');
+  const [activeSection, setActiveSection] = useState<PromptSection>('lovable');
   const [selectedBlock, setSelectedBlock] = useState<PromptBlock | null>(null);
   const [editContent, setEditContent] = useState('');
   const [saved, setSaved] = useState(false);
@@ -19,13 +15,14 @@ export default function PromptLibrary() {
     setLibrary(getPromptLibrary());
   }, []);
 
+  const blocksInSection = library.filter(b => b.section === activeSection);
+
   useEffect(() => {
-    const blocks = library.filter(b => b.category === selectedCategory);
-    if (blocks.length > 0 && !selectedBlock) {
-      setSelectedBlock(blocks[0]);
-      setEditContent(blocks[0].content);
+    if (blocksInSection.length > 0 && (!selectedBlock || selectedBlock.section !== activeSection)) {
+      setSelectedBlock(blocksInSection[0]);
+      setEditContent(blocksInSection[0].content);
     }
-  }, [selectedCategory, library, selectedBlock]);
+  }, [activeSection, library]);
 
   const handleSelectBlock = (block: PromptBlock) => {
     setSelectedBlock(block);
@@ -41,8 +38,6 @@ export default function PromptLibrary() {
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
-
-  const blocksInCategory = library.filter(b => b.category === selectedCategory);
 
   return (
     <div className="flex flex-col h-screen">
@@ -64,42 +59,43 @@ export default function PromptLibrary() {
       </header>
 
       <div className="flex flex-1 min-h-0">
-        {/* Sidebar - Categories & Blocks */}
+        {/* Sidebar */}
         <aside className="w-[280px] shrink-0 border-r border-border bg-card overflow-y-auto">
           <div className="p-4 space-y-4">
-            {/* Category Tabs */}
-            <div className="space-y-1">
-              {categoryOrder.map(cat => (
+            {/* Section Tabs */}
+            <div className="flex gap-1 p-1 rounded-lg bg-muted">
+              {(['lovable', 'claude'] as PromptSection[]).map(section => (
                 <button
-                  key={cat}
+                  key={section}
                   onClick={() => {
-                    setSelectedCategory(cat);
+                    setActiveSection(section);
                     setSelectedBlock(null);
                   }}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    selectedCategory === cat
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-foreground hover:bg-muted'
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold transition-colors ${
+                    activeSection === section
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  {categoryLabels[cat]}
+                  {section === 'lovable' ? <Cpu size={13} /> : <Bot size={13} />}
+                  {sectionLabels[section]}
                 </button>
               ))}
             </div>
 
-            {/* Blocks in selected category */}
-            <div className="border-t border-border pt-4">
+            {/* Prompt Blocks */}
+            <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                Prompts
+                {activeSection === 'lovable' ? 'Build Prompts' : 'Processing Prompts'}
               </p>
               <div className="space-y-1">
-                {blocksInCategory.map(block => (
+                {blocksInSection.map(block => (
                   <button
                     key={block.id}
                     onClick={() => handleSelectBlock(block)}
                     className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
                       selectedBlock?.id === block.id
-                        ? 'bg-accent text-accent-foreground'
+                        ? 'bg-primary text-primary-foreground'
                         : 'text-foreground hover:bg-muted'
                     }`}
                   >
@@ -118,7 +114,9 @@ export default function PromptLibrary() {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="text-xl font-bold text-foreground">{selectedBlock.name}</h2>
-                  <p className="text-sm text-muted-foreground">{categoryLabels[selectedBlock.category]}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {sectionLabels[selectedBlock.section]} · <span className="font-mono text-xs">{selectedBlock.id}</span>
+                  </p>
                 </div>
                 <button
                   onClick={handleSave}
