@@ -7,7 +7,6 @@ function getStoredProjects(): SavedProject[] {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) return JSON.parse(stored);
   } catch {}
-  // Initialize with example projects
   localStorage.setItem(STORAGE_KEY, JSON.stringify(exampleProjects));
   return exampleProjects;
 }
@@ -24,6 +23,11 @@ export function saveProject(project: SavedProject): void {
   } else {
     projects.unshift(project);
   }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+}
+
+export function deleteProject(id: string): void {
+  const projects = getStoredProjects().filter(p => p.id !== id);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
 }
 
