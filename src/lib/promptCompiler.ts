@@ -29,8 +29,11 @@ export function compilePrompts(config: PromptConfig): { promptA: string; promptB
   const baseEngine = getPromptBlock('base_core_engine')?.content || '[BASE ENGINE NOT FOUND]';
   const packagePrompt = getPromptBlock(isHighTier ? 'pkg_550_standard' : 'pkg_350_standard')?.content || '[PACKAGE NOT FOUND]';
   const conversionUpgrade = getPromptBlock('fake_conversion_layout_upgrade')?.content || '[UPGRADE NOT FOUND]';
-  const referenceRulesBlock = getPromptBlock('reference_rules')?.content || '';
-  const brandOverridesBlock = getPromptBlock('brand_overrides')?.content || '';
+  const referenceRulesBlock = config.referenceUrl
+    ? (getPromptBlock('ref_use_reference_url')?.content || '')
+    : (getPromptBlock('ref_use_reference_library')?.content || '');
+  const brandColorsBlock = getPromptBlock('brand_override_colors')?.content || '';
+  const brandFontBlock = getPromptBlock('brand_override_font')?.content || '';
 
   // Build module section from library
   const moduleBlocks = config.modules.map(m => {
