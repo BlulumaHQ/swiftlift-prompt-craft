@@ -62,8 +62,6 @@ export default function ControlPanel({ onPromptsGenerated, onClear, clearSignal,
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [generating, setGenerating] = useState(false);
 
-  // Quality Control
-  const [qcLevel, setQcLevel] = useState<'basic' | 'advanced' | ''>('');
 
   // Brand confirmation popup
   const [showBrandConfirm, setShowBrandConfirm] = useState(false);
