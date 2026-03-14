@@ -1,8 +1,8 @@
 // Prompt Library Store - manages editable prompt blocks
 
-const STORAGE_KEY = 'swiftlift_prompt_library_v2';
+const STORAGE_KEY = 'swiftlift_prompt_library_v3';
 
-export type PromptSection = 'lovable' | 'claude';
+export type PromptSection = 'master' | 'builder' | 'module' | 'override' | 'revision' | 'claude';
 
 export interface PromptBlock {
   id: string;
@@ -12,11 +12,11 @@ export interface PromptBlock {
 }
 
 const defaultPrompts: PromptBlock[] = [
-  // === FOR LOVABLE ===
+  // === MASTER PROMPTS ===
   {
     id: 'base_core_engine',
     name: 'Base Core Engine',
-    section: 'lovable',
+    section: 'master',
     content: `You are a deterministic website builder operating in PRODUCTION MODE.
 
 Your goal is to generate a COMPLETE, CLIENT-READY WEBSITE in a single build.
@@ -101,10 +101,12 @@ FOOTER CREDIT
 
 © YEAR Company Name | Web Design by Bluluma.com`
   },
+
+  // === BUILDER PROMPTS ===
   {
     id: 'pkg_350_standard',
     name: '$350 Standard Package',
-    section: 'lovable',
+    section: 'builder',
     content: `PACKAGE MODE: LAUNCH
 
 1–2 pages maximum.
@@ -118,7 +120,7 @@ Focus on simplicity and clarity.`
   {
     id: 'pkg_550_standard',
     name: '$550 Standard Package',
-    section: 'lovable',
+    section: 'builder',
     content: `PACKAGE MODE: GROWTH
 
 3–7 pages.
@@ -135,7 +137,7 @@ Typical pages:
   {
     id: 'fake_conversion_layout_upgrade',
     name: 'Conversion Layout Upgrade',
-    section: 'lovable',
+    section: 'builder',
     content: `Enhance layout to feel visually conversion-oriented.
 
 Do NOT perform deep conversion analysis.
@@ -152,7 +154,7 @@ The goal is visual persuasion only.`
   {
     id: 'ref_use_reference_url',
     name: 'Use Reference URL',
-    section: 'lovable',
+    section: 'builder',
     content: `REFERENCE SOURCE: DIRECT URL
 
 A Reference URL has been provided directly.
@@ -166,7 +168,7 @@ Apply the extracted design skeleton to the new website build.`
   {
     id: 'ref_use_reference_library',
     name: 'Use Reference Library',
-    section: 'lovable',
+    section: 'builder',
     content: `REFERENCE SOURCE: LIBRARY SELECTION
 
 A reference layout has been selected from the Reference Library.
@@ -181,90 +183,32 @@ Follow the same analysis process:
 
 The Reference Library entry may include industry context to guide design decisions.`
   },
+
+  // === MODULE PROMPTS ===
   {
-    id: 'brand_override_colors',
-    name: 'Brand Override – Colors',
-    section: 'lovable',
-    content: `BRAND COLOR OVERRIDE
+    id: 'mod_portfolio_login',
+    name: 'Portfolio — With Login',
+    section: 'module',
+    content: `PORTFOLIO MODULE (WITH LOGIN)
 
-When brand colors are specified:
-- Replace all primary brand colors with the provided Primary Color
-- Replace all secondary/accent colors with the provided Secondary Color
-- Maintain proper contrast ratios for accessibility
-- Update hover states, active states, and focus rings
-- Apply consistently across all pages and components
-- Ensure buttons, links, and CTAs reflect the brand palette
+Create a filterable portfolio gallery with authentication.
 
-If no colors are specified, use colors detected from the Source URL.`
+Include:
+- Project images
+- Project titles
+- Brief descriptions
+- Category tags
+- Login-protected admin area for managing projects
+
+Support category filtering.
+Use masonry or uniform grid layout.
+Include lightbox functionality for images.`
   },
   {
-    id: 'brand_override_font',
-    name: 'Brand Override – Font',
-    section: 'lovable',
-    content: `BRAND FONT OVERRIDE
-
-When a primary font is specified:
-- Apply to all headings (h1–h6)
-- Apply to body text and paragraphs
-- Ensure proper font weights are loaded (400, 500, 600, 700 minimum)
-- Maintain readability at all sizes
-- Load font via Google Fonts or appropriate CDN
-- Set appropriate fallback font stack
-
-If no font is specified, use the font detected from the Source URL.`
-  },
-  {
-    id: 'mod_team',
-    name: 'Team Module',
-    section: 'lovable',
-    content: `TEAM MODULE
-
-Display team members with:
-- Professional photos
-- Full names
-- Job titles
-- Brief professional bios
-
-Use a clean, consistent grid layout.
-Ensure equal card heights.
-Include social links if available.`
-  },
-  {
-    id: 'mod_testimonials',
-    name: 'Testimonials Module',
-    section: 'lovable',
-    content: `TESTIMONIALS MODULE
-
-Display client testimonials with:
-- Client name
-- Company/business name
-- Star rating (if applicable)
-- Testimonial quote
-
-Use carousel or grid format.
-Include client photos when available.
-Maintain consistent card styling.`
-  },
-  {
-    id: 'mod_faq',
-    name: 'FAQ Module',
-    section: 'lovable',
-    content: `FAQ MODULE
-
-Implement an accordion-style FAQ section.
-
-Include at least 6 relevant questions and answers.
-Questions should address common client concerns.
-Answers should be concise but informative.
-
-Smooth expand/collapse animations.
-Clear visual hierarchy between question and answer.`
-  },
-  {
-    id: 'mod_portfolio_projects',
-    name: 'Portfolio / Projects Module',
-    section: 'lovable',
-    content: `PORTFOLIO / PROJECTS MODULE
+    id: 'mod_portfolio_nologin',
+    name: 'Portfolio — Without Login',
+    section: 'module',
+    content: `PORTFOLIO MODULE (PUBLIC)
 
 Create a filterable portfolio gallery.
 
@@ -279,26 +223,28 @@ Use masonry or uniform grid layout.
 Include lightbox functionality for images.`
   },
   {
-    id: 'mod_multilanguage',
-    name: 'Multi-language Module',
-    section: 'lovable',
-    content: `MULTI-LANGUAGE MODULE
+    id: 'mod_blog_login',
+    name: 'Blog — With Login',
+    section: 'module',
+    content: `BLOG MODULE (WITH LOGIN)
 
-Implement language switching capability.
+Create a blog system with authentication for content management.
 
-Requirements:
-- Clear language selector (flags or text)
-- Preserve navigation state on switch
-- Proper content structure for translations
-- RTL support preparation if needed
+Blog listing page:
+- Featured post highlight
+- Post thumbnails
+- Post titles and excerpts
+- Publication dates
+- Category tags
+- Pagination
 
-Seamless switching without page reload preferred.`
+Login-protected admin for creating/editing posts.`
   },
   {
-    id: 'mod_blog',
-    name: 'Blog Module',
-    section: 'lovable',
-    content: `BLOG MODULE
+    id: 'mod_blog_nologin',
+    name: 'Blog — Without Login',
+    section: 'module',
+    content: `BLOG MODULE (PUBLIC)
 
 Create a blog listing page with:
 - Featured post highlight
@@ -314,6 +260,184 @@ Individual blog post pages should include:
 - Related posts
 - Social sharing buttons`
   },
+  {
+    id: 'mod_gallery',
+    name: 'Gallery Module',
+    section: 'module',
+    content: `GALLERY MODULE
+
+Create a visual gallery section with:
+- Image grid layout
+- Lightbox functionality
+- Category filtering (optional)
+- Responsive columns
+- Lazy loading for performance
+
+Support both landscape and portrait images.`
+  },
+  {
+    id: 'mod_multilanguage',
+    name: 'Multi-language Module',
+    section: 'module',
+    content: `MULTI-LANGUAGE MODULE
+
+Implement language switching capability.
+
+Requirements:
+- Clear language selector (flags or text)
+- Preserve navigation state on switch
+- Proper content structure for translations
+- RTL support preparation if needed
+
+Seamless switching without page reload preferred.`
+  },
+  {
+    id: 'mod_lead_capture',
+    name: 'Lead Capture Upgrade',
+    section: 'module',
+    content: `LEAD CAPTURE UPGRADE
+
+Add enhanced lead capture elements:
+- Exit-intent popup
+- Floating CTA bar
+- Inline lead forms in content sections
+- Newsletter signup
+- Free consultation booking widget`
+  },
+  {
+    id: 'mod_conversion_layout',
+    name: 'Conversion Layout',
+    section: 'module',
+    content: `CONVERSION LAYOUT MODULE
+
+Apply conversion-focused design patterns:
+- Above-the-fold value proposition
+- Social proof near CTAs
+- Urgency/scarcity indicators
+- Benefit-driven headlines
+- Streamlined user flow`
+  },
+  {
+    id: 'mod_trust_badges',
+    name: 'Trust Badge Section',
+    section: 'module',
+    content: `TRUST BADGE SECTION
+
+Add trust-building elements:
+- Certification badges
+- Partner logos
+- Security seals
+- Guarantee badges
+- Industry association logos
+- Years in business indicator`
+  },
+  {
+    id: 'mod_service_comparison',
+    name: 'Service Comparison',
+    section: 'module',
+    content: `SERVICE COMPARISON MODULE
+
+Create a comparison table or section:
+- Feature comparison grid
+- Pricing tiers (if applicable)
+- Highlighted recommended option
+- Clear CTAs per tier
+- Mobile-friendly layout`
+  },
+  {
+    id: 'mod_case_study',
+    name: 'Case Study Section',
+    section: 'module',
+    content: `CASE STUDY SECTION
+
+Display detailed case studies:
+- Client challenge/problem
+- Solution provided
+- Results and metrics
+- Client testimonial
+- Before/after visuals
+- CTA to contact for similar results`
+  },
+  {
+    id: 'mod_full_seo',
+    name: 'Full SEO Package',
+    section: 'module',
+    content: `FULL SEO PACKAGE
+
+Implement comprehensive SEO:
+- Optimized meta titles and descriptions for all pages
+- Schema markup (LocalBusiness, FAQ, etc.)
+- Open Graph tags
+- Sitemap generation
+- Canonical URLs
+- Alt text for all images
+- Internal linking structure
+- Header hierarchy (H1-H6)`
+  },
+
+  // === OVERRIDE PROMPTS ===
+  {
+    id: 'brand_override_colors',
+    name: 'Brand Override – Colors',
+    section: 'override',
+    content: `BRAND COLOR OVERRIDE
+
+When brand colors are specified:
+- Replace all primary brand colors with the provided Primary Color
+- Replace all secondary/accent colors with the provided Secondary Color
+- Apply Accent Color for highlights and interactive elements
+- Maintain proper contrast ratios for accessibility
+- Update hover states, active states, and focus rings
+- Apply consistently across all pages and components
+- Ensure buttons, links, and CTAs reflect the brand palette
+
+If no colors are specified, use colors detected from the Source URL.`
+  },
+  {
+    id: 'brand_override_font',
+    name: 'Brand Override – Font',
+    section: 'override',
+    content: `BRAND FONT OVERRIDE
+
+When a primary font is specified:
+- Apply to all headings (h1–h6)
+- Apply to body text and paragraphs
+- Ensure proper font weights are loaded (400, 500, 600, 700 minimum)
+- Maintain readability at all sizes
+- Load font via Google Fonts or appropriate CDN
+- Set appropriate fallback font stack
+
+If no font is specified, use the font detected from the Source URL.`
+  },
+
+  // === REVISION PROMPTS ===
+  {
+    id: 'revision_client_feedback',
+    name: 'Client Feedback Template',
+    section: 'revision',
+    content: `REVISION MODE: CLIENT FEEDBACK
+
+Apply the following client-requested changes to the existing website build.
+
+Maintain all existing design patterns and layout structure unless specifically requested to change.
+
+Changes must be surgical — only modify what the client has asked for.
+
+Do not reorganize sections unless explicitly requested.`
+  },
+  {
+    id: 'revision_quick_fix',
+    name: 'Quick Fix Template',
+    section: 'revision',
+    content: `REVISION MODE: QUICK FIX
+
+Apply the selected quick fixes to the existing website build.
+
+Each fix should be minimal and targeted.
+Do not alter unrelated sections.
+Maintain design consistency throughout.`
+  },
+
   // === FOR CLAUDE ===
   {
     id: 'scraping_engine_prompt',
@@ -350,7 +474,6 @@ function getStoredLibrary(): PromptBlock[] {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed: PromptBlock[] = JSON.parse(stored);
-      // Ensure all default prompts exist (merge new ones)
       const ids = new Set(parsed.map(p => p.id));
       for (const dp of defaultPrompts) {
         if (!ids.has(dp.id)) parsed.push(dp);
@@ -386,11 +509,14 @@ export function getPromptsBySection(section: PromptSection): PromptBlock[] {
 }
 
 export const sectionLabels: Record<PromptSection, string> = {
-  lovable: 'For Lovable',
-  claude: 'For Claude'
+  master: 'Master Prompts',
+  builder: 'Builder Prompts',
+  module: 'Module Prompts',
+  override: 'Override Prompts',
+  revision: 'Revision Prompts',
+  claude: 'For Claude',
 };
 
-// Keep backward compat
 export const categoryLabels: Record<string, string> = {
   base: 'Base Engine',
   packages: 'Packages',
