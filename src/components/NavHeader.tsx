@@ -43,60 +43,64 @@ export default function NavHeader({ title, rightContent }: NavHeaderProps) {
   const isBuilderActive = location.pathname === '/';
 
   return (
-    <header className="console-header flex items-center justify-between px-6 py-3 shrink-0">
-      {/* Left side: Logo + Nav */}
-      <div className="flex items-center gap-3">
-        <button onClick={() => navigate('/')} className="flex items-center shrink-0 hover:opacity-80 transition-opacity">
-          <img src={logo} alt="SwiftLift" className="h-8" />
-        </button>
-        <div className="h-5 w-px bg-foreground/20" />
-        <nav className="flex items-center gap-1.5">
-          {/* Builder Dropdown */}
-          <div className="relative" ref={builderRef}>
-            <button
-              onClick={() => setBuilderOpen(!builderOpen)}
-              className={`nav-link flex items-center gap-1.5 ${isBuilderActive ? 'active' : ''}`}
-            >
-              <Hammer size={14} /> Builder <ChevronDown size={12} className={`transition-transform ${builderOpen ? 'rotate-180' : ''}`} />
-            </button>
-            {builderOpen && (
-              <div className="absolute top-full left-0 mt-1 w-52 rounded-lg border border-border bg-card shadow-xl z-50 py-1 overflow-hidden">
-                {builderItems.map(item => (
-                  <Link
-                    key={item.label}
-                    to={item.active ? item.path : '#'}
-                    onClick={() => { if (item.active) setBuilderOpen(false); }}
-                    className={`flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${
-                      item.active
-                        ? 'text-foreground hover:bg-muted cursor-pointer'
-                        : 'text-muted-foreground/50 cursor-not-allowed'
-                    } ${isBuilderActive && item.active ? 'bg-accent' : ''}`}
-                  >
-                    <item.icon size={14} />
-                    <span>{item.label}</span>
-                    {!item.active && (
-                      <span className="ml-auto text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40">Soon</span>
-                    )}
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
+    <header className="console-header flex items-center px-6 py-3 shrink-0">
+      {/* Left side: Logo */}
+      <button onClick={() => navigate('/')} className="flex items-center shrink-0 hover:opacity-80 transition-opacity">
+        <img src={logo} alt="SwiftLift" className="h-8" />
+      </button>
 
-          <Link to="/revision" className={`nav-link ${isActive('/revision') ? 'active' : ''}`}>
-            <PenLine size={14} /> Revision
-          </Link>
-          <Link to="/references" className={`nav-link ${isActive('/references') ? 'active' : ''}`}>
-            <Layout size={14} /> Demo Sites
-          </Link>
-          <Link to="/quality-control" className={`nav-link ${isActive('/quality-control') ? 'active' : ''}`}>
-            <CircleCheck size={14} /> Quality Control
-          </Link>
-          <Link to="/lock-preview" className={`nav-link ${isActive('/lock-preview') ? 'active' : ''}`}>
-            <Lock size={14} /> Lock Preview
-          </Link>
-        </nav>
-      </div>
+      {/* Flexible spacer */}
+      <div className="flex-1" />
+
+      {/* Right side: Nav buttons group */}
+      <nav className="flex items-center gap-1.5 mr-3">
+        {/* Builder Dropdown */}
+        <div className="relative" ref={builderRef}>
+          <button
+            onClick={() => setBuilderOpen(!builderOpen)}
+            className={`nav-link flex items-center gap-1.5 ${isBuilderActive ? 'active' : ''}`}
+          >
+            <Hammer size={14} /> Builder <ChevronDown size={12} className={`transition-transform ${builderOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {builderOpen && (
+            <div className="absolute top-full left-0 mt-1 w-52 rounded-lg border border-border bg-card shadow-xl z-50 py-1 overflow-hidden">
+              {builderItems.map(item => (
+                <Link
+                  key={item.label}
+                  to={item.active ? item.path : '#'}
+                  onClick={() => { if (item.active) setBuilderOpen(false); }}
+                  className={`flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${
+                    item.active
+                      ? 'text-foreground hover:bg-muted cursor-pointer'
+                      : 'text-muted-foreground/50 cursor-not-allowed'
+                  } ${isBuilderActive && item.active ? 'bg-accent' : ''}`}
+                >
+                  <item.icon size={14} />
+                  <span>{item.label}</span>
+                  {!item.active && (
+                    <span className="ml-auto text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40">Soon</span>
+                  )}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <Link to="/revision" className={`nav-link ${isActive('/revision') ? 'active' : ''}`}>
+          <PenLine size={14} /> Revision
+        </Link>
+        <Link to="/references" className={`nav-link ${isActive('/references') ? 'active' : ''}`}>
+          <Layout size={14} /> Demo Sites
+        </Link>
+        <Link to="/quality-control" className={`nav-link ${isActive('/quality-control') ? 'active' : ''}`}>
+          <CircleCheck size={14} /> Quality Control
+        </Link>
+        <Link to="/lock-preview" className={`nav-link ${isActive('/lock-preview') ? 'active' : ''}`}>
+          <Lock size={14} /> Lock Preview
+        </Link>
+      </nav>
+
+      <div className="h-5 w-px bg-foreground/20 mr-2" />
 
       {/* Right side: Action buttons + Profile */}
       <div className="flex items-center gap-2">
