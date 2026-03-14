@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { googleFonts, contentModules, advancedModules, industryOptions } from '@/lib/mockData';
+import { googleFonts, contentModules, advancedModules } from '@/lib/mockData';
 import { compilePrompts, getProjectName } from '@/lib/promptCompiler';
 import { saveProject } from '@/lib/store';
 import type { SavedProject } from '@/lib/mockData';
 import ReferenceLibraryModal from './ReferenceLibraryModal';
-import { Library, Sparkles } from 'lucide-react';
+import { Library, Sparkles, ShieldCheck } from 'lucide-react';
 import type { ReferenceLayout } from '@/lib/mockData';
+
+const projectBrands = ['SwiftLift', 'Bluluma', 'Sonykun', 'SwiftSite'];
 
 interface Props {
   onPromptsGenerated: (promptA: string, promptB: string, tier: '350' | '550') => void;
@@ -15,28 +17,25 @@ interface Props {
   newSignal: number;
 }
 
-function simulateBrandDetection(url: string): { primary: string; secondary: string; accent: string; font: string } {
-  if (!url) return { primary: '#2563eb', secondary: '#10b981', accent: '#f59e0b', font: '' };
+function simulateBrandDetection(url: string): { primary: string; secondary: string; font: string } {
+  if (!url) return { primary: '', secondary: '', font: '' };
   const lower = url.toLowerCase();
-  if (lower.includes('dental') || lower.includes('clinic')) return { primary: '#2B6CB0', secondary: '#38A169', accent: '#E53E3E', font: 'DM Sans' };
-  if (lower.includes('construct') || lower.includes('build')) return { primary: '#DD6B20', secondary: '#1A202C', accent: '#ECC94B', font: 'Montserrat' };
-  if (lower.includes('real') || lower.includes('estate') || lower.includes('property')) return { primary: '#2C5282', secondary: '#D69E2E', accent: '#E53E3E', font: 'Playfair Display' };
-  if (lower.includes('restaurant') || lower.includes('food') || lower.includes('cafe')) return { primary: '#C53030', secondary: '#2D3748', accent: '#D69E2E', font: 'Lora' };
-  if (lower.includes('luxury') || lower.includes('premium')) return { primary: '#1A202C', secondary: '#B7791F', accent: '#E2E8F0', font: 'Cormorant Garamond' };
+  if (lower.includes('dental') || lower.includes('clinic')) return { primary: '#2B6CB0', secondary: '#38A169', font: 'DM Sans' };
+  if (lower.includes('construct') || lower.includes('build')) return { primary: '#DD6B20', secondary: '#1A202C', font: 'Montserrat' };
+  if (lower.includes('real') || lower.includes('estate') || lower.includes('property')) return { primary: '#2C5282', secondary: '#D69E2E', font: 'Playfair Display' };
+  if (lower.includes('restaurant') || lower.includes('food') || lower.includes('cafe')) return { primary: '#C53030', secondary: '#2D3748', font: 'Lora' };
+  if (lower.includes('luxury') || lower.includes('premium')) return { primary: '#1A202C', secondary: '#B7791F', font: 'Cormorant Garamond' };
   const hash = url.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   const hue = hash % 360;
-  return { primary: `hsl(${hue}, 65%, 45%)`, secondary: `hsl(${(hue + 120) % 360}, 55%, 40%)`, accent: `hsl(${(hue + 240) % 360}, 50%, 50%)`, font: googleFonts[hash % googleFonts.length] };
+  return { primary: `hsl(${hue}, 65%, 45%)`, secondary: `hsl(${(hue + 120) % 360}, 55%, 40%)`, font: googleFonts[hash % googleFonts.length] };
 }
 
 export default function ControlPanel({ onPromptsGenerated, onClear, clearSignal, saveSignal, newSignal }: Props) {
   // Project Setup
-  const [producedBy, setProducedBy] = useState('');
+  const [projectBrand, setProjectBrand] = useState('SwiftLift');
   const [sourceUrl, setSourceUrl] = useState('');
   const [projectName, setProjectName] = useState('');
   const [clientName, setClientName] = useState('');
-  const [industry, setIndustry] = useState('');
-  const [region, setRegion] = useState('');
-  const [language, setLanguage] = useState('English');
 
   // Reference Design
   const [referenceLayout, setReferenceLayout] = useState('');
@@ -47,11 +46,10 @@ export default function ControlPanel({ onPromptsGenerated, onClear, clearSignal,
   const [packageTier, setPackageTier] = useState<'350' | '550'>('550');
 
   // Brand Override
-  const [primaryColor, setPrimaryColor] = useState('#2563eb');
-  const [secondaryColor, setSecondaryColor] = useState('#10b981');
-  const [accentColor, setAccentColor] = useState('#f59e0b');
+  const [primaryColor, setPrimaryColor] = useState('');
+  const [secondaryColor, setSecondaryColor] = useState('');
   const [primaryFont, setPrimaryFont] = useState('');
-  const [fontWeight, setFontWeight] = useState('400');
+  const [fontWeight, setFontWeight] = useState('700');
   const [brandDetected, setBrandDetected] = useState(false);
 
   // Content Modules
@@ -63,6 +61,13 @@ export default function ControlPanel({ onPromptsGenerated, onClear, clearSignal,
   // Special Instructions
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [generating, setGenerating] = useState(false);
+
+  // Quality Control
+  const [qcLevel, setQcLevel] = useState<'basic' | 'advanced' | ''>('');
+
+  // Brand confirmation popup
+  const [showBrandConfirm, setShowBrandConfirm] = useState(false);
+  const [confirmBrand, setConfirmBrand] = useState('SwiftLift');
 
   const toggleModule = (id: string) => {
     setModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -76,16 +81,15 @@ export default function ControlPanel({ onPromptsGenerated, onClear, clearSignal,
     setSourceUrl(url);
     if (url.length > 5 && !brandDetected) {
       const detected = simulateBrandDetection(url);
-      setPrimaryColor(detected.primary);
-      setSecondaryColor(detected.secondary);
-      setAccentColor(detected.accent);
+      if (detected.primary) setPrimaryColor(detected.primary);
+      if (detected.secondary) setSecondaryColor(detected.secondary);
       if (detected.font) setPrimaryFont(detected.font);
       setBrandDetected(true);
     }
     if (!url) setBrandDetected(false);
   };
 
-  const handleGenerate = () => {
+  const executeGenerate = () => {
     setGenerating(true);
     setTimeout(() => {
       const { promptA, promptB } = compilePrompts({
@@ -95,6 +99,17 @@ export default function ControlPanel({ onPromptsGenerated, onClear, clearSignal,
       onPromptsGenerated(promptA, promptB, packageTier);
       setGenerating(false);
     }, 1200);
+  };
+
+  const handleGenerate = () => {
+    setConfirmBrand(projectBrand);
+    setShowBrandConfirm(true);
+  };
+
+  const handleConfirmGenerate = () => {
+    setProjectBrand(confirmBrand);
+    setShowBrandConfirm(false);
+    executeGenerate();
   };
 
   const doSave = () => {
@@ -109,20 +124,20 @@ export default function ControlPanel({ onPromptsGenerated, onClear, clearSignal,
       modules, addons: [], primaryColor, secondaryColor, primaryFont,
       specialInstructions, promptA, promptB,
       dateCreated: new Date().toISOString().slice(0, 10),
-      producedBy, projectName, clientName, industry, region, language,
-      accentColor, fontWeight, advancedModules: advModules,
+      producedBy: projectBrand, projectName, clientName,
+      fontWeight, advancedModules: advModules,
     };
     saveProject(project);
   };
 
   const doClear = () => {
-    setProducedBy(''); setSourceUrl(''); setProjectName(''); setClientName('');
-    setIndustry(''); setRegion(''); setLanguage('English');
+    setProjectBrand('SwiftLift'); setSourceUrl(''); setProjectName(''); setClientName('');
     setReferenceLayout(''); setReferenceUrl('');
     setPackageTier('550'); setModules([]); setAdvModules([]);
-    setPrimaryColor('#2563eb'); setSecondaryColor('#10b981'); setAccentColor('#f59e0b');
-    setPrimaryFont(''); setFontWeight('400');
+    setPrimaryColor(''); setSecondaryColor('');
+    setPrimaryFont(''); setFontWeight('700');
     setSpecialInstructions(''); setBrandDetected(false);
+    setQcLevel('');
     onClear();
   };
 
@@ -142,9 +157,10 @@ export default function ControlPanel({ onPromptsGenerated, onClear, clearSignal,
           <h3 className="panel-section-title">Project Setup</h3>
           <div className="space-y-3">
             <div>
-              <label className="control-label">Produced By</label>
-              <input type="text" value={producedBy} onChange={e => setProducedBy(e.target.value)}
-                placeholder="Your name" className="control-input" />
+              <label className="control-label">Project Brand</label>
+              <select value={projectBrand} onChange={e => setProjectBrand(e.target.value)} className="control-input">
+                {projectBrands.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
             </div>
             <div>
               <label className="control-label">Source URL</label>
@@ -160,25 +176,6 @@ export default function ControlPanel({ onPromptsGenerated, onClear, clearSignal,
               <label className="control-label">Client Name</label>
               <input type="text" value={clientName} onChange={e => setClientName(e.target.value)}
                 placeholder="Client or business name" className="control-input" />
-            </div>
-            <div>
-              <label className="control-label">Industry</label>
-              <select value={industry} onChange={e => setIndustry(e.target.value)} className="control-input">
-                <option value="">Select industry...</option>
-                {industryOptions.map(i => <option key={i} value={i}>{i}</option>)}
-              </select>
-            </div>
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label className="control-label">Region / Market</label>
-                <input type="text" value={region} onChange={e => setRegion(e.target.value)}
-                  placeholder="e.g., Toronto, CA" className="control-input" />
-              </div>
-              <div className="flex-1">
-                <label className="control-label">Language</label>
-                <input type="text" value={language} onChange={e => setLanguage(e.target.value)}
-                  placeholder="English" className="control-input" />
-              </div>
             </div>
           </div>
         </div>
@@ -242,32 +239,23 @@ export default function ControlPanel({ onPromptsGenerated, onClear, clearSignal,
             </div>
           )}
           <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="control-label">Primary</label>
+                <label className="control-label">Primary Color</label>
                 <div className="flex items-center gap-1.5">
-                  <input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)}
+                  <input type="color" value={primaryColor || '#000000'} onChange={e => setPrimaryColor(e.target.value)}
                     className="w-8 h-8 rounded border border-border cursor-pointer" />
                   <input type="text" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)}
-                    className="control-input flex-1 font-mono text-xs" />
+                    placeholder="#______" className="control-input flex-1 font-mono text-xs" />
                 </div>
               </div>
               <div>
-                <label className="control-label">Secondary</label>
+                <label className="control-label">Secondary Color</label>
                 <div className="flex items-center gap-1.5">
-                  <input type="color" value={secondaryColor} onChange={e => setSecondaryColor(e.target.value)}
+                  <input type="color" value={secondaryColor || '#000000'} onChange={e => setSecondaryColor(e.target.value)}
                     className="w-8 h-8 rounded border border-border cursor-pointer" />
                   <input type="text" value={secondaryColor} onChange={e => setSecondaryColor(e.target.value)}
-                    className="control-input flex-1 font-mono text-xs" />
-                </div>
-              </div>
-              <div>
-                <label className="control-label">Accent</label>
-                <div className="flex items-center gap-1.5">
-                  <input type="color" value={accentColor} onChange={e => setAccentColor(e.target.value)}
-                    className="w-8 h-8 rounded border border-border cursor-pointer" />
-                  <input type="text" value={accentColor} onChange={e => setAccentColor(e.target.value)}
-                    className="control-input flex-1 font-mono text-xs" />
+                    placeholder="#______" className="control-input flex-1 font-mono text-xs" />
                 </div>
               </div>
             </div>
@@ -288,11 +276,10 @@ export default function ControlPanel({ onPromptsGenerated, onClear, clearSignal,
             <div>
               <label className="control-label">Font Weight</label>
               <select value={fontWeight} onChange={e => setFontWeight(e.target.value)} className="control-input">
-                <option value="300">300 — Light</option>
-                <option value="400">400 — Regular</option>
-                <option value="500">500 — Medium</option>
                 <option value="600">600 — Semi Bold</option>
                 <option value="700">700 — Bold</option>
+                <option value="800">800 — Extra Bold</option>
+                <option value="900">900 — Black</option>
               </select>
             </div>
           </div>
@@ -341,7 +328,41 @@ export default function ControlPanel({ onPromptsGenerated, onClear, clearSignal,
           />
         </div>
 
-        {/* 8. Generate Button */}
+        {/* 8. Quality Control */}
+        <div className="panel-section">
+          <h3 className="panel-section-title flex items-center gap-2">
+            <ShieldCheck size={14} className="text-muted-foreground" />
+            Quality Control
+          </h3>
+          <p className="text-xs text-muted-foreground mb-3">Automated QA checks — coming soon.</p>
+          <div className="space-y-2">
+            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+              qcLevel === 'basic' ? 'border-primary bg-accent' : 'border-border hover:bg-muted/50'
+            }`}>
+              <input type="radio" name="qc" value="basic" checked={qcLevel === 'basic'}
+                onChange={() => setQcLevel('basic')} className="mt-0.5 accent-primary" />
+              <div>
+                <p className="text-sm font-medium text-foreground">Basic Check</p>
+                <p className="text-xs text-muted-foreground">Links, redirects, forms, mobile spacing, scroll-to-top</p>
+              </div>
+            </label>
+            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+              qcLevel === 'advanced' ? 'border-primary bg-accent' : 'border-border hover:bg-muted/50'
+            }`}>
+              <input type="radio" name="qc" value="advanced" checked={qcLevel === 'advanced'}
+                onChange={() => setQcLevel('advanced')} className="mt-0.5 accent-primary" />
+              <div>
+                <p className="text-sm font-medium text-foreground">Advanced Audit</p>
+                <p className="text-xs text-muted-foreground">SEO, conversion layout, performance, UX quality</p>
+              </div>
+            </label>
+          </div>
+          <span className="inline-block mt-3 px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-muted text-muted-foreground">
+            Coming Soon
+          </span>
+        </div>
+
+        {/* 9. Generate Button */}
         <div className="pb-2">
           <button onClick={handleGenerate} disabled={generating}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-sm">
@@ -350,6 +371,35 @@ export default function ControlPanel({ onPromptsGenerated, onClear, clearSignal,
           </button>
         </div>
       </div>
+
+      {/* Brand Confirmation Popup */}
+      {showBrandConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-card border border-border rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-foreground mb-2">Confirm Brand</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              This prompt system is copyrighted by SwiftLift.<br />
+              Are you generating this prompt under the correct brand?
+            </p>
+            <div className="mb-5">
+              <label className="control-label">Brand</label>
+              <select value={confirmBrand} onChange={e => setConfirmBrand(e.target.value)} className="control-input">
+                {projectBrands.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowBrandConfirm(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleConfirmGenerate}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                Confirm & Generate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ReferenceLibraryModal
         open={showLibrary}
