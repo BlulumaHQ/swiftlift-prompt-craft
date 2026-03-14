@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import logo from '@/assets/swiftlift-logo.svg';
+import NavHeader from '@/components/NavHeader';
 import { getReferences, saveReference, deleteReference, ReferenceLayout } from '@/lib/referenceStore';
-import { Plus, Trash2, X, Settings, BookOpen, Library, FolderOpen, Search } from 'lucide-react';
+import { Plus, Trash2, X, Search, ExternalLink } from 'lucide-react';
 
 const industries = [
   'Dental', 'Construction', 'Restaurant', 'Real Estate',
@@ -41,7 +40,6 @@ export default function ReferenceLibraryManager() {
   }, [references, searchQuery, filterCategory, sortBy]);
 
   const generatePreviewImage = (url: string, category: string): string => {
-    // Generate a simple placeholder based on category color
     const colors: Record<string, string> = {
       'Dental': '2B6CB0', 'Construction': 'DD6B20', 'Restaurant': 'C53030',
       'Real Estate': '2C5282', 'Professional Services': '4A5568',
@@ -77,24 +75,12 @@ export default function ReferenceLibraryManager() {
 
   return (
     <div className="flex flex-col h-screen">
-      <header className="console-header flex items-center justify-between px-6 py-3 shrink-0">
-        <div className="flex items-center gap-3">
-          <img src={logo} alt="SwiftLift" className="h-8" />
-          <div className="h-5 w-px bg-foreground/20" />
-          <h1 className="text-sm font-semibold tracking-tight text-[hsl(var(--console-header-foreground))]">Reference Library</h1>
-        </div>
-        <nav className="flex items-center gap-2">
-          <Link to="/" className="nav-link"><Settings size={14} /> Generator</Link>
-          <Link to="/prompt-library" className="nav-link"><BookOpen size={14} /> Library</Link>
-          <Link to="/references" className="nav-link active"><Library size={14} /> References</Link>
-          <Link to="/projects" className="nav-link"><FolderOpen size={14} /> Archive</Link>
-        </nav>
-      </header>
+      <NavHeader title="References Demo Sites" />
 
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-foreground">Reference Layouts</h2>
+            <h2 className="text-2xl font-bold text-foreground">Reference Demo Sites</h2>
             <button onClick={() => setShowAddModal(true)}
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
               <Plus size={16} /> Add Reference
@@ -145,8 +131,14 @@ export default function ReferenceLibraryManager() {
                   </div>
                   <p className="text-xs text-muted-foreground mt-2 truncate">{ref.referenceUrl}</p>
                   <div className="flex items-center gap-2 mt-3">
+                    <button
+                      onClick={() => window.open(ref.referenceUrl, '_blank')}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                    >
+                      <ExternalLink size={12} /> Live View
+                    </button>
                     <button className="flex-1 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-                      Select
+                      Select Layout
                     </button>
                     {deleteConfirm === ref.id ? (
                       <div className="flex items-center gap-1">

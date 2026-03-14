@@ -1,12 +1,22 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import logo from '@/assets/swiftlift-logo.svg';
-import { getPromptLibrary, savePromptBlock, getPromptsBySection, sectionLabels, PromptBlock, PromptSection } from '@/lib/promptLibraryStore';
-import { Save, Check, BookOpen, FolderOpen, Library, Settings, Cpu, Bot } from 'lucide-react';
+import NavHeader from '@/components/NavHeader';
+import { getPromptLibrary, savePromptBlock, sectionLabels, PromptBlock, PromptSection } from '@/lib/promptLibraryStore';
+import { Save, Check, Crown, Hammer, Puzzle, SlidersHorizontal, PenLine, Bot } from 'lucide-react';
+
+const sectionIcons: Record<PromptSection, typeof Crown> = {
+  master: Crown,
+  builder: Hammer,
+  module: Puzzle,
+  override: SlidersHorizontal,
+  revision: PenLine,
+  claude: Bot,
+};
+
+const sectionOrder: PromptSection[] = ['master', 'builder', 'module', 'override', 'revision', 'claude'];
 
 export default function PromptLibrary() {
   const [library, setLibrary] = useState<PromptBlock[]>([]);
-  const [activeSection, setActiveSection] = useState<PromptSection>('lovable');
+  const [activeSection, setActiveSection] = useState<PromptSection>('master');
   const [selectedBlock, setSelectedBlock] = useState<PromptBlock | null>(null);
   const [editContent, setEditContent] = useState('');
   const [saved, setSaved] = useState(false);
@@ -41,52 +51,42 @@ export default function PromptLibrary() {
 
   return (
     <div className="flex flex-col h-screen">
-      {/* Header */}
-      <header className="console-header flex items-center justify-between px-6 py-3 shrink-0">
-        <div className="flex items-center gap-3">
-          <img src={logo} alt="SwiftLift" className="h-8" />
-          <div className="h-5 w-px bg-foreground/20" />
-          <h1 className="text-sm font-semibold tracking-tight text-[hsl(var(--console-header-foreground))]">
-            Prompt Library
-          </h1>
-        </div>
-        <nav className="flex items-center gap-2">
-          <Link to="/" className="nav-link"><Settings size={14} /> Generator</Link>
-          <Link to="/prompt-library" className="nav-link active"><BookOpen size={14} /> Library</Link>
-          <Link to="/references" className="nav-link"><Library size={14} /> References</Link>
-          <Link to="/projects" className="nav-link"><FolderOpen size={14} /> Archive</Link>
-        </nav>
-      </header>
+      <NavHeader title="Prompt Library" />
 
       <div className="flex flex-1 min-h-0">
         {/* Sidebar */}
         <aside className="w-[280px] shrink-0 border-r border-border bg-card overflow-y-auto">
           <div className="p-4 space-y-4">
             {/* Section Tabs */}
-            <div className="flex gap-1 p-1 rounded-lg bg-muted">
-              {(['lovable', 'claude'] as PromptSection[]).map(section => (
-                <button
-                  key={section}
-                  onClick={() => {
-                    setActiveSection(section);
-                    setSelectedBlock(null);
-                  }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold transition-colors ${
-                    activeSection === section
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {section === 'lovable' ? <Cpu size={13} /> : <Bot size={13} />}
-                  {sectionLabels[section]}
-                </button>
-              ))}
+            <div className="space-y-1">
+              {sectionOrder.map(section => {
+                const Icon = sectionIcons[section];
+                return (
+                  <button
+                    key={section}
+                    onClick={() => {
+                      setActiveSection(section);
+                      setSelectedBlock(null);
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-xs font-semibold transition-colors ${
+                      activeSection === section
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <Icon size={13} />
+                    {sectionLabels[section]}
+                  </button>
+                );
+              })}
             </div>
+
+            <div className="h-px bg-border" />
 
             {/* Prompt Blocks */}
             <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                {activeSection === 'lovable' ? 'Build Prompts' : 'Processing Prompts'}
+                Prompts
               </p>
               <div className="space-y-1">
                 {blocksInSection.map(block => (
@@ -95,7 +95,7 @@ export default function PromptLibrary() {
                     onClick={() => handleSelectBlock(block)}
                     className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
                       selectedBlock?.id === block.id
-                        ? 'bg-primary text-primary-foreground'
+                        ? 'bg-accent text-accent-foreground font-medium'
                         : 'text-foreground hover:bg-muted'
                     }`}
                   >

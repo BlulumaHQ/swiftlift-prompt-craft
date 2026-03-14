@@ -7,6 +7,8 @@ import Index from "./pages/Index";
 import Projects from "./pages/Projects";
 import PromptLibrary from "./pages/PromptLibrary";
 import ReferenceLibraryManager from "./pages/ReferenceLibraryManager";
+import Revision from "./pages/Revision";
+import SettingsPage from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +24,8 @@ const App = () => (
           <Route path="/prompt-library" element={<PromptLibrary />} />
           <Route path="/references" element={<ReferenceLibraryManager />} />
           <Route path="/projects" element={<Projects />} />
+          <Route path="/revision" element={<Revision />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

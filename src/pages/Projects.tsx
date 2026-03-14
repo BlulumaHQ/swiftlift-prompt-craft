@@ -1,11 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import NavHeader from '@/components/NavHeader';
 import { getProjects, deleteProject } from '@/lib/store';
 import { SavedProject, contentModules } from '@/lib/mockData';
 import { compilePrompts } from '@/lib/promptCompiler';
 import { saveProject } from '@/lib/store';
-import logo from '@/assets/swiftlift-logo.svg';
-import { ArrowLeft, Copy, Check, Files, Settings, BookOpen, Library, FolderOpen, Search, Trash2 } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Files, Search, Trash2, Eye, PenLine } from 'lucide-react';
 
 const moduleLabel = (id: string) => contentModules.find(m => m.id === id)?.label || id;
 
@@ -64,32 +63,16 @@ export default function Projects() {
     return items;
   }, [projects, searchQuery, sortBy]);
 
-  const navHeader = (
-    <header className="console-header flex items-center justify-between px-6 py-3 shrink-0">
-      <div className="flex items-center gap-3">
-        <img src={logo} alt="SwiftLift" className="h-8" />
-        <div className="h-5 w-px bg-foreground/20" />
-        <h1 className="text-sm font-semibold tracking-tight text-[hsl(var(--console-header-foreground))]">Project Archive</h1>
-      </div>
-      <nav className="flex items-center gap-2">
-        <Link to="/" className="nav-link"><Settings size={14} /> Generator</Link>
-        <Link to="/prompt-library" className="nav-link"><BookOpen size={14} /> Library</Link>
-        <Link to="/references" className="nav-link"><Library size={14} /> References</Link>
-        <Link to="/projects" className="nav-link active"><FolderOpen size={14} /> Archive</Link>
-      </nav>
-    </header>
-  );
-
   // Detail view
   if (selected) {
     const { promptA, promptB } = getPrompts(selected);
     const tierLabel = selected.packageTier === '350'
-      ? { a: 'Prompt A — $350 Standard', b: 'Prompt B — $475 Premium' }
-      : { a: 'Prompt A — $550 Standard', b: 'Prompt B — $750 Premium' };
+      ? { a: 'Prompt A — $350 Standard Layout Preview', b: 'Prompt B — $475 Conversion Style Layout Preview' }
+      : { a: 'Prompt A — $550 Standard Layout Preview', b: 'Prompt B — $750 Conversion Style Layout Preview' };
 
     return (
       <div className="flex flex-col h-screen">
-        {navHeader}
+        <NavHeader title="Archive" />
         <div className="flex-1 overflow-y-auto p-6 max-w-5xl mx-auto w-full">
           <button onClick={() => setSelected(null)} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors">
             <ArrowLeft size={16} /> Back to Projects
@@ -101,7 +84,13 @@ export default function Projects() {
           <div className="flex gap-2 mb-6">
             <button onClick={() => handleDuplicate(selected)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
-              <Files size={14} /> Duplicate Project
+              <Files size={14} /> Duplicate Build
+            </button>
+            <button className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors opacity-50 cursor-not-allowed">
+              <Eye size={14} /> View Preview
+            </button>
+            <button className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors opacity-50 cursor-not-allowed">
+              <PenLine size={14} /> Generate Revision
             </button>
           </div>
           <div className="space-y-4">
@@ -128,7 +117,7 @@ export default function Projects() {
   // List view
   return (
     <div className="flex flex-col h-screen">
-      {navHeader}
+      <NavHeader title="Archive" />
       <div className="flex-1 overflow-y-auto p-6 max-w-5xl mx-auto w-full">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-foreground">Project Archive</h2>
@@ -186,7 +175,6 @@ export default function Projects() {
                   <p className="text-xs text-muted-foreground mt-3">{p.dateCreated}</p>
                 </button>
 
-                {/* Delete button */}
                 {deleteConfirm === p.id ? (
                   <div className="absolute top-3 right-3 flex items-center gap-1.5 bg-card border border-border rounded-lg px-2 py-1.5 shadow-lg">
                     <span className="text-xs text-muted-foreground">Delete?</span>
