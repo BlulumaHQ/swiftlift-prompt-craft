@@ -328,39 +328,6 @@ export default function ControlPanel({ onPromptsGenerated, onClear, clearSignal,
           />
         </div>
 
-        {/* 8. Quality Control */}
-        <div className="panel-section">
-          <h3 className="panel-section-title flex items-center gap-2">
-            <ShieldCheck size={14} className="text-muted-foreground" />
-            Quality Control
-          </h3>
-          <p className="text-xs text-muted-foreground mb-3">Automated QA checks — coming soon.</p>
-          <div className="space-y-2">
-            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-              qcLevel === 'basic' ? 'border-primary bg-accent' : 'border-border hover:bg-muted/50'
-            }`}>
-              <input type="radio" name="qc" value="basic" checked={qcLevel === 'basic'}
-                onChange={() => setQcLevel('basic')} className="mt-0.5 accent-primary" />
-              <div>
-                <p className="text-sm font-medium text-foreground">Basic Check</p>
-                <p className="text-xs text-muted-foreground">Links, redirects, forms, mobile spacing, scroll-to-top</p>
-              </div>
-            </label>
-            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-              qcLevel === 'advanced' ? 'border-primary bg-accent' : 'border-border hover:bg-muted/50'
-            }`}>
-              <input type="radio" name="qc" value="advanced" checked={qcLevel === 'advanced'}
-                onChange={() => setQcLevel('advanced')} className="mt-0.5 accent-primary" />
-              <div>
-                <p className="text-sm font-medium text-foreground">Advanced Audit</p>
-                <p className="text-xs text-muted-foreground">SEO, conversion layout, performance, UX quality</p>
-              </div>
-            </label>
-          </div>
-          <span className="inline-block mt-3 px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-muted text-muted-foreground">
-            Coming Soon
-          </span>
-        </div>
 
         {/* 9. Generate Button */}
         <div className="pb-2">
