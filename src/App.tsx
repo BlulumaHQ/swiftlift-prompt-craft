@@ -9,6 +9,8 @@ import PromptLibrary from "./pages/PromptLibrary";
 import ReferenceLibraryManager from "./pages/ReferenceLibraryManager";
 import Revision from "./pages/Revision";
 import SettingsPage from "./pages/Settings";
+import QualityControl from "./pages/QualityControl";
+import LockPreview from "./pages/LockPreview";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +28,8 @@ const App = () => (
           <Route path="/projects" element={<Projects />} />
           <Route path="/revision" element={<Revision />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/quality-control" element={<QualityControl />} />
+          <Route path="/lock-preview" element={<LockPreview />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
