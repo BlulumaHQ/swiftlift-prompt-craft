@@ -89,6 +89,12 @@ export default function NavHeader({ title, rightContent }: NavHeaderProps) {
           <Link to="/references" className={`nav-link ${isActive('/references') ? 'active' : ''}`}>
             <Layout size={14} /> Demo Sites
           </Link>
+          <Link to="/quality-control" className={`nav-link ${isActive('/quality-control') ? 'active' : ''}`}>
+            <CheckCircle size={14} /> Quality Control
+          </Link>
+          <Link to="/lock-preview" className={`nav-link ${isActive('/lock-preview') ? 'active' : ''}`}>
+            <Lock size={14} /> Lock Preview
+          </Link>
         </nav>
       </div>
 
