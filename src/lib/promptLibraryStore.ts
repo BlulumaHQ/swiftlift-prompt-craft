@@ -1,22 +1,39 @@
 // Prompt Library Store - manages editable prompt blocks
 
-const STORAGE_KEY = 'swiftlift_prompt_library_v3';
+const STORAGE_KEY = 'swiftlift_prompt_library_v4';
 
-export type PromptSection = 'master' | 'builder' | 'module' | 'override' | 'revision' | 'claude';
+export type PromptCategory = 'core' | 'preview' | 'module' | 'advanced' | 'revision' | 'qc';
 
 export interface PromptBlock {
   id: string;
   name: string;
-  section: PromptSection;
+  category: PromptCategory;
   content: string;
 }
 
+// Keep old type for backward compat in promptCompiler
+export type PromptSection = PromptCategory;
+
+export const categoryLabels: Record<PromptCategory, string> = {
+  core: 'Core System Prompts',
+  preview: 'Preview Prompts',
+  module: 'Module Prompts',
+  advanced: 'Advanced Module Prompts',
+  revision: 'Revision Prompts',
+  qc: 'Quality Control Prompts',
+};
+
+export const categoryOrder: PromptCategory[] = ['core', 'preview', 'module', 'advanced', 'revision', 'qc'];
+
+// Alias for backward compat
+export const sectionLabels = categoryLabels;
+
 const defaultPrompts: PromptBlock[] = [
-  // === MASTER PROMPTS ===
+  // ═══ CORE SYSTEM PROMPTS ═══
   {
-    id: 'base_core_engine',
-    name: 'Base Core Engine',
-    section: 'master',
+    id: 'core_master_v3',
+    name: 'SwiftLift Core Master Prompt V3',
+    category: 'core',
     content: `You are a deterministic website builder operating in PRODUCTION MODE.
 
 Your goal is to generate a COMPLETE, CLIENT-READY WEBSITE in a single build.
@@ -61,419 +78,297 @@ REFERENCE PRIORITY
 
 If Source layout conflicts with Reference layout, follow Reference layout.
 
-URL STRUCTURE PRESERVATION
+SOURCE IMAGE PRIORITY
 
-Preserve exact URL paths.
+Real images from the source website must be prioritized.
 
-SOURCE IMAGE ENFORCEMENT
+Examples:
+- team photos
+- staff photos
+- company interior
+- equipment
+- location photos
 
-Always prioritize images from the Source website.
+Generated images are allowed only for decorative or generic visuals.
 
-IMAGE GENERATION
-
-Allowed for hero backgrounds and decorative visuals.
-
-MOBILE FIRST DESIGN
+MOBILE FIRST
 
 Validate layout at 375px width.
 Sticky header required.
 Scroll-to-top button required.
 
-PAGE NAVIGATION RESET
+NAVIGATION BEHAVIOR
 
-Header, footer, and internal links must reset scroll position to top.
+All page navigation must reset scroll position to the top.
 
-CARD GRID CONSISTENCY
+Applies to:
+- Header links
+- Footer links
+- Internal links
 
-Cards must maintain equal height and width.
+LAYOUT SANITY RULES
 
-METADATA
+Card grids must maintain equal height and equal width.
+Cards must align cleanly.
 
-Each page must include a Page Title.
+SEO BASELINE
+
+Each page must include a unique page title.
 Homepage must include a meta description.
+Favicon must exist.
+Open Graph / Social Graph image must exist.
 
 FORM ROUTING
 
-Forms must submit to:
+All forms must submit to:
 https://formspree.io/f/mbdabbql
 
-FOOTER CREDIT
+FOOTER CREDIT SYSTEM
 
-© YEAR Company Name | Web Design by Bluluma.com`
-  },
+Footer credit is controlled by project variables.
 
-  // === BUILDER PROMPTS ===
-  {
-    id: 'pkg_350_standard',
-    name: '$350 Standard Package',
-    section: 'builder',
-    content: `PACKAGE MODE: LAUNCH
+{SHOW_FOOTER_CREDIT}
 
-1–2 pages maximum.
+Credit format:
+| Web Design by {WEB_DESIGN_CREDIT}
 
-Typical structure:
-- Homepage
-- Contact
+The credit text must be visually subtle and smaller than body text.
 
-Focus on simplicity and clarity.`
-  },
-  {
-    id: 'pkg_550_standard',
-    name: '$550 Standard Package',
-    section: 'builder',
-    content: `PACKAGE MODE: GROWTH
+FINAL EXECUTION CHECK
 
-3–7 pages.
-
-Typical pages:
-- Home
-- About
-- Services
-- Projects
-- Testimonials
-- Contact
-- FAQ (optional)`
+Verify:
+- homepage meta description exists
+- page titles exist
+- source images prioritized
+- navigation resets scroll
+- favicon exists
+- social graph exists
+- forms submit correctly`
   },
   {
-    id: 'fake_conversion_layout_upgrade',
-    name: 'Conversion Layout Upgrade',
-    section: 'builder',
-    content: `Enhance layout to feel visually conversion-oriented.
+    id: 'core_scraping_v2',
+    name: 'SwiftLift Website Scraping Prompt V2',
+    category: 'core',
+    content: `Extract structured information from the source website.
 
-Do NOT perform deep conversion analysis.
+Return structured JSON only.
 
-Enhancements may include:
-- Stronger hero messaging
-- More prominent CTA
-- Lead emphasis
-- Benefit-focused service sections
-- Testimonial placement
+Extract:
+- business name
+- industry
+- services
+- contact information
+- navigation structure
+- url structure
+- brand colors
+- logo
+- fonts
+- social media links
 
-The goal is visual persuasion only.`
-  },
-  {
-    id: 'ref_use_reference_url',
-    name: 'Use Reference URL',
-    section: 'builder',
-    content: `REFERENCE SOURCE: DIRECT URL
+Extract up to 6 items for:
+- portfolio
+- blog
+- gallery
 
-A Reference URL has been provided directly.
+Extract CTA signals.
+Extract language availability.
 
-Use this URL as the primary design reference.
-
-Analyze the page layout, section structure, visual hierarchy, color application, typography, and animation patterns.
-
-Apply the extracted design skeleton to the new website build.`
-  },
-  {
-    id: 'ref_use_reference_library',
-    name: 'Use Reference Library',
-    section: 'builder',
-    content: `REFERENCE SOURCE: LIBRARY SELECTION
-
-A reference layout has been selected from the Reference Library.
-
-Use the stored Reference URL as the design reference.
-
-Follow the same analysis process:
-- Extract layout skeleton
-- Lock section order
-- Apply visual patterns
-- Maintain design rhythm
-
-The Reference Library entry may include industry context to guide design decisions.`
+Do not fabricate content.`
   },
 
-  // === MODULE PROMPTS ===
+  // ═══ PREVIEW PROMPTS ═══
   {
-    id: 'mod_portfolio_login',
-    name: 'Portfolio — With Login',
-    section: 'module',
-    content: `PORTFOLIO MODULE (WITH LOGIN)
+    id: 'preview_a_standard',
+    name: 'Preview Prompt A – Standard Layout',
+    category: 'preview',
+    content: `Generate a professional business website preview.
 
-Create a filterable portfolio gallery with authentication.
+Use:
+Reference Design
++
+Source Business Content
 
-Include:
-- Project images
-- Project titles
-- Brief descriptions
-- Category tags
-- Login-protected admin area for managing projects
+The site must look fully finished.
 
-Support category filtering.
-Use masonry or uniform grid layout.
-Include lightbox functionality for images.`
+Use up to 6 portfolio items if available.
+Use up to 6 blog posts if available.
+Use up to 6 gallery images if available.
+
+Ensure the site contains:
+- hero section
+- services section
+- about section
+- content section
+- contact section`
   },
   {
-    id: 'mod_portfolio_nologin',
-    name: 'Portfolio — Without Login',
-    section: 'module',
-    content: `PORTFOLIO MODULE (PUBLIC)
+    id: 'preview_b_conversion',
+    name: 'Preview Prompt B – Conversion Layout',
+    category: 'preview',
+    content: `Generate a conversion-style website preview.
 
-Create a filterable portfolio gallery.
+This layout must be visually different from the standard layout.
 
-Include:
-- Project images
-- Project titles
-- Brief descriptions
-- Category tags
+Required sections:
+- hero with CTA
+- form in hero
+- sticky CTA button
+- testimonial section
+- trust badge section
+- benefits section
+- contact form
 
-Support category filtering.
-Use masonry or uniform grid layout.
-Include lightbox functionality for images.`
+The layout should feel conversion-focused.`
+  },
+
+  // ═══ MODULE PROMPTS ═══
+  {
+    id: 'mod_portfolio',
+    name: 'Portfolio Module',
+    category: 'module',
+    content: `Add a portfolio section.
+
+Use real portfolio items scraped from the source site.
+
+Maximum:
+6 items.
+
+No login system.`
   },
   {
-    id: 'mod_blog_login',
-    name: 'Blog — With Login',
-    section: 'module',
-    content: `BLOG MODULE (WITH LOGIN)
+    id: 'mod_blog',
+    name: 'Blog Module',
+    category: 'module',
+    content: `Add a blog section.
 
-Create a blog system with authentication for content management.
+Use real blog posts scraped from the source site.
 
-Blog listing page:
-- Featured post highlight
-- Post thumbnails
-- Post titles and excerpts
-- Publication dates
-- Category tags
-- Pagination
+Maximum:
+6 posts.
 
-Login-protected admin for creating/editing posts.`
-  },
-  {
-    id: 'mod_blog_nologin',
-    name: 'Blog — Without Login',
-    section: 'module',
-    content: `BLOG MODULE (PUBLIC)
-
-Create a blog listing page with:
-- Featured post highlight
-- Post thumbnails
-- Post titles and excerpts
-- Publication dates
-- Category tags
-- Pagination
-
-Individual blog post pages should include:
-- Full content
-- Author info
-- Related posts
-- Social sharing buttons`
+No CMS system.`
   },
   {
     id: 'mod_gallery',
     name: 'Gallery Module',
-    section: 'module',
-    content: `GALLERY MODULE
+    category: 'module',
+    content: `Add a gallery section.
 
-Create a visual gallery section with:
-- Image grid layout
-- Lightbox functionality
-- Category filtering (optional)
-- Responsive columns
-- Lazy loading for performance
+Use real images scraped from the source site.
 
-Support both landscape and portrait images.`
+Maximum:
+6 images.`
   },
   {
     id: 'mod_multilanguage',
-    name: 'Multi-language Module',
-    section: 'module',
-    content: `MULTI-LANGUAGE MODULE
+    name: 'Multi-Language Module',
+    category: 'module',
+    content: `Create a language switcher.
 
-Implement language switching capability.
+Use real languages detected from the source website.
 
-Requirements:
-- Clear language selector (flags or text)
-- Preserve navigation state on switch
-- Proper content structure for translations
-- RTL support preparation if needed
-
-Seamless switching without page reload preferred.`
+Each language must have its own page structure.`
   },
-  {
-    id: 'mod_lead_capture',
-    name: 'Lead Capture Upgrade',
-    section: 'module',
-    content: `LEAD CAPTURE UPGRADE
 
-Add enhanced lead capture elements:
-- Exit-intent popup
-- Floating CTA bar
-- Inline lead forms in content sections
-- Newsletter signup
-- Free consultation booking widget`
-  },
+  // ═══ ADVANCED MODULE PROMPTS ═══
   {
-    id: 'mod_conversion_layout',
-    name: 'Conversion Layout',
-    section: 'module',
-    content: `CONVERSION LAYOUT MODULE
-
-Apply conversion-focused design patterns:
-- Above-the-fold value proposition
-- Social proof near CTAs
-- Urgency/scarcity indicators
-- Benefit-driven headlines
-- Streamlined user flow`
-  },
-  {
-    id: 'mod_trust_badges',
+    id: 'adv_trust_badges',
     name: 'Trust Badge Section',
-    section: 'module',
-    content: `TRUST BADGE SECTION
-
-Add trust-building elements:
-- Certification badges
-- Partner logos
-- Security seals
-- Guarantee badges
-- Industry association logos
-- Years in business indicator`
+    category: 'advanced',
+    content: `Add trust badges and certification indicators.`
   },
   {
-    id: 'mod_service_comparison',
+    id: 'adv_service_comparison',
     name: 'Service Comparison',
-    section: 'module',
-    content: `SERVICE COMPARISON MODULE
-
-Create a comparison table or section:
-- Feature comparison grid
-- Pricing tiers (if applicable)
-- Highlighted recommended option
-- Clear CTAs per tier
-- Mobile-friendly layout`
+    category: 'advanced',
+    content: `TO BE DETERMINED`
   },
   {
-    id: 'mod_case_study',
+    id: 'adv_case_study',
     name: 'Case Study Section',
-    section: 'module',
-    content: `CASE STUDY SECTION
-
-Display detailed case studies:
-- Client challenge/problem
-- Solution provided
-- Results and metrics
-- Client testimonial
-- Before/after visuals
-- CTA to contact for similar results`
+    category: 'advanced',
+    content: `TO BE DETERMINED`
   },
   {
-    id: 'mod_full_seo',
+    id: 'adv_lead_capture',
+    name: 'Lead Capture Upgrade',
+    category: 'advanced',
+    content: `TO BE DETERMINED`
+  },
+  {
+    id: 'adv_conversion_layout',
+    name: 'Conversion Layout Upgrade',
+    category: 'advanced',
+    content: `TO BE DETERMINED`
+  },
+  {
+    id: 'adv_full_seo',
     name: 'Full SEO Package',
-    section: 'module',
-    content: `FULL SEO PACKAGE
+    category: 'advanced',
+    content: `Apply advanced SEO structure.
 
-Implement comprehensive SEO:
-- Optimized meta titles and descriptions for all pages
-- Schema markup (LocalBusiness, FAQ, etc.)
-- Open Graph tags
-- Sitemap generation
-- Canonical URLs
-- Alt text for all images
-- Internal linking structure
-- Header hierarchy (H1-H6)`
+Ensure:
+- clean heading hierarchy
+- semantic HTML
+- internal linking
+- image alt tags
+- metadata consistency`
   },
 
-  // === OVERRIDE PROMPTS ===
+  // ═══ REVISION PROMPTS ═══
   {
-    id: 'brand_override_colors',
-    name: 'Brand Override – Colors',
-    section: 'override',
-    content: `BRAND COLOR OVERRIDE
-
-When brand colors are specified:
-- Replace all primary brand colors with the provided Primary Color
-- Replace all secondary/accent colors with the provided Secondary Color
-- Apply Accent Color for highlights and interactive elements
-- Maintain proper contrast ratios for accessibility
-- Update hover states, active states, and focus rings
-- Apply consistently across all pages and components
-- Ensure buttons, links, and CTAs reflect the brand palette
-
-If no colors are specified, use colors detected from the Source URL.`
+    id: 'rev_generator',
+    name: 'Revision Prompt Generator',
+    category: 'revision',
+    content: `TO BE DETERMINED`
   },
   {
-    id: 'brand_override_font',
-    name: 'Brand Override – Font',
-    section: 'override',
-    content: `BRAND FONT OVERRIDE
-
-When a primary font is specified:
-- Apply to all headings (h1–h6)
-- Apply to body text and paragraphs
-- Ensure proper font weights are loaded (400, 500, 600, 700 minimum)
-- Maintain readability at all sizes
-- Load font via Google Fonts or appropriate CDN
-- Set appropriate fallback font stack
-
-If no font is specified, use the font detected from the Source URL.`
+    id: 'rev_quick_fix',
+    name: 'Quick Fix Prompt',
+    category: 'revision',
+    content: `Fix common website issues:
+- scroll-to-top behavior
+- broken links
+- mobile spacing
+- form routing issues`
   },
 
-  // === REVISION PROMPTS ===
+  // ═══ QUALITY CONTROL PROMPTS ═══
   {
-    id: 'revision_client_feedback',
-    name: 'Client Feedback Template',
-    section: 'revision',
-    content: `REVISION MODE: CLIENT FEEDBACK
-
-Apply the following client-requested changes to the existing website build.
-
-Maintain all existing design patterns and layout structure unless specifically requested to change.
-
-Changes must be surgical — only modify what the client has asked for.
-
-Do not reorganize sections unless explicitly requested.`
+    id: 'qc_basic',
+    name: 'Basic Website QA',
+    category: 'qc',
+    content: `Verify:
+- links work
+- forms submit
+- navigation scroll resets
+- mobile layout readable`
   },
   {
-    id: 'revision_quick_fix',
-    name: 'Quick Fix Template',
-    section: 'revision',
-    content: `REVISION MODE: QUICK FIX
-
-Apply the selected quick fixes to the existing website build.
-
-Each fix should be minimal and targeted.
-Do not alter unrelated sections.
-Maintain design consistency throughout.`
+    id: 'qc_advanced',
+    name: 'Advanced System Audit',
+    category: 'qc',
+    content: `Perform technical audit:
+- HTML structure
+- heading hierarchy
+- image optimization
+- link structure
+- mobile responsiveness`
   },
-
-  // === FOR CLAUDE ===
-  {
-    id: 'scraping_engine_prompt',
-    name: 'Scraping Engine Prompt',
-    section: 'claude',
-    content: `You are a professional website content extraction engine.
-
-Extract ALL usable business information from the Source URL.
-
-Preserve wording when possible.
-
-Return structured data including:
-- Company profile (name, tagline, description)
-- Page structure (existing pages and navigation)
-- Navigation menu (items and hierarchy)
-- URL structure (all internal links)
-- Hero content (headlines, subheadlines, CTAs)
-- About content (company story, mission, values)
-- Services (list with descriptions)
-- Projects/Portfolio (if available)
-- Team members (names, titles, bios)
-- Testimonials (quotes, authors, companies)
-- Images (URLs, alt text, context)
-- Contact information (address, phone, email, hours)
-- Social media links
-- Language detection
-
-Return results as a structured content database in JSON format.`
-  }
 ];
 
 function getStoredLibrary(): PromptBlock[] {
+  // Always force the new v4 defaults — clear old data
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultPrompts));
+  return [...defaultPrompts];
+}
+
+export function getPromptLibrary(): PromptBlock[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed: PromptBlock[] = JSON.parse(stored);
+      // Ensure all defaults exist
       const ids = new Set(parsed.map(p => p.id));
       for (const dp of defaultPrompts) {
         if (!ids.has(dp.id)) parsed.push(dp);
@@ -485,16 +380,17 @@ function getStoredLibrary(): PromptBlock[] {
   return [...defaultPrompts];
 }
 
-export function getPromptLibrary(): PromptBlock[] {
-  return getStoredLibrary();
+export function resetLibrary(): void {
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultPrompts));
 }
 
 export function getPromptBlock(id: string): PromptBlock | undefined {
-  return getStoredLibrary().find(p => p.id === id);
+  return getPromptLibrary().find(p => p.id === id);
 }
 
 export function savePromptBlock(block: PromptBlock): void {
-  const library = getStoredLibrary();
+  const library = getPromptLibrary();
   const idx = library.findIndex(p => p.id === block.id);
   if (idx >= 0) {
     library[idx] = block;
@@ -504,25 +400,11 @@ export function savePromptBlock(block: PromptBlock): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
 }
 
-export function getPromptsBySection(section: PromptSection): PromptBlock[] {
-  return getStoredLibrary().filter(p => p.section === section);
+export function deletePromptBlock(id: string): void {
+  const library = getPromptLibrary().filter(p => p.id !== id);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
 }
 
-export const sectionLabels: Record<PromptSection, string> = {
-  master: 'Master Prompts',
-  builder: 'Builder Prompts',
-  module: 'Module Prompts',
-  override: 'Override Prompts',
-  revision: 'Revision Prompts',
-  claude: 'For Claude',
-};
-
-export const categoryLabels: Record<string, string> = {
-  base: 'Base Engine',
-  packages: 'Packages',
-  upgrades: 'Upgrades',
-  modules: 'Modules',
-  reference_rules: 'Reference Rules',
-  brand_overrides: 'Brand Overrides',
-  scraping: 'Scraping Prompt'
-};
+export function getPromptsBySection(section: PromptCategory): PromptBlock[] {
+  return getPromptLibrary().filter(p => p.category === section);
+}
