@@ -135,7 +135,7 @@ export default function ControlPanel({ onPromptsGenerated, onClear, clearSignal,
     setPrimaryColor(''); setSecondaryColor('');
     setPrimaryFont(''); setFontWeight('700');
     setSpecialInstructions(''); setBrandDetected(false);
-    setQcLevel('');
+    
     onClear();
   };
 
