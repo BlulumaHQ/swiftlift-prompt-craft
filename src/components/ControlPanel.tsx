@@ -4,7 +4,7 @@ import { compilePrompts, getProjectName } from '@/lib/promptCompiler';
 import { saveProject } from '@/lib/store';
 import type { SavedProject } from '@/lib/mockData';
 import ReferenceLibraryModal from './ReferenceLibraryModal';
-import { Library, Sparkles, ShieldCheck } from 'lucide-react';
+import { Library, Sparkles } from 'lucide-react';
 import type { ReferenceLayout } from '@/lib/mockData';
 
 const projectBrands = ['SwiftLift', 'Bluluma', 'Sonykun', 'SwiftSite'];
