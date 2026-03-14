@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import logo from '@/assets/swiftlift-logo.svg';
-import { ChevronDown, Hammer, PenLine, Layout, ShoppingCart, Home, Paintbrush, User, BookOpen, FolderOpen, Settings, LogOut } from 'lucide-react';
+import { ChevronDown, Hammer, PenLine, Layout, ShoppingCart, Home, Paintbrush, User, BookOpen, FolderOpen, Settings, LogOut, CheckCircle, Lock } from 'lucide-react';
 
 interface NavHeaderProps {
   title?: string;

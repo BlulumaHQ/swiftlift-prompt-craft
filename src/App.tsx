@@ -28,6 +28,8 @@ const App = () => (
           <Route path="/projects" element={<Projects />} />
           <Route path="/revision" element={<Revision />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/quality-control" element={<QualityControl />} />
+          <Route path="/lock-preview" element={<LockPreview />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
