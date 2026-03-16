@@ -109,7 +109,7 @@ const Index = () => {
           </aside>
         </Panel>
 
-        <PanelResizeHandle className="w-1.5 bg-border hover:bg-primary/30 transition-colors cursor-col-resize" />
+        <Separator className="w-1.5 bg-border hover:bg-primary/30 transition-colors cursor-col-resize" />
 
         <Panel defaultSize={45} minSize={20}>
           <main className="h-full flex flex-col gap-4 p-5 overflow-y-auto">
