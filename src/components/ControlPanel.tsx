@@ -198,7 +198,8 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
 
   const doClear = () => {
     setProjectBrand('SwiftLift'); setSourceUrl(''); setProjectName(''); setClientName('');
-    setStyleRef(null); setConvRef(null); setReferenceUrl('');
+    setStyleRef(null); setConvRef(null); setStyleRefUrl(''); setConvRefUrl('');
+    setStyleUrlError(''); setConvUrlError('');
     setPackageTier('550'); setModules([]); setAdvModules([]);
     setPrimaryColor(''); setSecondaryColor('');
     setPrimaryFont(''); setFontWeight('700'); setThemeMode('auto');
