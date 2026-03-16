@@ -1,12 +1,16 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import NavHeader from '@/components/NavHeader';
 import {
-  getReferences, saveReference, deleteReference,
+  getDemoSites, addDemoSite, deleteDemoSite, type DemoSite
+} from '@/lib/demoSiteStore';
+import {
+  getReferences, saveReference, deleteReference as deleteLocalRef,
   createEmptyReference, generatePreviewPlaceholder,
   industries, type ReferenceEntry, type ReferenceRole
 } from '@/lib/referenceStore';
 import { uploadReferenceScreenshots } from '@/lib/referenceUpload';
 import { Plus, Trash2, X, Search, ExternalLink, Upload, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 const categoryFilters = ['All', ...industries];
 const roleFilters: Array<{ value: 'all' | ReferenceRole; label: string }> = [
@@ -17,8 +21,23 @@ const roleFilters: Array<{ value: 'all' | ReferenceRole; label: string }> = [
 
 type SortOption = 'recent' | 'az' | 'industry';
 
+// Unified display item
+interface DisplayRef {
+  id: string;
+  name: string;
+  industry: string;
+  role: ReferenceRole;
+  live_url: string;
+  preview_image: string;
+  source: 'cloud' | 'local';
+  cloudId?: string;
+  created: string;
+}
+
 export default function ReferenceLibraryManager() {
-  const [references, setReferences] = useState<ReferenceEntry[]>([]);
+  const { toast } = useToast();
+  const [items, setItems] = useState<DisplayRef[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -32,9 +51,8 @@ export default function ReferenceLibraryManager() {
   const [newRef, setNewRef] = useState({
     name: '', industry: 'Professional Services', liveUrl: '', role: 'style' as ReferenceRole, notes: ''
   });
-  const [screenshotFiles, setScreenshotFiles] = useState<{
-    desktop_hero?: File; desktop_full?: File; mobile_hero?: File; mobile_full?: File;
-  }>({});
+  const [desktopFile, setDesktopFile] = useState<File | undefined>();
+  const [mobileFile, setMobileFile] = useState<File | undefined>();
 
   // Bulk import state
   const [bulkJsonFile, setBulkJsonFile] = useState<File | null>(null);
@@ -42,51 +60,78 @@ export default function ReferenceLibraryManager() {
   const [bulkStatus, setBulkStatus] = useState('');
   const bulkFileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setReferences(getReferences()); }, []);
+  useEffect(() => { loadAll(); }, []);
+
+  async function loadAll() {
+    setLoading(true);
+    let allItems: DisplayRef[] = [];
+
+    // Load from cloud
+    try {
+      const cloudSites = await getDemoSites();
+      allItems.push(...cloudSites.map(s => ({
+        id: `cloud-${s.id}`, name: s.site_name, industry: s.industry,
+        role: s.reference_role as ReferenceRole, live_url: s.live_url,
+        preview_image: s.preview_image || s.desktop_screenshot_url || generatePreviewPlaceholder(s.industry),
+        source: 'cloud' as const, cloudId: s.id, created: s.created_at,
+      })));
+    } catch (err) {
+      console.warn('Could not load cloud demo sites:', err);
+    }
+
+    // Load local references
+    const localRefs = getReferences();
+    allItems.push(...localRefs.map(r => ({
+      id: r.id, name: r.reference_name, industry: r.industry,
+      role: r.reference_role, live_url: r.live_url,
+      preview_image: r.preview_image || generatePreviewPlaceholder(r.industry),
+      source: 'local' as const, created: r.added_date,
+    })));
+
+    setItems(allItems);
+    setLoading(false);
+  }
 
   const filtered = useMemo(() => {
-    let items = references.filter(r => {
+    let result = items.filter(r => {
       const q = searchQuery.toLowerCase();
-      const matchesSearch = !q || r.reference_name.toLowerCase().includes(q) || r.industry.toLowerCase().includes(q);
+      const matchesSearch = !q || r.name.toLowerCase().includes(q) || r.industry.toLowerCase().includes(q);
       const matchesCategory = filterCategory === 'All' || r.industry === filterCategory;
-      const matchesRole = filterRole === 'all' || r.reference_role === filterRole;
+      const matchesRole = filterRole === 'all' || r.role === filterRole;
       return matchesSearch && matchesCategory && matchesRole;
     });
     switch (sortBy) {
-      case 'recent': items.sort((a, b) => b.added_date.localeCompare(a.added_date)); break;
-      case 'az': items.sort((a, b) => a.reference_name.localeCompare(b.reference_name)); break;
-      case 'industry': items.sort((a, b) => a.industry.localeCompare(b.industry)); break;
+      case 'recent': result.sort((a, b) => b.created.localeCompare(a.created)); break;
+      case 'az': result.sort((a, b) => a.name.localeCompare(b.name)); break;
+      case 'industry': result.sort((a, b) => a.industry.localeCompare(b.industry)); break;
     }
-    return items;
-  }, [references, searchQuery, filterCategory, filterRole, sortBy]);
+    return result;
+  }, [items, searchQuery, filterCategory, filterRole, sortBy]);
 
   const handleAdd = async () => {
     if (!newRef.name || !newRef.liveUrl) return;
     setUploading(true);
-
-    let screenshots = { desktop_hero: '', desktop_full: '', mobile_hero: '', mobile_full: '' };
     try {
-      if (Object.values(screenshotFiles).some(f => f)) {
-        screenshots = await uploadReferenceScreenshots(screenshotFiles, newRef.role, newRef.name);
-      }
-    } catch (err) {
-      console.error('Screenshot upload failed:', err);
-    }
+      await addDemoSite({
+        site_name: newRef.name,
+        live_url: newRef.liveUrl,
+        reference_role: newRef.role,
+        industry: newRef.industry,
+        desktop_screenshot_url: '',
+        mobile_screenshot_url: '',
+        preview_image: '',
+        notes: newRef.notes,
+      }, desktopFile, mobileFile);
 
-    const ref = createEmptyReference({
-      reference_name: newRef.name,
-      industry: newRef.industry,
-      reference_role: newRef.role,
-      live_url: newRef.liveUrl,
-      preview_image: screenshots.desktop_hero || generatePreviewPlaceholder(newRef.industry),
-      screenshots,
-      notes: newRef.notes,
-    });
-    saveReference(ref);
-    setReferences(getReferences());
-    setShowAddModal(false);
-    setNewRef({ name: '', industry: 'Professional Services', liveUrl: '', role: 'style', notes: '' });
-    setScreenshotFiles({});
+      toast({ title: 'Reference added to cloud' });
+      setShowAddModal(false);
+      setNewRef({ name: '', industry: 'Professional Services', liveUrl: '', role: 'style', notes: '' });
+      setDesktopFile(undefined);
+      setMobileFile(undefined);
+      await loadAll();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
     setUploading(false);
   };
 
@@ -94,74 +139,27 @@ export default function ReferenceLibraryManager() {
     if (!bulkJsonFile) return;
     setUploading(true);
     setBulkStatus('Reading metadata...');
-
     try {
       const jsonText = await bulkJsonFile.text();
       const entries: any[] = JSON.parse(jsonText);
 
-      // Build a map of screenshot files by name for matching
-      const fileMap: Record<string, File> = {};
-      bulkScreenshotFiles.forEach(f => { fileMap[f.name] = f; });
-
       for (let i = 0; i < entries.length; i++) {
         const entry = entries[i];
-        setBulkStatus(`Importing ${i + 1} of ${entries.length}: ${entry.reference_name || 'Untitled'}...`);
-
-        let screenshots = { desktop_hero: '', desktop_full: '', mobile_hero: '', mobile_full: '' };
-
-        // Try to match screenshot files by slug pattern
-        const slug = (entry.reference_name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
-        const screenshotKeys = ['desktop_hero', 'desktop_full', 'mobile_hero', 'mobile_full'] as const;
-        const matchedFiles: Record<string, File> = {};
-
-        for (const key of screenshotKeys) {
-          // Look for files matching pattern: slug-key.ext or slug/key.ext
-          const match = bulkScreenshotFiles.find(f =>
-            f.name.toLowerCase().includes(slug) && f.name.toLowerCase().includes(key.replace('_', '-'))
-          ) || bulkScreenshotFiles.find(f =>
-            f.name.toLowerCase().includes(slug) && f.name.toLowerCase().includes(key)
-          );
-          if (match) matchedFiles[key] = match;
-        }
-
-        if (Object.keys(matchedFiles).length > 0) {
-          try {
-            screenshots = await uploadReferenceScreenshots(
-              matchedFiles,
-              entry.reference_role || 'style',
-              entry.reference_name || `ref-${i}`
-            );
-          } catch (err) {
-            console.error('Bulk screenshot upload failed for', entry.reference_name, err);
-          }
-        }
-
-        // Use provided screenshot URLs if no files matched
-        if (entry.screenshots) {
-          for (const key of screenshotKeys) {
-            if (!screenshots[key] && entry.screenshots[key]) {
-              screenshots[key] = entry.screenshots[key];
-            }
-          }
-        }
-
-        const ref = createEmptyReference({
-          reference_name: entry.reference_name || `Import ${i + 1}`,
-          industry: entry.industry || 'Other',
-          reference_role: entry.reference_role || 'style',
+        setBulkStatus(`Importing ${i + 1} of ${entries.length}: ${entry.site_name || entry.reference_name || 'Untitled'}...`);
+        await addDemoSite({
+          site_name: entry.site_name || entry.reference_name || `Import ${i + 1}`,
           live_url: entry.live_url || '',
-          theme_mode: entry.theme_mode || 'light',
-          preview_image: screenshots.desktop_hero || entry.preview_image || generatePreviewPlaceholder(entry.industry || 'Other'),
-          screenshots,
-          style_tokens: entry.style_tokens || undefined,
-          layout_tokens: entry.layout_tokens || undefined,
+          reference_role: entry.reference_role || 'style',
+          industry: entry.industry || 'Other',
+          desktop_screenshot_url: entry.desktop_screenshot_url || '',
+          mobile_screenshot_url: entry.mobile_screenshot_url || '',
+          preview_image: entry.preview_image || '',
           notes: entry.notes || '',
         });
-        saveReference(ref);
       }
 
       setBulkStatus(`✅ Imported ${entries.length} references`);
-      setReferences(getReferences());
+      await loadAll();
       setTimeout(() => {
         setShowBulkModal(false);
         setBulkStatus('');
@@ -174,25 +172,36 @@ export default function ReferenceLibraryManager() {
     setUploading(false);
   };
 
-  const handleDelete = (id: string) => {
-    deleteReference(id);
-    setReferences(getReferences());
-    setDeleteConfirm(null);
+  const handleDelete = async (item: DisplayRef) => {
+    try {
+      if (item.source === 'cloud' && item.cloudId) {
+        await deleteDemoSite(item.cloudId, item.name, item.role);
+      } else {
+        deleteLocalRef(item.id);
+      }
+      await loadAll();
+      setDeleteConfirm(null);
+      toast({ title: 'Reference deleted' });
+    } catch (err: any) {
+      toast({ title: 'Delete failed', description: err.message, variant: 'destructive' });
+    }
   };
 
   const roleBadge = (role: ReferenceRole) => (
     <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-      role === 'style'
-        ? 'bg-primary/10 text-primary'
-        : 'bg-accent text-accent-foreground'
+      role === 'style' ? 'bg-primary/10 text-primary' : 'bg-accent text-accent-foreground'
     }`}>
       {role === 'style' ? 'Style' : 'Conversion Layout'}
     </span>
   );
 
-  const handleScreenshotFile = (key: string, file: File | undefined) => {
-    setScreenshotFiles(prev => ({ ...prev, [key]: file }));
-  };
+  const sourceBadge = (source: 'cloud' | 'local') => (
+    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+      source === 'cloud' ? 'bg-blue-500/10 text-blue-600' : 'bg-muted text-muted-foreground'
+    }`}>
+      {source === 'cloud' ? 'Cloud' : 'Local'}
+    </span>
+  );
 
   return (
     <div className="flex flex-col h-screen">
@@ -229,81 +238,81 @@ export default function ReferenceLibraryManager() {
                 <option value="industry">Industry</option>
               </select>
             </div>
-            {/* Role Filter */}
             <div className="flex gap-1.5 flex-wrap">
               {roleFilters.map(r => (
                 <button key={r.value} onClick={() => setFilterRole(r.value)}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                     filterRole === r.value ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-secondary'
-                  }`}>
-                  {r.label}
-                </button>
+                  }`}>{r.label}</button>
               ))}
               <span className="w-px bg-border mx-1" />
               {categoryFilters.map(c => (
                 <button key={c} onClick={() => setFilterCategory(c)}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                     filterCategory === c ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-secondary'
-                  }`}>
-                  {c}
-                </button>
+                  }`}>{c}</button>
               ))}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map(ref => (
-              <div key={ref.id} className="rounded-lg border border-border bg-card overflow-hidden group relative">
-                <div className="aspect-[4/3] bg-muted overflow-hidden">
-                  <img src={ref.preview_image || generatePreviewPlaceholder(ref.industry)} alt={ref.reference_name} className="w-full h-full object-cover" />
-                </div>
-                <div className="p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-foreground truncate">{ref.reference_name}</h3>
-                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                        <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-secondary text-secondary-foreground">
-                          {ref.industry}
-                        </span>
-                        {roleBadge(ref.reference_role)}
+          {loading ? (
+            <div className="flex items-center justify-center py-16 gap-2 text-muted-foreground">
+              <Loader2 size={16} className="animate-spin" /> Loading...
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filtered.map(ref => (
+                <div key={ref.id} className="rounded-lg border border-border bg-card overflow-hidden group relative">
+                  <div className="aspect-[4/3] bg-muted overflow-hidden">
+                    <img src={ref.preview_image} alt={ref.name} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-foreground truncate">{ref.name}</h3>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-secondary text-secondary-foreground">
+                            {ref.industry}
+                          </span>
+                          {roleBadge(ref.role)}
+                          {sourceBadge(ref.source)}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2 truncate">{ref.live_url}</p>
-                  <div className="flex items-center gap-2 mt-3">
-                    <button
-                      onClick={() => window.open(ref.live_url, '_blank')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-                    >
-                      <ExternalLink size={12} /> Live View
-                    </button>
-                    <button className="flex-1 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-                      Select Reference
-                    </button>
-                    {deleteConfirm === ref.id ? (
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => handleDelete(ref.id)}
-                          className="px-2 py-1 rounded text-xs font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors">
-                          Confirm
-                        </button>
-                        <button onClick={() => setDeleteConfirm(null)}
-                          className="px-2 py-1 rounded text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button onClick={() => setDeleteConfirm(ref.id)}
-                        className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
-                        <Trash2 size={16} />
+                    <p className="text-xs text-muted-foreground mt-2 truncate">{ref.live_url}</p>
+                    <div className="flex items-center gap-2 mt-3">
+                      <button onClick={() => window.open(ref.live_url, '_blank')}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
+                        <ExternalLink size={12} /> Live View
                       </button>
-                    )}
+                      <button className="flex-1 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                        Select Reference
+                      </button>
+                      {deleteConfirm === ref.id ? (
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => handleDelete(ref)}
+                            className="px-2 py-1 rounded text-xs font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors">
+                            Confirm
+                          </button>
+                          <button onClick={() => setDeleteConfirm(null)}
+                            className="px-2 py-1 rounded text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setDeleteConfirm(ref.id)}
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
-          {filtered.length === 0 && (
+          {!loading && filtered.length === 0 && (
             <div className="text-center py-16">
               <p className="text-muted-foreground mb-2">No reference layouts found.</p>
               <p className="text-xs text-muted-foreground">Add your first reference using the button above.</p>
@@ -357,31 +366,27 @@ export default function ReferenceLibraryManager() {
               {/* Screenshot Uploads */}
               <div>
                 <label className="control-label">Screenshots (optional)</label>
-                <p className="text-xs text-muted-foreground mb-2">Upload screenshots to cloud storage for this reference.</p>
+                <p className="text-xs text-muted-foreground mb-2">Upload screenshots to cloud storage.</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {(['desktop_hero', 'desktop_full', 'mobile_hero', 'mobile_full'] as const).map(key => (
-                    <div key={key}>
-                      <label className="text-xs text-muted-foreground mb-1 block capitalize">
-                        {key.replace('_', ' ')}
-                      </label>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={e => handleScreenshotFile(key, e.target.files?.[0])}
-                        className="text-xs w-full file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-secondary file:text-secondary-foreground"
-                      />
-                      {screenshotFiles[key] && (
-                        <p className="text-xs text-primary mt-0.5 truncate">✓ {screenshotFiles[key]!.name}</p>
-                      )}
-                    </div>
-                  ))}
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Desktop</label>
+                    <input type="file" accept="image/*" onChange={e => setDesktopFile(e.target.files?.[0])}
+                      className="text-xs w-full file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-secondary file:text-secondary-foreground" />
+                    {desktopFile && <p className="text-xs text-primary mt-0.5 truncate">✓ {desktopFile.name}</p>}
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Mobile</label>
+                    <input type="file" accept="image/*" onChange={e => setMobileFile(e.target.files?.[0])}
+                      className="text-xs w-full file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-secondary file:text-secondary-foreground" />
+                    {mobileFile && <p className="text-xs text-primary mt-0.5 truncate">✓ {mobileFile.name}</p>}
+                  </div>
                 </div>
               </div>
 
               <div>
                 <label className="control-label">Notes (optional)</label>
                 <textarea value={newRef.notes} onChange={e => setNewRef({ ...newRef, notes: e.target.value })}
-                  placeholder="Any additional notes about this reference..." rows={3} className="control-input resize-none" />
+                  placeholder="Any additional notes..." rows={3} className="control-input resize-none" />
               </div>
               <div className="flex gap-2 pt-2">
                 <button onClick={() => setShowAddModal(false)}
@@ -412,43 +417,17 @@ export default function ReferenceLibraryManager() {
             <div className="p-6 space-y-4">
               <div>
                 <label className="control-label">Metadata JSON File</label>
-                <p className="text-xs text-muted-foreground mb-2">
-                  Upload a JSON file containing an array of reference entries.
-                </p>
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={e => setBulkJsonFile(e.target.files?.[0] || null)}
-                  className="text-sm w-full file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:bg-secondary file:text-secondary-foreground"
-                />
+                <p className="text-xs text-muted-foreground mb-2">Upload a JSON array of reference entries.</p>
+                <input type="file" accept=".json" onChange={e => setBulkJsonFile(e.target.files?.[0] || null)}
+                  className="text-sm w-full file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:bg-secondary file:text-secondary-foreground" />
                 {bulkJsonFile && <p className="text-xs text-primary mt-1">✓ {bulkJsonFile.name}</p>}
               </div>
-
-              <div>
-                <label className="control-label">Screenshot Files (optional)</label>
-                <p className="text-xs text-muted-foreground mb-2">
-                  Upload screenshot images. Name them like: <code className="text-xs bg-muted px-1 rounded">slug-desktop-hero.png</code>
-                </p>
-                <input
-                  ref={bulkFileRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={e => setBulkScreenshotFiles(Array.from(e.target.files || []))}
-                  className="text-sm w-full file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:bg-secondary file:text-secondary-foreground"
-                />
-                {bulkScreenshotFiles.length > 0 && (
-                  <p className="text-xs text-primary mt-1">✓ {bulkScreenshotFiles.length} files selected</p>
-                )}
-              </div>
-
               {bulkStatus && (
                 <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted text-sm">
                   {uploading && <Loader2 size={14} className="animate-spin text-primary" />}
                   <span>{bulkStatus}</span>
                 </div>
               )}
-
               <div className="flex gap-2 pt-2">
                 <button onClick={() => { setShowBulkModal(false); setBulkStatus(''); }}
                   className="flex-1 px-4 py-2 rounded-lg text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">

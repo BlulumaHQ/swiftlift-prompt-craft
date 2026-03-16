@@ -14,7 +14,146 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      client_assets: {
+        Row: {
+          alt_text: string
+          asset_type: string
+          caption: string
+          client_slug: string
+          created_at: string
+          file_url: string
+          folder_slug: string
+          id: string
+        }
+        Insert: {
+          alt_text?: string
+          asset_type?: string
+          caption?: string
+          client_slug: string
+          created_at?: string
+          file_url?: string
+          folder_slug?: string
+          id?: string
+        }
+        Update: {
+          alt_text?: string
+          asset_type?: string
+          caption?: string
+          client_slug?: string
+          created_at?: string
+          file_url?: string
+          folder_slug?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_assets_client_slug_fkey"
+            columns: ["client_slug"]
+            isOneToOne: false
+            referencedRelation: "client_projects"
+            referencedColumns: ["client_slug"]
+          },
+        ]
+      }
+      client_projects: {
+        Row: {
+          client_name: string
+          client_slug: string
+          created_at: string
+          id: string
+          included_image_limit: number
+          uploaded_image_count: number
+        }
+        Insert: {
+          client_name: string
+          client_slug: string
+          created_at?: string
+          id?: string
+          included_image_limit?: number
+          uploaded_image_count?: number
+        }
+        Update: {
+          client_name?: string
+          client_slug?: string
+          created_at?: string
+          id?: string
+          included_image_limit?: number
+          uploaded_image_count?: number
+        }
+        Relationships: []
+      }
+      demo_sites: {
+        Row: {
+          created_at: string
+          desktop_screenshot_url: string
+          id: string
+          industry: string
+          live_url: string
+          mobile_screenshot_url: string
+          notes: string
+          preview_image: string
+          reference_role: string
+          site_name: string
+        }
+        Insert: {
+          created_at?: string
+          desktop_screenshot_url?: string
+          id?: string
+          industry?: string
+          live_url?: string
+          mobile_screenshot_url?: string
+          notes?: string
+          preview_image?: string
+          reference_role?: string
+          site_name: string
+        }
+        Update: {
+          created_at?: string
+          desktop_screenshot_url?: string
+          id?: string
+          industry?: string
+          live_url?: string
+          mobile_screenshot_url?: string
+          notes?: string
+          preview_image?: string
+          reference_role?: string
+          site_name?: string
+        }
+        Relationships: []
+      }
+      prompts: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          file_path: string
+          id: string
+          prompt_name: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          category?: string
+          content?: string
+          created_at?: string
+          file_path?: string
+          id?: string
+          prompt_name: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          file_path?: string
+          id?: string
+          prompt_name?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import logo from '@/assets/swiftlift-logo.svg';
-import { ChevronDown, Hammer, PenLine, Layout, ShoppingCart, Home, Paintbrush, User, BookOpen, FolderOpen, Settings, LogOut, CircleCheck, Lock } from 'lucide-react';
+import { ChevronDown, Hammer, PenLine, Layout, ShoppingCart, Home, Paintbrush, User, BookOpen, FolderOpen, Settings, LogOut, CircleCheck, Lock, ImageIcon } from 'lucide-react';
 
 interface NavHeaderProps {
   title?: string;
@@ -97,6 +97,9 @@ export default function NavHeader({ title, rightContent }: NavHeaderProps) {
         </Link>
         <Link to="/lock-preview" className={`nav-link ${isActive('/lock-preview') ? 'active' : ''}`}>
           <Lock size={14} /> Lock Preview
+        </Link>
+        <Link to="/client-assets" className={`nav-link ${isActive('/client-assets') ? 'active' : ''}`}>
+          <ImageIcon size={14} /> Client Assets
         </Link>
       </nav>
 

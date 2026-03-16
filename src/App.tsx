@@ -11,6 +11,7 @@ import Revision from "./pages/Revision";
 import SettingsPage from "./pages/Settings";
 import QualityControl from "./pages/QualityControl";
 import LockPreview from "./pages/LockPreview";
+import ClientAssets from "./pages/ClientAssets";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/quality-control" element={<QualityControl />} />
           <Route path="/lock-preview" element={<LockPreview />} />
+          <Route path="/client-assets" element={<ClientAssets />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
