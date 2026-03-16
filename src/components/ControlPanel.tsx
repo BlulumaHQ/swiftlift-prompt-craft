@@ -6,12 +6,14 @@ import type { SavedProject } from '@/lib/mockData';
 import ReferenceLibraryModal from './ReferenceLibraryModal';
 import { Library, Sparkles } from 'lucide-react';
 import type { ReferenceLayout } from '@/lib/mockData';
+import { supabase } from '@/integrations/supabase/client';
 
 const projectBrands = ['SwiftLift', 'Bluluma', 'Sonykun', 'SwiftSite'];
 
 interface Props {
   onPromptsGenerated: (promptA: string, promptB: string, tier: '350' | '550') => void;
   onClear: () => void;
+  onClaudeGenerated?: (finalPrompt: string, extractedData: any, error?: string) => void;
   clearSignal: number;
   saveSignal: number;
   newSignal: number;
@@ -30,7 +32,7 @@ function simulateBrandDetection(url: string): { primary: string; secondary: stri
   return { primary: `hsl(${hue}, 65%, 45%)`, secondary: `hsl(${(hue + 120) % 360}, 55%, 40%)`, font: googleFonts[hash % googleFonts.length] };
 }
 
-export default function ControlPanel({ onPromptsGenerated, onClear, clearSignal, saveSignal, newSignal }: Props) {
+export default function ControlPanel({ onPromptsGenerated, onClear, onClaudeGenerated, clearSignal, saveSignal, newSignal }: Props) {
   // Project Setup
   const [projectBrand, setProjectBrand] = useState('SwiftLift');
   const [sourceUrl, setSourceUrl] = useState('');
@@ -87,16 +89,41 @@ export default function ControlPanel({ onPromptsGenerated, onClear, clearSignal,
     if (!url) setBrandDetected(false);
   };
 
-  const executeGenerate = () => {
+  const executeGenerate = async () => {
     setGenerating(true);
-    setTimeout(() => {
-      const { promptA, promptB } = compilePrompts({
-        sourceUrl, referenceLayout, referenceUrl, packageTier,
-        modules: [...modules, ...advModules], primaryColor, secondaryColor, primaryFont, specialInstructions,
-      });
-      onPromptsGenerated(promptA, promptB, packageTier);
-      setGenerating(false);
-    }, 1200);
+
+    // Legacy local prompt compilation (keeps existing Prompt A/B output)
+    const { promptA, promptB } = compilePrompts({
+      sourceUrl, referenceLayout, referenceUrl, packageTier,
+      modules: [...modules, ...advModules], primaryColor, secondaryColor, primaryFont, specialInstructions,
+    });
+    onPromptsGenerated(promptA, promptB, packageTier);
+
+    // Claude-powered extraction + assembly
+    if (onClaudeGenerated && sourceUrl) {
+      try {
+        const { data, error } = await supabase.functions.invoke('generate-final-prompt', {
+          body: {
+            sourceUrl,
+            referenceUrl: referenceUrl || referenceLayout || '',
+            businessType: '', // not in current form, pass empty
+            userNotes: specialInstructions || '',
+          },
+        });
+
+        if (error) {
+          onClaudeGenerated('', null, error.message || 'Edge function call failed');
+        } else if (data?.success) {
+          onClaudeGenerated(data.finalPrompt, data.extractedData);
+        } else {
+          onClaudeGenerated('', null, data?.error || 'Generation failed');
+        }
+      } catch (err: any) {
+        onClaudeGenerated('', null, err.message || 'Network error');
+      }
+    }
+
+    setGenerating(false);
   };
 
   const handleGenerate = () => {

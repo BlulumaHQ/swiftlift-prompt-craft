@@ -12,12 +12,24 @@ const Index = () => {
   const [saveSignal, setSaveSignal] = useState(0);
   const [newSignal, setNewSignal] = useState(0);
 
+  // Claude generation state
+  const [finalPrompt, setFinalPrompt] = useState('');
+  const [extractedData, setExtractedData] = useState<any>(null);
+  const [claudeError, setClaudeError] = useState('');
+
   const handlePromptsGenerated = (a: string, b: string, t: '350' | '550') => {
     setPromptA(a); setPromptB(b); setTier(t);
   };
 
+  const handleClaudeGenerated = (fp: string, data: any, error?: string) => {
+    setFinalPrompt(fp || '');
+    setExtractedData(data || null);
+    setClaudeError(error || '');
+  };
+
   const handleClear = () => {
     setPromptA(''); setPromptB('');
+    setFinalPrompt(''); setExtractedData(null); setClaudeError('');
   };
 
   const tierLabels = tier === '350'
@@ -50,6 +62,7 @@ const Index = () => {
           <ControlPanel
             onPromptsGenerated={handlePromptsGenerated}
             onClear={handleClear}
+            onClaudeGenerated={handleClaudeGenerated}
             clearSignal={clearSignal}
             saveSignal={saveSignal}
             newSignal={newSignal}
@@ -57,6 +70,23 @@ const Index = () => {
         </aside>
 
         <main className="flex-1 flex flex-col gap-4 p-5 overflow-y-auto">
+          {/* Claude Final Prompt Output */}
+          <PromptOutputPanel title="Final Lovable Build Prompt" content={finalPrompt} />
+
+          {/* Claude Error */}
+          {claudeError && (
+            <div className="px-4 py-3 rounded-lg border border-destructive/50 bg-destructive/10 text-destructive text-sm">
+              <strong>Error:</strong> {claudeError}
+            </div>
+          )}
+
+          {/* Extraction Preview JSON */}
+          <PromptOutputPanel
+            title="Extraction Preview JSON"
+            content={extractedData ? JSON.stringify(extractedData, null, 2) : ''}
+          />
+
+          {/* Legacy Prompt A/B */}
           <PromptOutputPanel title={tierLabels.a} content={promptA} />
           <PromptOutputPanel title={tierLabels.b} content={promptB} />
         </main>
