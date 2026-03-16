@@ -97,16 +97,52 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     if (!url) setBrandDetected(false);
   };
 
+  function normalizeUrl(url: string): string {
+    let u = url.trim();
+    if (!u) return '';
+    if (!u.startsWith('http://') && !u.startsWith('https://')) {
+      u = u.startsWith('www.') ? `https://${u}` : `https://${u}`;
+    }
+    return u;
+  }
+
   const executeGenerate = async () => {
+    // Validate manual URLs if provided
+    const normalizedStyleUrl = normalizeUrl(styleRefUrl);
+    const normalizedConvUrl = normalizeUrl(convRefUrl);
+
+    if (styleRefUrl && normalizedStyleUrl) {
+      try {
+        new URL(normalizedStyleUrl);
+        setStyleUrlError('');
+      } catch {
+        setStyleUrlError('Unable to access the reference URL. Please check the address.');
+        return;
+      }
+    }
+    if (convRefUrl && normalizedConvUrl) {
+      try {
+        new URL(normalizedConvUrl);
+        setConvUrlError('');
+      } catch {
+        setConvUrlError('Unable to access the reference URL. Please check the address.');
+        return;
+      }
+    }
+
     setGenerating(true);
     onGenerateStart(packageTier);
+
+    // Priority: Manual URL > Demo Site selection > empty
+    const resolvedStyleRef = normalizedStyleUrl || styleRef?.live_url || '';
+    const resolvedConvRef = normalizedConvUrl || convRef?.live_url || '';
 
     try {
       const { data, error } = await supabase.functions.invoke('generate-final-prompt', {
         body: {
           sourceUrl,
-          referenceUrl: styleRef?.live_url || referenceUrl || '',
-          conversionLayoutUrl: convRef?.live_url || '',
+          referenceUrl: resolvedStyleRef,
+          conversionLayoutUrl: resolvedConvRef,
           businessType: '',
           userNotes: specialInstructions || '',
           packageTier,
@@ -115,6 +151,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           secondaryColor,
           primaryFont,
           fontWeight,
+          enabledModules: modules,
         },
       });
 
