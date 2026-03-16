@@ -6,6 +6,7 @@ import ReferenceLibraryModal from './ReferenceLibraryModal';
 import { LayoutGrid, Sparkles, X } from 'lucide-react';
 import type { DemoSite } from '@/lib/demoSiteStore';
 import { supabase } from '@/integrations/supabase/client';
+import { getPromptLibrary } from '@/lib/promptLibraryStore';
 
 const projectBrands = ['SwiftLift', 'Bluluma', 'Sonykun', 'SwiftSite'];
 
