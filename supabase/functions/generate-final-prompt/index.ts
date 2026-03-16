@@ -1,5 +1,4 @@
 import Anthropic from "npm:@anthropic-ai/sdk@0.39.0";
-import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,40 +6,489 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// ── Brand Footer Credit Map ──
-const BRAND_FOOTER_MAP: Record<string, { label: string; url: string; format: string }> = {
-  Bluluma: {
-    label: "Bluluma",
-    url: "https://bluluma.com",
-    format: "© {YEAR} {COMPANY} | Web Design by Bluluma",
-  },
-  SwiftLift: {
-    label: "SwiftLift",
-    url: "https://swiftlift.app",
-    format: "© {YEAR} {COMPANY} | Website Launch by SwiftLift",
-  },
-  SwiftSite: {
-    label: "SwiftSite",
-    url: "https://swiftsite.ca",
-    format: "© {YEAR} {COMPANY} | Website by SwiftSite",
-  },
-  Sonykun: {
-    label: "Sonykun Design",
-    url: "https://sonykundesign.com",
-    format: "© {YEAR} {COMPANY} | Web Design by Sonykun Design",
-  },
-};
+// ── Extraction System Prompt ──
+const EXTRACTION_SYSTEM_PROMPT = `You are a deterministic website source extraction engine.
 
-// ── Fetch prompts from database ──
-async function fetchPromptContent(supabaseUrl: string, supabaseKey: string, promptName: string): Promise<string> {
-  const client = createClient(supabaseUrl, supabaseKey);
-  const { data, error } = await client
-    .from("prompts")
-    .select("content")
-    .eq("prompt_name", promptName)
-    .single();
-  if (error) throw new Error(`Failed to fetch prompt "${promptName}": ${error.message}`);
-  return data.content || "";
+Your task is to extract ALL usable business, structural, design, and asset information from the Source URL so the website can be rebuilt as accurately as possible.
+
+This output will be used as a structured database for rebuilding the website and generating a final website build prompt.
+
+CRITICAL RULES
+
+1. Use the Source URL as the primary source of truth.
+2. Preserve original wording whenever possible.
+3. Do not summarize aggressively.
+4. Do not omit meaningful public-facing copywriting.
+5. Extract and preserve the original public URL structure and slug naming whenever available.
+6. Do not rename page URLs unless the source clearly does not provide a usable public slug.
+7. Extract all meaningful page titles, headings, subheadings, paragraph copy, button labels, navigation labels, form labels, footer text, CTA copy, FAQ content, testimonial content, and offer text.
+8. Extract all meaningful business information including services, service details, locations served, contact information, hours, trust signals, and social links.
+9. Extract design-related information including primary color, secondary color, accent color, additional colors, heading font family, body font family, font size hierarchy, font weight hierarchy, button style, border radius style, and overall visual direction.
+10. Extract all usable public image URLs including logo, favicon, hero images, section images, service images, gallery images, team images, background images, and any other meaningful image assets.
+11. Ignore privacy policy, terms, login, account, cart, checkout, cookie notices, and unrelated blog clutter unless they contain important business facts.
+12. Do not invent facts.
+13. Merge duplicate information cleanly while preserving important wording.
+14. Return valid JSON only.
+15. Do not output markdown.
+16. Do not output explanations.
+17. Leave missing values blank or as empty arrays.
+
+RETURN THIS EXACT JSON STRUCTURE
+
+{
+  "site_meta": {
+    "source_url": "",
+    "site_name": "",
+    "logo_url": "",
+    "favicon_url": "",
+    "primary_domain": ""
+  },
+  "site_structure": [
+    {
+      "page_title": "",
+      "page_type": "",
+      "url": "",
+      "slug": "",
+      "nav_label": "",
+      "meta_title": "",
+      "meta_description": ""
+    }
+  ],
+  "copywriting": {
+    "global_value_proposition": "",
+    "brand_summary": "",
+    "tone_of_voice": "",
+    "all_headings": [],
+    "all_subheadings": [],
+    "all_paragraphs": [],
+    "all_button_texts": [],
+    "all_ctas": [],
+    "all_form_labels": [],
+    "all_nav_labels": [],
+    "all_footer_text": [],
+    "all_faqs": [],
+    "all_testimonials": [],
+    "all_offers": []
+  },
+  "business_info": {
+    "business_name": "",
+    "services": [],
+    "service_details": [],
+    "target_audience": [],
+    "locations_served": [],
+    "contact_info": {
+      "phone": "",
+      "email": "",
+      "address": ""
+    },
+    "hours": [],
+    "social_links": [],
+    "trust_signals": []
+  },
+  "design_system": {
+    "primary_color": "",
+    "secondary_color": "",
+    "accent_color": "",
+    "additional_colors": [],
+    "heading_font_family": "",
+    "body_font_family": "",
+    "font_sizes": {
+      "hero_title": "",
+      "page_title": "",
+      "section_title": "",
+      "body_text": "",
+      "button_text": ""
+    },
+    "font_weights": {
+      "hero_title": "",
+      "page_title": "",
+      "section_title": "",
+      "body_text": "",
+      "button_text": ""
+    },
+    "button_style": "",
+    "border_radius_style": "",
+    "overall_visual_direction": ""
+  },
+  "images": {
+    "hero_images": [],
+    "logo_images": [],
+    "section_images": [],
+    "gallery_images": [],
+    "team_images": [],
+    "service_images": [],
+    "background_images": [],
+    "all_image_urls": []
+  },
+  "extraction_notes": {
+    "missing_information": [],
+    "warnings": []
+  }
+}`;
+
+// ── Standard Layout Master Prompt Template ──
+const STANDARD_PROMPT_TEMPLATE = `You are a deterministic website builder operating in PRODUCTION MODE.
+
+Your goal is to generate a COMPLETE, CLIENT-READY WEBSITE in a single build.
+
+The website must appear fully finished, professional, intentional, and well-structured.
+
+No placeholder text.
+No lorem ipsum.
+No unfinished sections.
+No generic filler copy.
+
+--------------------------------------------------
+BUILD FORMULA
+--------------------------------------------------
+
+New Website =
+Reference Design Direction
++
+Extracted Source Business Content
++
+Preserved Source URL Structure
++
+Preserved Source Copywriting Database
+
+--------------------------------------------------
+LAYOUT MODE: STANDARD
+--------------------------------------------------
+
+Build a clean, professional business website layout.
+
+Use a conventional, well-organized section order appropriate for this type of business.
+
+Prioritize clarity, readability, and logical content flow.
+
+Sections should follow a natural business website progression:
+- Navigation
+- Hero / main headline
+- Services or offerings overview
+- About / company information
+- Testimonials or trust signals (if available)
+- Contact information / call to action
+- Footer
+
+This is a standard business website, not a landing page.
+
+--------------------------------------------------
+CORE BUILD RULES
+--------------------------------------------------
+
+1. Use the extracted source business content as the primary source of truth.
+2. Preserve the original public page URL structure and slug naming from the source website whenever available.
+3. Do not rename source page URLs unless explicitly required.
+4. Preserve important business wording, service names, CTA text, and trust signals whenever possible.
+5. Do not invent unsupported claims, certifications, awards, offers, or service details.
+6. Rebuild the website with a modern, polished presentation while keeping the business identity intact.
+7. Use the reference design direction for layout and visual refinement, but do not overwrite source business facts.
+8. Every public-facing page must feel complete and intentional.
+9. All pages must be mobile responsive and visually consistent.
+10. The final site must feel fully designed, not templated.
+11. Use only valid public-facing pages from the extracted source structure.
+12. Preserve page intent from the source site.
+13. Preserve important CTA wording, buttons, testimonials, FAQs, offers, and trust signals when available.
+14. Use the extracted design system as a continuity guide where appropriate.
+15. Do not omit meaningful button labels, navigation labels, form labels, or footer text when they are relevant to the site structure.
+16. If some design assets cannot be extracted, generate visually appropriate equivalents that maintain the same level of polish.
+17. Social media icons must only appear if valid social links exist in the extracted source data.
+18. If no social links are found, do not display social icons anywhere.
+19. Use clean, modern, visually consistent iconography only.
+20. Mobile-first execution is required.
+
+--------------------------------------------------
+SOURCE SITE META
+--------------------------------------------------
+
+{{SITE_META}}
+
+--------------------------------------------------
+SOURCE SITE STRUCTURE
+--------------------------------------------------
+
+Use this as the required public page structure and preserve the original page slugs wherever possible:
+
+{{SITE_STRUCTURE}}
+
+--------------------------------------------------
+SOURCE COPYWRITING DATABASE
+--------------------------------------------------
+
+Use this extracted copywriting database as the main source of business content. Preserve useful original wording whenever possible.
+
+{{COPYWRITING}}
+
+--------------------------------------------------
+SOURCE BUSINESS INFORMATION
+--------------------------------------------------
+
+{{BUSINESS_INFO}}
+
+--------------------------------------------------
+SOURCE DESIGN SYSTEM
+--------------------------------------------------
+
+Use the extracted design system as a source reference for maintaining brand continuity where appropriate:
+
+{{DESIGN_SYSTEM}}
+
+--------------------------------------------------
+SOURCE IMAGE URL DATABASE
+--------------------------------------------------
+
+Use these extracted image URLs where relevant. Preserve meaningful brand and content imagery.
+
+{{IMAGES}}
+
+--------------------------------------------------
+EXTRACTION WARNINGS AND MISSING INFORMATION
+--------------------------------------------------
+
+Respect these limitations. Do not invent missing facts.
+
+{{EXTRACTION_NOTES}}
+
+--------------------------------------------------
+REFERENCE DESIGN DIRECTION
+--------------------------------------------------
+
+Reference URL:
+{{REFERENCE_URL}}
+
+Use the reference site only as inspiration for layout quality, section flow, spacing, hierarchy, visual polish, and modern presentation.
+
+Do not copy the source content from the reference site.
+Do not replace the source business identity with the reference site.
+
+--------------------------------------------------
+USER NOTES
+--------------------------------------------------
+
+{{USER_NOTES}}
+
+--------------------------------------------------
+FINAL BUILD INSTRUCTION
+--------------------------------------------------
+
+Build the complete website using the extracted source website database above.
+
+Requirements:
+- preserve source page intent
+- preserve source URL structure
+- preserve critical service wording
+- preserve important CTA wording
+- preserve testimonials, FAQs, offers, and trust signals when available
+- use the extracted design system as a continuity guide
+- use the reference design direction to improve presentation quality
+- output a fully built, client-ready website`;
+
+// ── Premium Conversion Layout Master Prompt Template ──
+const PREMIUM_PROMPT_TEMPLATE = `You are a deterministic website builder operating in PRODUCTION MODE.
+
+Your goal is to generate a COMPLETE, CLIENT-READY WEBSITE in a single build.
+
+The website must appear fully finished, professional, intentional, and conversion-focused.
+
+No placeholder text.
+No lorem ipsum.
+No unfinished sections.
+No generic filler copy.
+
+--------------------------------------------------
+BUILD FORMULA
+--------------------------------------------------
+
+New Website =
+Reference Design Direction
++
+Extracted Source Business Content
++
+Preserved Source URL Structure
++
+Preserved Source Copywriting Database
++
+Conversion-Oriented Layout Structure
+
+--------------------------------------------------
+LAYOUT MODE: PREMIUM CONVERSION LAYOUT
+--------------------------------------------------
+
+Build a conversion-oriented layout using the same source business content.
+
+This is NOT a marketing strategy or CRO analysis.
+This is a LAYOUT UPGRADE ONLY.
+
+Apply these layout principles:
+
+1. Lead with the strongest value proposition or hero headline.
+2. Place the primary call-to-action prominently above the fold.
+3. Use a landing-page-inspired section flow:
+   - Hero with clear CTA
+   - Key benefits or services (visual, scannable)
+   - Social proof / testimonials / trust signals early
+   - Detailed service or offering breakdown
+   - Secondary CTA or lead capture
+   - About / credibility section
+   - Final CTA / contact
+   - Footer
+4. Use stronger visual hierarchy: larger headings, bolder CTAs, more whitespace between sections.
+5. Place trust signals (testimonials, certifications, years in business) closer to CTAs.
+6. Use more prominent button styling for primary actions.
+7. Repeat the primary CTA at strategic intervals throughout the page.
+8. Use visual separators, background color alternation, or card layouts to create clear section breaks.
+
+IMPORTANT: Do NOT add conversion strategy, CRO analysis, sales funnel planning, audience targeting, or marketing consulting content. Only restructure the layout for better conversion flow.
+
+--------------------------------------------------
+CORE BUILD RULES
+--------------------------------------------------
+
+1. Use the extracted source business content as the primary source of truth.
+2. Preserve the original public page URL structure and slug naming from the source website whenever available.
+3. Do not rename source page URLs unless explicitly required.
+4. Preserve important business wording, service names, CTA text, and trust signals whenever possible.
+5. Do not invent unsupported claims, certifications, awards, offers, or service details.
+6. Rebuild the website with a modern, polished, high-conversion presentation while keeping the business identity intact.
+7. Use the reference design direction for layout and visual refinement, but do not overwrite source business facts.
+8. Every public-facing page must feel complete and intentional.
+9. All pages must be mobile responsive and visually consistent.
+10. The final site must feel fully designed, not templated.
+11. Use only valid public-facing pages from the extracted source structure.
+12. Preserve page intent from the source site.
+13. Preserve important CTA wording, buttons, testimonials, FAQs, offers, and trust signals when available.
+14. Use the extracted design system as a continuity guide where appropriate.
+15. Do not omit meaningful button labels, navigation labels, form labels, or footer text when they are relevant to the site structure.
+16. If some design assets cannot be extracted, generate visually appropriate equivalents that maintain the same level of polish.
+17. Social media icons must only appear if valid social links exist in the extracted source data.
+18. If no social links are found, do not display social icons anywhere.
+19. Use clean, modern, visually consistent iconography only.
+20. Mobile-first execution is required.
+
+--------------------------------------------------
+SOURCE SITE META
+--------------------------------------------------
+
+{{SITE_META}}
+
+--------------------------------------------------
+SOURCE SITE STRUCTURE
+--------------------------------------------------
+
+Use this as the required public page structure and preserve the original page slugs wherever possible:
+
+{{SITE_STRUCTURE}}
+
+--------------------------------------------------
+SOURCE COPYWRITING DATABASE
+--------------------------------------------------
+
+Use this extracted copywriting database as the main source of business content. Preserve useful original wording whenever possible.
+
+{{COPYWRITING}}
+
+--------------------------------------------------
+SOURCE BUSINESS INFORMATION
+--------------------------------------------------
+
+{{BUSINESS_INFO}}
+
+--------------------------------------------------
+SOURCE DESIGN SYSTEM
+--------------------------------------------------
+
+Use the extracted design system as a source reference for maintaining brand continuity where appropriate:
+
+{{DESIGN_SYSTEM}}
+
+--------------------------------------------------
+SOURCE IMAGE URL DATABASE
+--------------------------------------------------
+
+Use these extracted image URLs where relevant. Preserve meaningful brand and content imagery.
+
+{{IMAGES}}
+
+--------------------------------------------------
+EXTRACTION WARNINGS AND MISSING INFORMATION
+--------------------------------------------------
+
+Respect these limitations. Do not invent missing facts.
+
+{{EXTRACTION_NOTES}}
+
+--------------------------------------------------
+REFERENCE DESIGN DIRECTION
+--------------------------------------------------
+
+Reference URL:
+{{REFERENCE_URL}}
+
+Use the reference site only as inspiration for layout quality, section flow, spacing, hierarchy, visual polish, and modern presentation.
+
+Do not copy the source content from the reference site.
+Do not replace the source business identity with the reference site.
+
+--------------------------------------------------
+USER NOTES
+--------------------------------------------------
+
+{{USER_NOTES}}
+
+--------------------------------------------------
+FINAL BUILD INSTRUCTION
+--------------------------------------------------
+
+Build the complete website using the extracted source website database above.
+
+Requirements:
+- preserve source page intent
+- preserve source URL structure
+- preserve critical service wording
+- preserve important CTA wording
+- preserve testimonials, FAQs, offers, and trust signals when available
+- use the extracted design system as a continuity guide
+- use the reference design direction to improve presentation quality
+- apply conversion-oriented layout structure for stronger CTA placement, visual hierarchy, and trust signal positioning
+- output a fully built, client-ready website`;
+
+// ── compileExtractionUserPrompt ──
+function compileExtractionUserPrompt(input: {
+  sourceUrl: string;
+  referenceUrl: string;
+  businessType: string;
+  userNotes: string;
+}): string {
+  return `SOURCE URL:
+${input.sourceUrl}
+
+REFERENCE URL:
+${input.referenceUrl || "(none)"}
+
+BUSINESS TYPE:
+${input.businessType || "(not specified)"}
+
+USER NOTES:
+${input.userNotes || "(none)"}
+
+TASK:
+Extract the source website as completely as possible for downstream website rebuilding.
+
+PRIORITIES
+1. Preserve the original page URL structure and slug naming.
+2. Extract all useful public-facing copywriting, including buttons, navigation, and section text.
+3. Extract all business information, services, locations, testimonials, FAQs, offers, and contact details.
+4. Extract design attributes including color palette, font families, font sizes, font weights, and visual direction.
+5. Extract all usable public image URLs and classify them where possible.
+6. Return only valid JSON in the required schema.
+
+IMPORTANT
+- Do not aggressively summarize.
+- Do not omit public-facing copy.
+- Do not rewrite service names.
+- Do not invent facts.
+- If information is missing, leave it blank.
+- Return valid JSON only.`;
 }
 
 // ── callClaudeExtraction ──
@@ -280,54 +728,124 @@ function formatExtractionNotes(data: any): string {
   return sections.join("\n\n");
 }
 
-// ── Build brand footer credit block ──
-function buildBrandFooterBlock(brand: string): string {
-  const entry = BRAND_FOOTER_MAP[brand];
-  if (!entry) return "";
-  return `\n\n--------------------------------------------------
-FOOTER CREDIT
---------------------------------------------------
-
-Add a footer credit line at the bottom of the website footer.
-
-Format: ${entry.format}
-
-Replace {YEAR} with the current year.
-Replace {COMPANY} with the business name from the extracted source data.
-
-The credit text "${entry.label}" must be a hyperlink to ${entry.url} that opens in a new tab (target="_blank").
-
-Styling rules:
-- The credit line must be visually subtle
-- Font size must be smaller than normal paragraph text (e.g. 12px or 0.75rem)
-- Use muted / secondary text color
-- Do not make it bold or prominent
-- It should feel like a natural part of the footer, not an advertisement`;
+// ── assemblePrompt — fill template with formatted blocks ──
+function assemblePrompt(
+  template: string,
+  blocks: {
+    siteMeta: string;
+    siteStructure: string;
+    copywriting: string;
+    businessInfo: string;
+    designSystem: string;
+    images: string;
+    extractionNotes: string;
+  },
+  referenceUrl: string,
+  userNotes: string,
+): string {
+  return template
+    .replace("{{SITE_META}}", blocks.siteMeta || "")
+    .replace("{{SITE_STRUCTURE}}", blocks.siteStructure || "")
+    .replace("{{COPYWRITING}}", blocks.copywriting || "")
+    .replace("{{BUSINESS_INFO}}", blocks.businessInfo || "")
+    .replace("{{DESIGN_SYSTEM}}", blocks.designSystem || "")
+    .replace("{{IMAGES}}", blocks.images || "")
+    .replace("{{EXTRACTION_NOTES}}", blocks.extractionNotes || "")
+    .replace("{{REFERENCE_URL}}", referenceUrl || "(none)")
+    .replace("{{USER_NOTES}}", userNotes || "(none)");
 }
 
-// ── Build module append blocks ──
-function buildModuleBlocks(enabledModules: string[]): string {
-  if (!enabledModules || enabledModules.length === 0) return "";
+// ── Main handler ──
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
 
-  const blocks: string[] = [];
+  try {
+    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ success: false, error: "ANTHROPIC_API_KEY is not configured." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
-  // Content module design continuity
-  const contentModuleNames: Record<string, string> = {
-    portfolio_login: "Portfolio / Projects (With Login)",
-    portfolio_nologin: "Portfolio / Projects (Without Login)",
-    blog_login: "Blog (With Login)",
-    blog_nologin: "Blog (Without Login)",
-    gallery: "Gallery",
-    multilanguage: "Multi-language",
-  };
+    const { sourceUrl, referenceUrl, conversionLayoutUrl, businessType, userNotes, packageTier, themeMode, primaryColor, secondaryColor, primaryFont, fontWeight, enabledModules } = await req.json();
 
-  const activeContentModules = enabledModules.filter((m) =>
-    ["portfolio_login", "portfolio_nologin", "blog_login", "blog_nologin", "gallery", "multilanguage"].includes(m)
-  );
+    if (!sourceUrl) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Source URL is required." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
-  if (activeContentModules.length > 0) {
-    const moduleList = activeContentModules.map((m) => contentModuleNames[m] || m).join(", ");
-    let block = `\n\n--------------------------------------------------
+    const tier = packageTier === "350" ? "350" : "550";
+    const tierLabelA = tier === "350" ? "$350 Standard Layout" : "$550 Standard Layout";
+    const tierLabelB = tier === "350" ? "$450 Premium Conversion Layout" : "$750 Premium Conversion Layout";
+
+    console.log("Starting extraction for:", sourceUrl);
+
+    // Step 1: Compile extraction prompt
+    const userPrompt = compileExtractionUserPrompt({
+      sourceUrl,
+      referenceUrl: referenceUrl || "",
+      businessType: businessType || "",
+      userNotes: userNotes || "",
+    });
+
+    // Step 2: Call Claude for extraction
+    const rawText = await callClaudeExtraction(apiKey, EXTRACTION_SYSTEM_PROMPT, userPrompt);
+    console.log("Claude response received, length:", rawText.length);
+
+    // Step 3: Parse JSON
+    const parsedData = parseClaudeTextToJson(rawText);
+
+    // Step 4: Validate
+    if (!validateExtractionJson(parsedData)) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Claude returned invalid extraction data." }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Step 5: Normalize
+    const normalized = normalizeExtractionData(parsedData);
+
+    // Step 6: Format blocks (shared between both prompts)
+    const blocks = {
+      siteMeta: formatSiteMeta(normalized),
+      siteStructure: formatSiteStructure(normalized),
+      copywriting: formatCopywriting(normalized),
+      businessInfo: formatBusinessInfo(normalized),
+      designSystem: formatDesignSystem(normalized),
+      images: formatImages(normalized),
+      extractionNotes: formatExtractionNotes(normalized),
+    };
+
+    // Build brand override block
+    const brandOverrideParts: string[] = [];
+    if (primaryColor) brandOverrideParts.push(`Primary Color: ${primaryColor}`);
+    if (secondaryColor) brandOverrideParts.push(`Secondary Color: ${secondaryColor}`);
+    if (primaryFont) brandOverrideParts.push(`Primary Font: ${primaryFont}`);
+    if (fontWeight) brandOverrideParts.push(`Font Weight: ${fontWeight}`);
+    if (themeMode && themeMode !== 'auto') {
+      brandOverrideParts.push(`Theme Mode: ${themeMode === 'force_light' ? 'Force Light — use light backgrounds, light surfaces, dark text' : 'Force Dark — use dark backgrounds, dark surfaces, light text'}`);
+    }
+    const brandOverrideBlock = brandOverrideParts.length > 0
+      ? `\n\n--------------------------------------------------\nBRAND & THEME OVERRIDE\n--------------------------------------------------\n\n${brandOverrideParts.join('\n')}\n\nApply these brand overrides to the final design. Brand colors take priority over extracted design system colors. Theme mode affects page background, section backgrounds, surface/card tones, and text contrast — but does NOT override brand colors.`
+      : '';
+
+    // Build content module design continuity block
+    const contentModuleNames: Record<string, string> = {
+      portfolio: 'Portfolio / Projects',
+      blog: 'Blog',
+      gallery: 'Gallery',
+    };
+    const activeContentModules = (enabledModules || []).filter((m: string) => ['portfolio', 'blog', 'gallery'].includes(m));
+    let contentModuleBlock = '';
+    if (activeContentModules.length > 0) {
+      const moduleList = activeContentModules.map((m: string) => contentModuleNames[m] || m).join(', ');
+      contentModuleBlock = `\n\n--------------------------------------------------
 CONTENT MODULE DESIGN CONTINUITY
 --------------------------------------------------
 
@@ -347,279 +865,29 @@ They must inherit:
 
 Do NOT introduce a new design system for these modules.
 New pages must look like they were originally part of the website.
-`;
 
-    if (activeContentModules.includes("portfolio_login") || activeContentModules.includes("portfolio_nologin")) {
-      const withLogin = activeContentModules.includes("portfolio_login");
-      block += `\nPORTFOLIO MODULE:
+${activeContentModules.includes('portfolio') ? `PORTFOLIO MODULE:
 - Generate a Portfolio listing page and individual Project detail pages.
 - Portfolio cards must reuse the website's existing card style.
 - Project pages must use the same typography hierarchy and spacing system.
-${withLogin ? "- Include a login-gated admin area for managing portfolio items.\n" : ""}`;
-    }
-
-    if (activeContentModules.includes("blog_login") || activeContentModules.includes("blog_nologin")) {
-      const withLogin = activeContentModules.includes("blog_login");
-      block += `\nBLOG MODULE:
+` : ''}${activeContentModules.includes('blog') ? `BLOG MODULE:
 - Generate a Blog listing page and an Article page template.
 - Typography must follow the website's heading hierarchy and paragraph spacing.
-${withLogin ? "- Include a login-gated admin area for managing blog posts.\n" : ""}`;
-    }
-
-    if (activeContentModules.includes("gallery")) {
-      block += `\nGALLERY MODULE:
+` : ''}${activeContentModules.includes('gallery') ? `GALLERY MODULE:
 - Generate an image grid layout and a lightbox image viewer.
 - Gallery must inherit image border radius, spacing, overlay style, and hover effects.
-`;
+` : ''}`;
     }
 
-    if (activeContentModules.includes("multilanguage")) {
-      block += `\nMULTI-LANGUAGE MODULE:
-- Implement language switching capability.
-- All user-facing text must support translation.
-- Add a language selector in the navigation.
-`;
-    }
-
-    blocks.push(block);
-  }
-
-  // Advanced modules
-  const advancedModuleNames: Record<string, string> = {
-    lead_capture: "Lead Capture Upgrade",
-    conversion_layout: "Conversion Layout",
-    trust_badges: "Trust Badge Section",
-    service_comparison: "Service Comparison",
-    case_study: "Case Study Section",
-    full_seo: "Full SEO Package",
-  };
-
-  const activeAdvanced = enabledModules.filter((m) =>
-    ["lead_capture", "conversion_layout", "trust_badges", "service_comparison", "case_study", "full_seo"].includes(m)
-  );
-
-  if (activeAdvanced.length > 0) {
-    const advList = activeAdvanced.map((m) => advancedModuleNames[m] || m).join(", ");
-    blocks.push(`\n\n--------------------------------------------------
-ADVANCED MODULES
---------------------------------------------------
-
-Enabled Advanced Modules: ${advList}
-
-These modules are add-ons. They must not rewrite the core website structure. They must be appended as additional sections or enhancements to the existing design.
-`);
-  }
-
-  return blocks.join("");
-}
-
-// ── Main handler ──
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ success: false, error: "ANTHROPIC_API_KEY is not configured." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-
-    const {
-      sourceUrl, referenceUrl, conversionLayoutUrl, businessType, userNotes,
-      packageTier, themeMode, primaryColor, secondaryColor, primaryFont,
-      fontWeight, enabledModules, projectBrand,
-    } = await req.json();
-
-    if (!sourceUrl) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Source URL is required." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    const tier = packageTier === "350" ? "350" : "550";
-    const tierLabelA = tier === "350" ? "$350 Standard Layout" : "$550 Standard Layout";
-    const tierLabelB = tier === "350" ? "$450 Premium Conversion Layout" : "$750 Premium Conversion Layout";
-
-    console.log("Fetching prompts from database...");
-
-    // ── STEP 1: Fetch the three stored prompts ──
-    const [extractionPromptContent, masterPromptContent, _assemblyRulesContent] = await Promise.all([
-      fetchPromptContent(supabaseUrl, supabaseServiceKey, "SwiftLift Source Extraction Prompt V1"),
-      fetchPromptContent(supabaseUrl, supabaseServiceKey, "SwiftLift Final Build Master Prompt V1"),
-      fetchPromptContent(supabaseUrl, supabaseServiceKey, "SwiftLift Prompt Assembly Rules V1"),
-    ]);
-
-    console.log("Prompts fetched. Extraction prompt length:", extractionPromptContent.length, "Master prompt length:", masterPromptContent.length);
-
-    // ── STEP 2: Build the extraction system prompt by replacing {SOURCE_URL} ──
-    const extractionSystemPrompt = extractionPromptContent.replace(/\{SOURCE_URL\}/g, sourceUrl);
-
-    // ── STEP 3: Build extraction user prompt ──
-    const extractionUserPrompt = `SOURCE URL:
-${sourceUrl}
-
-REFERENCE URL:
-${referenceUrl || "(none)"}
-
-BUSINESS TYPE:
-${businessType || "(not specified)"}
-
-USER NOTES:
-${userNotes || "(none)"}
-
-TASK:
-Extract the source website as completely as possible for downstream website rebuilding.
-
-PRIORITIES
-1. Preserve the original page URL structure and slug naming.
-2. Extract all useful public-facing copywriting, including buttons, navigation, and section text.
-3. Extract all business information, services, locations, testimonials, FAQs, offers, and contact details.
-4. Extract design attributes including color palette, font families, font sizes, font weights, and visual direction.
-5. Extract all usable public image URLs and classify them where possible.
-6. Return only valid JSON in the required schema.
-
-IMPORTANT
-- Do not aggressively summarize.
-- Do not omit public-facing copy.
-- Do not rewrite service names.
-- Do not invent facts.
-- If information is missing, leave it blank.
-- Return valid JSON only.`;
-
-    console.log("Starting extraction for:", sourceUrl);
-
-    // ── STEP 4: Call Claude for extraction ──
-    const rawText = await callClaudeExtraction(apiKey, extractionSystemPrompt, extractionUserPrompt);
-    console.log("Claude response received, length:", rawText.length);
-
-    // ── STEP 5: Parse JSON ──
-    const parsedData = parseClaudeTextToJson(rawText);
-
-    // ── STEP 6: Validate ──
-    if (!validateExtractionJson(parsedData)) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Claude returned invalid extraction data." }),
-        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    // ── STEP 7: Normalize ──
-    const normalized = normalizeExtractionData(parsedData);
-
-    // ── STEP 8: Format blocks ──
-    const blocks = {
-      siteMeta: formatSiteMeta(normalized),
-      siteStructure: formatSiteStructure(normalized),
-      copywriting: formatCopywriting(normalized),
-      businessInfo: formatBusinessInfo(normalized),
-      designSystem: formatDesignSystem(normalized),
-      images: formatImages(normalized),
-      extractionNotes: formatExtractionNotes(normalized),
-    };
-
-    // Scraped URLs = formatted site structure
-    const scrapedUrls = formatSiteStructure(normalized);
-    // Scraped data = full JSON stringified extraction
-    const scrapedDataJson = JSON.stringify(normalized, null, 2);
-
-    // ── STEP 9: Inject placeholders into master prompt ──
+    // Use conversion layout URL for prompt B if provided
     const convUrl = conversionLayoutUrl || referenceUrl || "";
 
-    // Build brand override block
-    const brandOverrideParts: string[] = [];
-    if (primaryColor) brandOverrideParts.push(`Primary Color: ${primaryColor}`);
-    if (secondaryColor) brandOverrideParts.push(`Secondary Color: ${secondaryColor}`);
-    if (primaryFont) brandOverrideParts.push(`Primary Font: ${primaryFont}`);
-    if (fontWeight) brandOverrideParts.push(`Font Weight: ${fontWeight}`);
-    if (themeMode && themeMode !== "auto") {
-      brandOverrideParts.push(
-        `Theme Mode: ${themeMode === "force_light" ? "Force Light — use light backgrounds, light surfaces, dark text" : "Force Dark — use dark backgrounds, dark surfaces, light text"}`,
-      );
-    }
-    const brandOverrideBlock = brandOverrideParts.length > 0
-      ? `\n\n--------------------------------------------------\nBRAND & THEME OVERRIDE\n--------------------------------------------------\n\n${brandOverrideParts.join("\n")}\n\nApply these brand overrides to the final design. Brand colors take priority over extracted design system colors. Theme mode affects page background, section backgrounds, surface/card tones, and text contrast — but does NOT override brand colors.`
-      : "";
-
-    // Build module blocks
-    const moduleBlocks = buildModuleBlocks(enabledModules || []);
-
-    // Build brand footer credit
-    const footerCreditBlock = buildBrandFooterBlock(projectBrand || "SwiftLift");
-
-    // ── STEP 10: Assemble prompts from the master prompt template ──
-    // The master prompt uses placeholders: {SOURCE_URL}, {REFERENCE_URL}, {REFERENCE_SCREENSHOT}, {SCRAPED_DATA}, {SCRAPED_URLS}
-    // Safe replace that avoids $ pattern interpretation in replacement strings
-    function safeReplace(str: string, search: RegExp, replacement: string): string {
-      return str.replace(search, () => replacement);
-    }
-
-    function injectMasterPrompt(template: string, refUrl: string): string {
-      let result = template;
-      result = safeReplace(result, /\{SOURCE_URL\}/g, sourceUrl);
-      result = safeReplace(result, /\{REFERENCE_URL\}/g, refUrl || "(none)");
-      result = safeReplace(result, /\{REFERENCE_SCREENSHOT\}/g, "(not available)");
-      result = safeReplace(result, /\{SCRAPED_DATA\}/g, scrapedDataJson);
-      result = safeReplace(result, /\{SCRAPED_URLS\}/g, scrapedUrls);
-      result = safeReplace(result, /\{\{SITE_META\}\}/g, blocks.siteMeta || "");
-      result = safeReplace(result, /\{\{SITE_STRUCTURE\}\}/g, blocks.siteStructure || "");
-      result = safeReplace(result, /\{\{COPYWRITING\}\}/g, blocks.copywriting || "");
-      result = safeReplace(result, /\{\{BUSINESS_INFO\}\}/g, blocks.businessInfo || "");
-      result = safeReplace(result, /\{\{DESIGN_SYSTEM\}\}/g, blocks.designSystem || "");
-      result = safeReplace(result, /\{\{IMAGES\}\}/g, blocks.images || "");
-      result = safeReplace(result, /\{\{EXTRACTION_NOTES\}\}/g, blocks.extractionNotes || "");
-      result = safeReplace(result, /\{\{REFERENCE_URL\}\}/g, refUrl || "(none)");
-      result = safeReplace(result, /\{\{USER_NOTES\}\}/g, userNotes || "(none)");
-      return result;
-    }
-
-    // Prompt A = Standard layout (uses style reference URL)
-    const assembledA = injectMasterPrompt(masterPromptContent, referenceUrl || "");
+    // Step 7: Assemble BOTH prompts from same extracted data
     const promptA = `SWIFTLIFT BUILD PROMPT — ${tierLabelA}\nSource: ${sourceUrl}\n\n` +
-      assembledA + brandOverrideBlock + moduleBlocks + footerCreditBlock;
+      assemblePrompt(STANDARD_PROMPT_TEMPLATE, blocks, referenceUrl || "", userNotes || "") + brandOverrideBlock + contentModuleBlock;
 
-    // Prompt B = Premium conversion layout (uses conversion reference URL)
-    // For Prompt B, we append a conversion layout instruction section
-    const conversionLayoutSection = `\n\n--------------------------------------------------
-LAYOUT MODE: PREMIUM CONVERSION LAYOUT
---------------------------------------------------
-
-Build a conversion-oriented layout using the same source business content.
-
-This is NOT a marketing strategy or CRO analysis.
-This is a LAYOUT UPGRADE ONLY.
-
-Apply these layout principles:
-
-1. Lead with the strongest value proposition or hero headline.
-2. Place the primary call-to-action prominently above the fold.
-3. Use a landing-page-inspired section flow:
-   - Hero with clear CTA
-   - Key benefits or services (visual, scannable)
-   - Social proof / testimonials / trust signals early
-   - Detailed service or offering breakdown
-   - Secondary CTA or lead capture
-   - About / credibility section
-   - Final CTA / contact
-   - Footer
-4. Use stronger visual hierarchy: larger headings, bolder CTAs, more whitespace between sections.
-5. Place trust signals (testimonials, certifications, years in business) closer to CTAs.
-6. Use more prominent button styling for primary actions.
-7. Repeat the primary CTA at strategic intervals throughout the page.
-8. Use visual separators, background color alternation, or card layouts to create clear section breaks.
-
-IMPORTANT: Do NOT add conversion strategy, CRO analysis, sales funnel planning, audience targeting, or marketing consulting content. Only restructure the layout for better conversion flow.`;
-
-    const assembledB = injectMasterPrompt(masterPromptContent, convUrl);
     const promptB = `SWIFTLIFT BUILD PROMPT — ${tierLabelB}\nSource: ${sourceUrl}\n\n` +
-      assembledB + conversionLayoutSection + brandOverrideBlock + moduleBlocks + footerCreditBlock;
+      assemblePrompt(PREMIUM_PROMPT_TEMPLATE, blocks, convUrl, userNotes || "") + brandOverrideBlock + contentModuleBlock;
 
     console.log("Prompts assembled. A length:", promptA.length, "B length:", promptB.length);
 
