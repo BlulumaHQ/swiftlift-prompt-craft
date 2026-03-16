@@ -98,6 +98,9 @@ export default function NavHeader({ title, rightContent }: NavHeaderProps) {
         <Link to="/lock-preview" className={`nav-link ${isActive('/lock-preview') ? 'active' : ''}`}>
           <Lock size={14} /> Lock Preview
         </Link>
+        <Link to="/client-assets" className={`nav-link ${isActive('/client-assets') ? 'active' : ''}`}>
+          <ImageIcon size={14} /> Client Assets
+        </Link>
       </nav>
 
       <div className="h-5 w-px bg-foreground/20 mr-2" />

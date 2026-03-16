@@ -31,6 +31,7 @@ const App = () => (
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/quality-control" element={<QualityControl />} />
           <Route path="/lock-preview" element={<LockPreview />} />
+          <Route path="/client-assets" element={<ClientAssets />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
