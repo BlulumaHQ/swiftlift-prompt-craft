@@ -3,7 +3,14 @@ import NavHeader from '@/components/NavHeader';
 import ControlPanel from '@/components/ControlPanel';
 import PromptOutputPanel from '@/components/PromptOutputPanel';
 import { Trash2, Save, FilePlus, Loader2 } from 'lucide-react';
-import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
+import { Panel } from 'react-resizable-panels';
+
+let Group: any, Separator: any;
+try {
+  const mod = require('react-resizable-panels');
+  Group = mod.Group || mod.PanelGroup;
+  Separator = mod.Separator || mod.PanelResizeHandle;
+} catch {}
 
 const LOADING_STEPS = [
   'Scraping Source URL...',
