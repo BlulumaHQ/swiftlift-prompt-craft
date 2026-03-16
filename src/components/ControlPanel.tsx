@@ -276,24 +276,20 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
             {/* Conversion Layout Reference */}
             <div>
               <label className="control-label">Conversion Layout Reference <span className="text-muted-foreground font-normal">(premium)</span></label>
-              <div className="flex gap-2">
-                <div className="control-input flex-1 bg-muted/50 flex items-center justify-between min-h-[36px]">
-                  {convRef ? (
-                    <>
-                      <span className="text-sm truncate">{convRef.reference_name}</span>
-                      <button onClick={() => setConvRef(null)} className="ml-1 p-0.5 rounded hover:bg-muted transition-colors text-muted-foreground">
-                        <X size={12} />
-                      </button>
-                    </>
-                  ) : (
-                    <span className="text-muted-foreground text-sm">Select conversion layout...</span>
-                  )}
+              {convRef ? (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-muted/50 min-h-[40px]">
+                  <LayoutGrid size={14} className="text-muted-foreground shrink-0" />
+                  <span className="text-sm truncate flex-1">{convRef.reference_name}</span>
+                  <button onClick={() => setConvRef(null)} className="p-0.5 rounded hover:bg-muted transition-colors text-muted-foreground">
+                    <X size={14} />
+                  </button>
                 </div>
+              ) : (
                 <button onClick={() => setShowConvLibrary(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors whitespace-nowrap">
-                  <LayoutGrid size={14} /> Demo Sites
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
+                  <LayoutGrid size={16} /> Select Conversion Demo Site
                 </button>
-              </div>
+              )}
             </div>
 
             {/* Conversion Reference URL (manual override) */}
