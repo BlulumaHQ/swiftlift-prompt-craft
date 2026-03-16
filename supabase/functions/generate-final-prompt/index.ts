@@ -1,0 +1,746 @@
+import Anthropic from "npm:@anthropic-ai/sdk@0.39.0";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+// ── Extraction System Prompt (from SwiftLift Source Extraction Prompt V1) ──
+const EXTRACTION_SYSTEM_PROMPT = `You are a deterministic website source extraction engine.
+
+Your task is to extract ALL usable business, structural, design, and asset information from the Source URL so the website can be rebuilt as accurately as possible.
+
+This output will be used as a structured database for rebuilding the website and generating a final website build prompt.
+
+CRITICAL RULES
+
+1. Use the Source URL as the primary source of truth.
+2. Preserve original wording whenever possible.
+3. Do not summarize aggressively.
+4. Do not omit meaningful public-facing copywriting.
+5. Extract and preserve the original public URL structure and slug naming whenever available.
+6. Do not rename page URLs unless the source clearly does not provide a usable public slug.
+7. Extract all meaningful page titles, headings, subheadings, paragraph copy, button labels, navigation labels, form labels, footer text, CTA copy, FAQ content, testimonial content, and offer text.
+8. Extract all meaningful business information including services, service details, locations served, contact information, hours, trust signals, and social links.
+9. Extract design-related information including primary color, secondary color, accent color, additional colors, heading font family, body font family, font size hierarchy, font weight hierarchy, button style, border radius style, and overall visual direction.
+10. Extract all usable public image URLs including logo, favicon, hero images, section images, service images, gallery images, team images, background images, and any other meaningful image assets.
+11. Ignore privacy policy, terms, login, account, cart, checkout, cookie notices, and unrelated blog clutter unless they contain important business facts.
+12. Do not invent facts.
+13. Merge duplicate information cleanly while preserving important wording.
+14. Return valid JSON only.
+15. Do not output markdown.
+16. Do not output explanations.
+17. Leave missing values blank or as empty arrays.
+
+RETURN THIS EXACT JSON STRUCTURE
+
+{
+  "site_meta": {
+    "source_url": "",
+    "site_name": "",
+    "logo_url": "",
+    "favicon_url": "",
+    "primary_domain": ""
+  },
+  "site_structure": [
+    {
+      "page_title": "",
+      "page_type": "",
+      "url": "",
+      "slug": "",
+      "nav_label": "",
+      "meta_title": "",
+      "meta_description": ""
+    }
+  ],
+  "copywriting": {
+    "global_value_proposition": "",
+    "brand_summary": "",
+    "tone_of_voice": "",
+    "all_headings": [],
+    "all_subheadings": [],
+    "all_paragraphs": [],
+    "all_button_texts": [],
+    "all_ctas": [],
+    "all_form_labels": [],
+    "all_nav_labels": [],
+    "all_footer_text": [],
+    "all_faqs": [],
+    "all_testimonials": [],
+    "all_offers": []
+  },
+  "business_info": {
+    "business_name": "",
+    "services": [],
+    "service_details": [],
+    "target_audience": [],
+    "locations_served": [],
+    "contact_info": {
+      "phone": "",
+      "email": "",
+      "address": ""
+    },
+    "hours": [],
+    "social_links": [],
+    "trust_signals": []
+  },
+  "design_system": {
+    "primary_color": "",
+    "secondary_color": "",
+    "accent_color": "",
+    "additional_colors": [],
+    "heading_font_family": "",
+    "body_font_family": "",
+    "font_sizes": {
+      "hero_title": "",
+      "page_title": "",
+      "section_title": "",
+      "body_text": "",
+      "button_text": ""
+    },
+    "font_weights": {
+      "hero_title": "",
+      "page_title": "",
+      "section_title": "",
+      "body_text": "",
+      "button_text": ""
+    },
+    "button_style": "",
+    "border_radius_style": "",
+    "overall_visual_direction": ""
+  },
+  "images": {
+    "hero_images": [],
+    "logo_images": [],
+    "section_images": [],
+    "gallery_images": [],
+    "team_images": [],
+    "service_images": [],
+    "background_images": [],
+    "all_image_urls": []
+  },
+  "extraction_notes": {
+    "missing_information": [],
+    "warnings": []
+  }
+}`;
+
+// ── Master Prompt Template (from SwiftLift Final Build Master Prompt V1) ──
+const MASTER_PROMPT_TEMPLATE = `You are a deterministic website builder operating in PRODUCTION MODE.
+
+Your goal is to generate a COMPLETE, CLIENT-READY WEBSITE in a single build.
+
+The website must appear fully finished, professional, intentional, and conversion-focused.
+
+No placeholder text.
+No lorem ipsum.
+No unfinished sections.
+No generic filler copy.
+
+--------------------------------------------------
+BUILD FORMULA
+--------------------------------------------------
+
+New Website =
+Reference Design Direction
++
+Extracted Source Business Content
++
+Preserved Source URL Structure
++
+Preserved Source Copywriting Database
+
+--------------------------------------------------
+CORE BUILD RULES
+--------------------------------------------------
+
+1. Use the extracted source business content as the primary source of truth.
+2. Preserve the original public page URL structure and slug naming from the source website whenever available.
+3. Do not rename source page URLs unless explicitly required.
+4. Preserve important business wording, service names, CTA text, and trust signals whenever possible.
+5. Do not invent unsupported claims, certifications, awards, offers, or service details.
+6. Rebuild the website with a modern, polished, high-conversion presentation while keeping the business identity intact.
+7. Use the reference design direction for layout and visual refinement, but do not overwrite source business facts.
+8. Every public-facing page must feel complete and intentional.
+9. All pages must be mobile responsive and visually consistent.
+10. The final site must feel fully designed, not templated.
+11. Use only valid public-facing pages from the extracted source structure.
+12. Preserve page intent from the source site.
+13. Preserve important CTA wording, buttons, testimonials, FAQs, offers, and trust signals when available.
+14. Use the extracted design system as a continuity guide where appropriate.
+15. Do not omit meaningful button labels, navigation labels, form labels, or footer text when they are relevant to the site structure.
+16. If some design assets cannot be extracted, generate visually appropriate equivalents that maintain the same level of polish.
+17. Social media icons must only appear if valid social links exist in the extracted source data.
+18. If no social links are found, do not display social icons anywhere.
+19. Use clean, modern, visually consistent iconography only.
+20. Mobile-first execution is required.
+
+--------------------------------------------------
+SOURCE SITE META
+--------------------------------------------------
+
+{{SITE_META}}
+
+--------------------------------------------------
+SOURCE SITE STRUCTURE
+--------------------------------------------------
+
+Use this as the required public page structure and preserve the original page slugs wherever possible:
+
+{{SITE_STRUCTURE}}
+
+--------------------------------------------------
+SOURCE COPYWRITING DATABASE
+--------------------------------------------------
+
+Use this extracted copywriting database as the main source of business content. Preserve useful original wording whenever possible.
+
+{{COPYWRITING}}
+
+--------------------------------------------------
+SOURCE BUSINESS INFORMATION
+--------------------------------------------------
+
+{{BUSINESS_INFO}}
+
+--------------------------------------------------
+SOURCE DESIGN SYSTEM
+--------------------------------------------------
+
+Use the extracted design system as a source reference for maintaining brand continuity where appropriate:
+
+{{DESIGN_SYSTEM}}
+
+--------------------------------------------------
+SOURCE IMAGE URL DATABASE
+--------------------------------------------------
+
+Use these extracted image URLs where relevant. Preserve meaningful brand and content imagery.
+
+{{IMAGES}}
+
+--------------------------------------------------
+EXTRACTION WARNINGS AND MISSING INFORMATION
+--------------------------------------------------
+
+Respect these limitations. Do not invent missing facts.
+
+{{EXTRACTION_NOTES}}
+
+--------------------------------------------------
+REFERENCE DESIGN DIRECTION
+--------------------------------------------------
+
+Reference URL:
+{{REFERENCE_URL}}
+
+Use the reference site only as inspiration for layout quality, section flow, spacing, hierarchy, visual polish, and modern presentation.
+
+Do not copy the source content from the reference site.
+Do not replace the source business identity with the reference site.
+
+--------------------------------------------------
+USER NOTES
+--------------------------------------------------
+
+{{USER_NOTES}}
+
+--------------------------------------------------
+FINAL BUILD INSTRUCTION
+--------------------------------------------------
+
+Build the complete website using the extracted source website database above.
+
+Requirements:
+- preserve source page intent
+- preserve source URL structure
+- preserve critical service wording
+- preserve important CTA wording
+- preserve testimonials, FAQs, offers, and trust signals when available
+- use the extracted design system as a continuity guide
+- use the reference design direction to improve presentation quality
+- output a fully built, client-ready website`;
+
+// ── 1. compileExtractionUserPrompt ──
+function compileExtractionUserPrompt(input: {
+  sourceUrl: string;
+  referenceUrl: string;
+  businessType: string;
+  userNotes: string;
+}): string {
+  return `SOURCE URL:
+${input.sourceUrl}
+
+REFERENCE URL:
+${input.referenceUrl || "(none)"}
+
+BUSINESS TYPE:
+${input.businessType || "(not specified)"}
+
+USER NOTES:
+${input.userNotes || "(none)"}
+
+TASK:
+Extract the source website as completely as possible for downstream website rebuilding.
+
+PRIORITIES
+1. Preserve the original page URL structure and slug naming.
+2. Extract all useful public-facing copywriting, including buttons, navigation, and section text.
+3. Extract all business information, services, locations, testimonials, FAQs, offers, and contact details.
+4. Extract design attributes including color palette, font families, font sizes, font weights, and visual direction.
+5. Extract all usable public image URLs and classify them where possible.
+6. Return only valid JSON in the required schema.
+
+IMPORTANT
+- Do not aggressively summarize.
+- Do not omit public-facing copy.
+- Do not rewrite service names.
+- Do not invent facts.
+- If information is missing, leave it blank.
+- Return valid JSON only.`;
+}
+
+// ── 2. callClaudeExtraction ──
+async function callClaudeExtraction(
+  apiKey: string,
+  systemPrompt: string,
+  userPrompt: string,
+): Promise<string> {
+  const client = new Anthropic({ apiKey });
+  const message = await client.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 16000,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userPrompt }],
+  });
+  const textBlock = message.content.find((b: any) => b.type === "text");
+  if (!textBlock || textBlock.type !== "text") {
+    throw new Error("Claude returned no text content");
+  }
+  return textBlock.text;
+}
+
+// ── 3. parseClaudeTextToJson ──
+function parseClaudeTextToJson(text: string): any {
+  // Try direct parse first
+  try {
+    return JSON.parse(text);
+  } catch {
+    // Extract JSON from possible markdown fences
+    const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (match) {
+      return JSON.parse(match[1].trim());
+    }
+    // Try finding first { to last }
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start !== -1 && end !== -1) {
+      return JSON.parse(text.slice(start, end + 1));
+    }
+    throw new Error("Could not parse Claude response as JSON");
+  }
+}
+
+// ── 4. validateExtractionJson ──
+function validateExtractionJson(data: any): boolean {
+  return (
+    data &&
+    typeof data === "object" &&
+    data.site_meta !== undefined &&
+    data.copywriting !== undefined &&
+    data.business_info !== undefined
+  );
+}
+
+// ── 5. normalizeExtractionData ──
+function normalizeExtractionData(data: any): any {
+  const str = (v: any) => (typeof v === "string" ? v : "");
+  const arr = (v: any) => (Array.isArray(v) ? v : []);
+  const obj = (v: any, defaults: any) => {
+    const result: any = {};
+    for (const key of Object.keys(defaults)) {
+      const def = defaults[key];
+      if (Array.isArray(def)) result[key] = arr(v?.[key]);
+      else if (typeof def === "object" && def !== null)
+        result[key] = obj(v?.[key], def);
+      else result[key] = str(v?.[key]);
+    }
+    return result;
+  };
+
+  const template = {
+    site_meta: {
+      source_url: "",
+      site_name: "",
+      logo_url: "",
+      favicon_url: "",
+      primary_domain: "",
+    },
+    site_structure: [],
+    copywriting: {
+      global_value_proposition: "",
+      brand_summary: "",
+      tone_of_voice: "",
+      all_headings: [],
+      all_subheadings: [],
+      all_paragraphs: [],
+      all_button_texts: [],
+      all_ctas: [],
+      all_form_labels: [],
+      all_nav_labels: [],
+      all_footer_text: [],
+      all_faqs: [],
+      all_testimonials: [],
+      all_offers: [],
+    },
+    business_info: {
+      business_name: "",
+      services: [],
+      service_details: [],
+      target_audience: [],
+      locations_served: [],
+      contact_info: { phone: "", email: "", address: "" },
+      hours: [],
+      social_links: [],
+      trust_signals: [],
+    },
+    design_system: {
+      primary_color: "",
+      secondary_color: "",
+      accent_color: "",
+      additional_colors: [],
+      heading_font_family: "",
+      body_font_family: "",
+      font_sizes: {
+        hero_title: "",
+        page_title: "",
+        section_title: "",
+        body_text: "",
+        button_text: "",
+      },
+      font_weights: {
+        hero_title: "",
+        page_title: "",
+        section_title: "",
+        body_text: "",
+        button_text: "",
+      },
+      button_style: "",
+      border_radius_style: "",
+      overall_visual_direction: "",
+    },
+    images: {
+      hero_images: [],
+      logo_images: [],
+      section_images: [],
+      gallery_images: [],
+      team_images: [],
+      service_images: [],
+      background_images: [],
+      all_image_urls: [],
+    },
+    extraction_notes: { missing_information: [], warnings: [] },
+  };
+
+  const normalized: any = {};
+  normalized.site_meta = obj(data.site_meta, template.site_meta);
+  normalized.site_structure = arr(data.site_structure);
+  normalized.copywriting = obj(data.copywriting, template.copywriting);
+  normalized.business_info = obj(data.business_info, template.business_info);
+  normalized.design_system = obj(data.design_system, template.design_system);
+  normalized.images = obj(data.images, template.images);
+  normalized.extraction_notes = obj(
+    data.extraction_notes,
+    template.extraction_notes,
+  );
+  return normalized;
+}
+
+// ── 6-12. Formatting functions (Assembly Rules) ──
+
+function formatBulletList(items: any[]): string {
+  if (!items || items.length === 0) return "";
+  return items
+    .map((item) => {
+      if (typeof item === "string") return `- ${item}`;
+      if (typeof item === "object") return `- ${JSON.stringify(item)}`;
+      return `- ${String(item)}`;
+    })
+    .join("\n");
+}
+
+function formatLabeledLines(obj: any): string {
+  if (!obj || typeof obj !== "object") return "";
+  return Object.entries(obj)
+    .filter(([, v]) => v !== "" && v !== undefined && v !== null)
+    .map(([k, v]) => {
+      if (Array.isArray(v)) return `${k}: ${v.join(", ")}`;
+      if (typeof v === "object" && v !== null) return `${k}:\n${formatLabeledLines(v)}`;
+      return `${k}: ${v}`;
+    })
+    .join("\n");
+}
+
+function formatSiteMeta(data: any): string {
+  return formatLabeledLines(data.site_meta);
+}
+
+function formatSiteStructure(data: any): string {
+  const pages = data.site_structure || [];
+  if (pages.length === 0) return "";
+  return pages
+    .map(
+      (p: any) =>
+        `Page Title: ${p.page_title || ""}
+Page Type: ${p.page_type || ""}
+URL: ${p.url || ""}
+Slug: ${p.slug || ""}
+Nav Label: ${p.nav_label || ""}
+Meta Title: ${p.meta_title || ""}
+Meta Description: ${p.meta_description || ""}`,
+    )
+    .join("\n\n");
+}
+
+function formatCopywriting(data: any): string {
+  const c = data.copywriting || {};
+  const sections: string[] = [];
+
+  if (c.global_value_proposition)
+    sections.push(`Global Value Proposition:\n${c.global_value_proposition}`);
+  if (c.brand_summary) sections.push(`Brand Summary:\n${c.brand_summary}`);
+  if (c.tone_of_voice) sections.push(`Tone of Voice:\n${c.tone_of_voice}`);
+
+  const listSections: [string, string][] = [
+    ["Headings", "all_headings"],
+    ["Subheadings", "all_subheadings"],
+    ["Paragraphs", "all_paragraphs"],
+    ["Button Texts", "all_button_texts"],
+    ["CTAs", "all_ctas"],
+    ["Form Labels", "all_form_labels"],
+    ["Navigation Labels", "all_nav_labels"],
+    ["Footer Text", "all_footer_text"],
+    ["FAQs", "all_faqs"],
+    ["Testimonials", "all_testimonials"],
+    ["Offers", "all_offers"],
+  ];
+
+  for (const [label, key] of listSections) {
+    const items = c[key];
+    if (items && items.length > 0) {
+      sections.push(`${label}:\n${formatBulletList(items)}`);
+    }
+  }
+
+  return sections.join("\n\n");
+}
+
+function formatBusinessInfo(data: any): string {
+  const b = data.business_info || {};
+  const sections: string[] = [];
+
+  if (b.business_name) sections.push(`Business Name: ${b.business_name}`);
+  if (b.services?.length) sections.push(`Services:\n${formatBulletList(b.services)}`);
+  if (b.service_details?.length) sections.push(`Service Details:\n${formatBulletList(b.service_details)}`);
+  if (b.target_audience?.length) sections.push(`Target Audience:\n${formatBulletList(b.target_audience)}`);
+  if (b.locations_served?.length) sections.push(`Locations Served:\n${formatBulletList(b.locations_served)}`);
+
+  const ci = b.contact_info;
+  if (ci && (ci.phone || ci.email || ci.address)) {
+    sections.push(
+      `Contact Information:\n${ci.phone ? `Phone: ${ci.phone}\n` : ""}${ci.email ? `Email: ${ci.email}\n` : ""}${ci.address ? `Address: ${ci.address}` : ""}`.trim(),
+    );
+  }
+
+  if (b.hours?.length) sections.push(`Hours:\n${formatBulletList(b.hours)}`);
+  if (b.social_links?.length) sections.push(`Social Links:\n${formatBulletList(b.social_links)}`);
+  if (b.trust_signals?.length) sections.push(`Trust Signals:\n${formatBulletList(b.trust_signals)}`);
+
+  return sections.join("\n\n");
+}
+
+function formatDesignSystem(data: any): string {
+  const d = data.design_system || {};
+  const lines: string[] = [];
+
+  if (d.primary_color) lines.push(`Primary Color: ${d.primary_color}`);
+  if (d.secondary_color) lines.push(`Secondary Color: ${d.secondary_color}`);
+  if (d.accent_color) lines.push(`Accent Color: ${d.accent_color}`);
+  if (d.additional_colors?.length) lines.push(`Additional Colors: ${d.additional_colors.join(", ")}`);
+  if (d.heading_font_family) lines.push(`Heading Font Family: ${d.heading_font_family}`);
+  if (d.body_font_family) lines.push(`Body Font Family: ${d.body_font_family}`);
+
+  if (d.font_sizes) {
+    const fs = d.font_sizes;
+    const fsLines = Object.entries(fs)
+      .filter(([, v]) => v)
+      .map(([k, v]) => `  ${k}: ${v}`);
+    if (fsLines.length) lines.push(`Font Sizes:\n${fsLines.join("\n")}`);
+  }
+
+  if (d.font_weights) {
+    const fw = d.font_weights;
+    const fwLines = Object.entries(fw)
+      .filter(([, v]) => v)
+      .map(([k, v]) => `  ${k}: ${v}`);
+    if (fwLines.length) lines.push(`Font Weights:\n${fwLines.join("\n")}`);
+  }
+
+  if (d.button_style) lines.push(`Button Style: ${d.button_style}`);
+  if (d.border_radius_style) lines.push(`Border Radius Style: ${d.border_radius_style}`);
+  if (d.overall_visual_direction) lines.push(`Overall Visual Direction: ${d.overall_visual_direction}`);
+
+  return lines.join("\n");
+}
+
+function formatImages(data: any): string {
+  const img = data.images || {};
+  const categories: [string, string][] = [
+    ["Hero Images", "hero_images"],
+    ["Logo Images", "logo_images"],
+    ["Section Images", "section_images"],
+    ["Gallery Images", "gallery_images"],
+    ["Team Images", "team_images"],
+    ["Service Images", "service_images"],
+    ["Background Images", "background_images"],
+    ["All Image URLs", "all_image_urls"],
+  ];
+
+  const sections: string[] = [];
+  for (const [label, key] of categories) {
+    const items = img[key];
+    if (items && items.length > 0) {
+      sections.push(`${label}:\n${formatBulletList(items)}`);
+    }
+  }
+  return sections.join("\n\n");
+}
+
+function formatExtractionNotes(data: any): string {
+  const notes = data.extraction_notes || {};
+  const sections: string[] = [];
+  if (notes.missing_information?.length)
+    sections.push(`Missing Information:\n${formatBulletList(notes.missing_information)}`);
+  if (notes.warnings?.length)
+    sections.push(`Warnings:\n${formatBulletList(notes.warnings)}`);
+  return sections.join("\n\n");
+}
+
+// ── 13. assembleFinalPrompt ──
+function assembleFinalPrompt(
+  blocks: {
+    siteMeta: string;
+    siteStructure: string;
+    copywriting: string;
+    businessInfo: string;
+    designSystem: string;
+    images: string;
+    extractionNotes: string;
+  },
+  referenceUrl: string,
+  userNotes: string,
+): string {
+  return MASTER_PROMPT_TEMPLATE.replace("{{SITE_META}}", blocks.siteMeta || "")
+    .replace("{{SITE_STRUCTURE}}", blocks.siteStructure || "")
+    .replace("{{COPYWRITING}}", blocks.copywriting || "")
+    .replace("{{BUSINESS_INFO}}", blocks.businessInfo || "")
+    .replace("{{DESIGN_SYSTEM}}", blocks.designSystem || "")
+    .replace("{{IMAGES}}", blocks.images || "")
+    .replace("{{EXTRACTION_NOTES}}", blocks.extractionNotes || "")
+    .replace("{{REFERENCE_URL}}", referenceUrl || "(none)")
+    .replace("{{USER_NOTES}}", userNotes || "(none)");
+}
+
+// ── Main handler ──
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "ANTHROPIC_API_KEY is not configured. Add it in project secrets.",
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const { sourceUrl, referenceUrl, businessType, userNotes } = await req.json();
+
+    if (!sourceUrl) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Source URL is required." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    console.log("Starting extraction for:", sourceUrl);
+
+    // Step 1: Compile extraction user prompt
+    const userPrompt = compileExtractionUserPrompt({
+      sourceUrl,
+      referenceUrl: referenceUrl || "",
+      businessType: businessType || "",
+      userNotes: userNotes || "",
+    });
+
+    // Step 2: Call Claude for extraction
+    const rawText = await callClaudeExtraction(apiKey, EXTRACTION_SYSTEM_PROMPT, userPrompt);
+    console.log("Claude response received, length:", rawText.length);
+
+    // Step 3: Parse JSON
+    const parsedData = parseClaudeTextToJson(rawText);
+
+    // Step 4: Validate
+    if (!validateExtractionJson(parsedData)) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Claude returned invalid extraction data structure.",
+          extractedData: parsedData,
+        }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Step 5: Normalize
+    const normalized = normalizeExtractionData(parsedData);
+
+    // Step 6: Format blocks
+    const blocks = {
+      siteMeta: formatSiteMeta(normalized),
+      siteStructure: formatSiteStructure(normalized),
+      copywriting: formatCopywriting(normalized),
+      businessInfo: formatBusinessInfo(normalized),
+      designSystem: formatDesignSystem(normalized),
+      images: formatImages(normalized),
+      extractionNotes: formatExtractionNotes(normalized),
+    };
+
+    // Step 7: Assemble final prompt
+    const finalPrompt = assembleFinalPrompt(blocks, referenceUrl || "", userNotes || "");
+
+    console.log("Final prompt assembled, length:", finalPrompt.length);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        finalPrompt,
+        extractedData: normalized,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  } catch (error) {
+    console.error("Generation error:", error);
+    const message = error instanceof Error ? error.message : "Unknown error occurred";
+    return new Response(
+      JSON.stringify({ success: false, error: message }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+});
