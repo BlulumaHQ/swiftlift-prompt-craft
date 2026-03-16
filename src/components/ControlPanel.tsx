@@ -87,14 +87,6 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
 
   const handleSourceUrlChange = (url: string) => {
     setSourceUrl(url);
-    if (url.length > 5 && !brandDetected) {
-      const detected = simulateBrandDetection(url);
-      if (detected.primary) setPrimaryColor(detected.primary);
-      if (detected.secondary) setSecondaryColor(detected.secondary);
-      if (detected.font) setPrimaryFont(detected.font);
-      setBrandDetected(true);
-    }
-    if (!url) setBrandDetected(false);
   };
 
   function normalizeUrl(url: string): string {
