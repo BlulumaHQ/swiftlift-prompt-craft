@@ -556,23 +556,28 @@ IMPORTANT
 
     // ── STEP 10: Assemble prompts from the master prompt template ──
     // The master prompt uses placeholders: {SOURCE_URL}, {REFERENCE_URL}, {REFERENCE_SCREENSHOT}, {SCRAPED_DATA}, {SCRAPED_URLS}
+    // Safe replace that avoids $ pattern interpretation in replacement strings
+    function safeReplace(str: string, search: RegExp, replacement: string): string {
+      return str.replace(search, () => replacement);
+    }
+
     function injectMasterPrompt(template: string, refUrl: string): string {
-      return template
-        .replace(/\{SOURCE_URL\}/g, sourceUrl)
-        .replace(/\{REFERENCE_URL\}/g, refUrl || "(none)")
-        .replace(/\{REFERENCE_SCREENSHOT\}/g, "(not available)")
-        .replace(/\{SCRAPED_DATA\}/g, scrapedDataJson)
-        .replace(/\{SCRAPED_URLS\}/g, scrapedUrls)
-        // Also support the {{BLOCK}} format from formatted assembly
-        .replace(/\{\{SITE_META\}\}/g, blocks.siteMeta || "")
-        .replace(/\{\{SITE_STRUCTURE\}\}/g, blocks.siteStructure || "")
-        .replace(/\{\{COPYWRITING\}\}/g, blocks.copywriting || "")
-        .replace(/\{\{BUSINESS_INFO\}\}/g, blocks.businessInfo || "")
-        .replace(/\{\{DESIGN_SYSTEM\}\}/g, blocks.designSystem || "")
-        .replace(/\{\{IMAGES\}\}/g, blocks.images || "")
-        .replace(/\{\{EXTRACTION_NOTES\}\}/g, blocks.extractionNotes || "")
-        .replace(/\{\{REFERENCE_URL\}\}/g, refUrl || "(none)")
-        .replace(/\{\{USER_NOTES\}\}/g, userNotes || "(none)");
+      let result = template;
+      result = safeReplace(result, /\{SOURCE_URL\}/g, sourceUrl);
+      result = safeReplace(result, /\{REFERENCE_URL\}/g, refUrl || "(none)");
+      result = safeReplace(result, /\{REFERENCE_SCREENSHOT\}/g, "(not available)");
+      result = safeReplace(result, /\{SCRAPED_DATA\}/g, scrapedDataJson);
+      result = safeReplace(result, /\{SCRAPED_URLS\}/g, scrapedUrls);
+      result = safeReplace(result, /\{\{SITE_META\}\}/g, blocks.siteMeta || "");
+      result = safeReplace(result, /\{\{SITE_STRUCTURE\}\}/g, blocks.siteStructure || "");
+      result = safeReplace(result, /\{\{COPYWRITING\}\}/g, blocks.copywriting || "");
+      result = safeReplace(result, /\{\{BUSINESS_INFO\}\}/g, blocks.businessInfo || "");
+      result = safeReplace(result, /\{\{DESIGN_SYSTEM\}\}/g, blocks.designSystem || "");
+      result = safeReplace(result, /\{\{IMAGES\}\}/g, blocks.images || "");
+      result = safeReplace(result, /\{\{EXTRACTION_NOTES\}\}/g, blocks.extractionNotes || "");
+      result = safeReplace(result, /\{\{REFERENCE_URL\}\}/g, refUrl || "(none)");
+      result = safeReplace(result, /\{\{USER_NOTES\}\}/g, userNotes || "(none)");
+      return result;
     }
 
     // Prompt A = Standard layout (uses style reference URL)
