@@ -770,7 +770,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { sourceUrl, referenceUrl, businessType, userNotes, packageTier, themeMode, primaryColor, secondaryColor, primaryFont, fontWeight } = await req.json();
+    const { sourceUrl, referenceUrl, conversionLayoutUrl, businessType, userNotes, packageTier, themeMode, primaryColor, secondaryColor, primaryFont, fontWeight, enabledModules } = await req.json();
 
     if (!sourceUrl) {
       return new Response(
@@ -835,12 +835,59 @@ Deno.serve(async (req) => {
       ? `\n\n--------------------------------------------------\nBRAND & THEME OVERRIDE\n--------------------------------------------------\n\n${brandOverrideParts.join('\n')}\n\nApply these brand overrides to the final design. Brand colors take priority over extracted design system colors. Theme mode affects page background, section backgrounds, surface/card tones, and text contrast — but does NOT override brand colors.`
       : '';
 
+    // Build content module design continuity block
+    const contentModuleNames: Record<string, string> = {
+      portfolio: 'Portfolio / Projects',
+      blog: 'Blog',
+      gallery: 'Gallery',
+    };
+    const activeContentModules = (enabledModules || []).filter((m: string) => ['portfolio', 'blog', 'gallery'].includes(m));
+    let contentModuleBlock = '';
+    if (activeContentModules.length > 0) {
+      const moduleList = activeContentModules.map((m: string) => contentModuleNames[m] || m).join(', ');
+      contentModuleBlock = `\n\n--------------------------------------------------
+CONTENT MODULE DESIGN CONTINUITY
+--------------------------------------------------
+
+Enabled Content Modules: ${moduleList}
+
+CRITICAL RULE: Generated content modules must visually follow the existing website design system.
+
+They must inherit:
+- Typography (heading hierarchy, paragraph spacing, font families)
+- Spacing (section padding, element gaps, margins)
+- Grid layout (column structure, responsive breakpoints)
+- Button style (shape, colors, hover states)
+- Card style (borders, shadows, padding, radius)
+- Color palette (primary, secondary, accent usage)
+- Image aspect ratios
+- Hover interactions
+
+Do NOT introduce a new design system for these modules.
+New pages must look like they were originally part of the website.
+
+${activeContentModules.includes('portfolio') ? `PORTFOLIO MODULE:
+- Generate a Portfolio listing page and individual Project detail pages.
+- Portfolio cards must reuse the website's existing card style.
+- Project pages must use the same typography hierarchy and spacing system.
+` : ''}${activeContentModules.includes('blog') ? `BLOG MODULE:
+- Generate a Blog listing page and an Article page template.
+- Typography must follow the website's heading hierarchy and paragraph spacing.
+` : ''}${activeContentModules.includes('gallery') ? `GALLERY MODULE:
+- Generate an image grid layout and a lightbox image viewer.
+- Gallery must inherit image border radius, spacing, overlay style, and hover effects.
+` : ''}`;
+    }
+
+    // Use conversion layout URL for prompt B if provided
+    const convUrl = conversionLayoutUrl || referenceUrl || "";
+
     // Step 7: Assemble BOTH prompts from same extracted data
     const promptA = `SWIFTLIFT BUILD PROMPT — ${tierLabelA}\nSource: ${sourceUrl}\n\n` +
-      assemblePrompt(STANDARD_PROMPT_TEMPLATE, blocks, referenceUrl || "", userNotes || "") + brandOverrideBlock;
+      assemblePrompt(STANDARD_PROMPT_TEMPLATE, blocks, referenceUrl || "", userNotes || "") + brandOverrideBlock + contentModuleBlock;
 
     const promptB = `SWIFTLIFT BUILD PROMPT — ${tierLabelB}\nSource: ${sourceUrl}\n\n` +
-      assemblePrompt(PREMIUM_PROMPT_TEMPLATE, blocks, referenceUrl || "", userNotes || "") + brandOverrideBlock;
+      assemblePrompt(PREMIUM_PROMPT_TEMPLATE, blocks, convUrl, userNotes || "") + brandOverrideBlock + contentModuleBlock;
 
     console.log("Prompts assembled. A length:", promptA.length, "B length:", promptB.length);
 

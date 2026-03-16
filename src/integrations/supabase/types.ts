@@ -55,6 +55,83 @@ export type Database = {
           },
         ]
       }
+      client_content_images: {
+        Row: {
+          alt_text: string
+          caption: string
+          content_item_id: string
+          created_at: string
+          file_name: string
+          file_url: string
+          id: string
+          sort_order: number
+        }
+        Insert: {
+          alt_text?: string
+          caption?: string
+          content_item_id: string
+          created_at?: string
+          file_name?: string
+          file_url?: string
+          id?: string
+          sort_order?: number
+        }
+        Update: {
+          alt_text?: string
+          caption?: string
+          content_item_id?: string
+          created_at?: string
+          file_name?: string
+          file_url?: string
+          id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_content_images_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "client_content_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_content_items: {
+        Row: {
+          client_slug: string
+          content_type: string
+          created_at: string
+          description: string
+          featured_image: string
+          id: string
+          image_count: number
+          item_slug: string
+          title: string
+        }
+        Insert: {
+          client_slug: string
+          content_type?: string
+          created_at?: string
+          description?: string
+          featured_image?: string
+          id?: string
+          image_count?: number
+          item_slug?: string
+          title?: string
+        }
+        Update: {
+          client_slug?: string
+          content_type?: string
+          created_at?: string
+          description?: string
+          featured_image?: string
+          id?: string
+          image_count?: number
+          item_slug?: string
+          title?: string
+        }
+        Relationships: []
+      }
       client_projects: {
         Row: {
           client_name: string

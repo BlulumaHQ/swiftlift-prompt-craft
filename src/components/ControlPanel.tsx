@@ -3,7 +3,7 @@ import { googleFonts, contentModules, advancedModules } from '@/lib/mockData';
 import { saveProject } from '@/lib/store';
 import type { SavedProject } from '@/lib/mockData';
 import ReferenceLibraryModal from './ReferenceLibraryModal';
-import { Library, Sparkles, X } from 'lucide-react';
+import { LayoutGrid, Sparkles, X } from 'lucide-react';
 import type { DemoSite } from '@/lib/demoSiteStore';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -62,8 +62,11 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const [convRef, setConvRef] = useState<RefSelection | null>(null);
   const [showConvLibrary, setShowConvLibrary] = useState(false);
 
-  // Legacy manual reference URL override
-  const [referenceUrl, setReferenceUrl] = useState('');
+  // Manual reference URL overrides
+  const [styleRefUrl, setStyleRefUrl] = useState('');
+  const [convRefUrl, setConvRefUrl] = useState('');
+  const [styleUrlError, setStyleUrlError] = useState('');
+  const [convUrlError, setConvUrlError] = useState('');
 
   const [packageTier, setPackageTier] = useState<'350' | '550'>('550');
   const [primaryColor, setPrimaryColor] = useState('');
@@ -94,16 +97,52 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     if (!url) setBrandDetected(false);
   };
 
+  function normalizeUrl(url: string): string {
+    let u = url.trim();
+    if (!u) return '';
+    if (!u.startsWith('http://') && !u.startsWith('https://')) {
+      u = u.startsWith('www.') ? `https://${u}` : `https://${u}`;
+    }
+    return u;
+  }
+
   const executeGenerate = async () => {
+    // Validate manual URLs if provided
+    const normalizedStyleUrl = normalizeUrl(styleRefUrl);
+    const normalizedConvUrl = normalizeUrl(convRefUrl);
+
+    if (styleRefUrl && normalizedStyleUrl) {
+      try {
+        new URL(normalizedStyleUrl);
+        setStyleUrlError('');
+      } catch {
+        setStyleUrlError('Unable to access the reference URL. Please check the address.');
+        return;
+      }
+    }
+    if (convRefUrl && normalizedConvUrl) {
+      try {
+        new URL(normalizedConvUrl);
+        setConvUrlError('');
+      } catch {
+        setConvUrlError('Unable to access the reference URL. Please check the address.');
+        return;
+      }
+    }
+
     setGenerating(true);
     onGenerateStart(packageTier);
+
+    // Priority: Manual URL > Demo Site selection > empty
+    const resolvedStyleRef = normalizedStyleUrl || styleRef?.live_url || '';
+    const resolvedConvRef = normalizedConvUrl || convRef?.live_url || '';
 
     try {
       const { data, error } = await supabase.functions.invoke('generate-final-prompt', {
         body: {
           sourceUrl,
-          referenceUrl: styleRef?.live_url || referenceUrl || '',
-          conversionLayoutUrl: convRef?.live_url || '',
+          referenceUrl: resolvedStyleRef,
+          conversionLayoutUrl: resolvedConvRef,
           businessType: '',
           userNotes: specialInstructions || '',
           packageTier,
@@ -112,6 +151,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           secondaryColor,
           primaryFont,
           fontWeight,
+          enabledModules: modules,
         },
       });
 
@@ -142,10 +182,11 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   };
 
   const doSave = () => {
+    const resolvedStyleRef = normalizeUrl(styleRefUrl) || styleRef?.live_url || '';
     const project: SavedProject = {
       id: crypto.randomUUID(),
       name: projectName || getProjectName(sourceUrl),
-      sourceUrl, referenceLayout: styleRef?.reference_name || '', referenceUrl: styleRef?.live_url || referenceUrl, packageTier,
+      sourceUrl, referenceLayout: styleRef?.reference_name || '', referenceUrl: resolvedStyleRef, packageTier,
       modules, addons: [], primaryColor, secondaryColor, primaryFont,
       specialInstructions, promptA: '', promptB: '',
       dateCreated: new Date().toISOString().slice(0, 10),
@@ -157,7 +198,8 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
 
   const doClear = () => {
     setProjectBrand('SwiftLift'); setSourceUrl(''); setProjectName(''); setClientName('');
-    setStyleRef(null); setConvRef(null); setReferenceUrl('');
+    setStyleRef(null); setConvRef(null); setStyleRefUrl(''); setConvRefUrl('');
+    setStyleUrlError(''); setConvUrlError('');
     setPackageTier('550'); setModules([]); setAdvModules([]);
     setPrimaryColor(''); setSecondaryColor('');
     setPrimaryFont(''); setFontWeight('700'); setThemeMode('auto');
@@ -222,9 +264,17 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
                 </div>
                 <button onClick={() => setShowStyleLibrary(true)}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors whitespace-nowrap">
-                  <Library size={14} /> Library
+                  <LayoutGrid size={14} /> Demo Sites
                 </button>
               </div>
+            </div>
+
+            {/* Style Reference URL (manual override) */}
+            <div>
+              <label className="control-label">Style Reference URL <span className="text-muted-foreground font-normal">(manual override)</span></label>
+              <input type="text" value={styleRefUrl} onChange={e => { setStyleRefUrl(e.target.value); setStyleUrlError(''); }}
+                placeholder="https://reference-site.com" className="control-input" />
+              {styleUrlError && <p className="text-xs text-destructive mt-1">{styleUrlError}</p>}
             </div>
 
             {/* Conversion Layout Reference */}
@@ -245,16 +295,17 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
                 </div>
                 <button onClick={() => setShowConvLibrary(true)}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors whitespace-nowrap">
-                  <Library size={14} /> Library
+                  <LayoutGrid size={14} /> Demo Sites
                 </button>
               </div>
             </div>
 
-            {/* Manual URL override */}
+            {/* Conversion Reference URL (manual override) */}
             <div>
-              <label className="control-label">Reference URL <span className="text-muted-foreground font-normal">(manual override)</span></label>
-              <input type="text" value={referenceUrl} onChange={e => setReferenceUrl(e.target.value)}
-                placeholder="https://reference-site.com" className="control-input" />
+              <label className="control-label">Conversion Reference URL <span className="text-muted-foreground font-normal">(manual override)</span></label>
+              <input type="text" value={convRefUrl} onChange={e => { setConvRefUrl(e.target.value); setConvUrlError(''); }}
+                placeholder="https://conversion-reference.com" className="control-input" />
+              {convUrlError && <p className="text-xs text-destructive mt-1">{convUrlError}</p>}
             </div>
           </div>
         </div>
