@@ -6,6 +6,7 @@ import type { SavedProject } from '@/lib/mockData';
 import ReferenceLibraryModal from './ReferenceLibraryModal';
 import { Library, Sparkles } from 'lucide-react';
 import type { ReferenceLayout } from '@/lib/mockData';
+import { supabase } from '@/integrations/supabase/client';
 
 const projectBrands = ['SwiftLift', 'Bluluma', 'Sonykun', 'SwiftSite'];
 
