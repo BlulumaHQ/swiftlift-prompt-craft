@@ -3,7 +3,7 @@ import { googleFonts, contentModules, advancedModules } from '@/lib/mockData';
 import { saveProject } from '@/lib/store';
 import type { SavedProject } from '@/lib/mockData';
 import ReferenceLibraryModal from './ReferenceLibraryModal';
-import { Library, Sparkles, X } from 'lucide-react';
+import { LayoutGrid, Sparkles, X } from 'lucide-react';
 import type { DemoSite } from '@/lib/demoSiteStore';
 import { supabase } from '@/integrations/supabase/client';
 
