@@ -94,7 +94,7 @@ const Index = () => {
     <div className="flex flex-col h-screen">
       <NavHeader title="Basic Builder" rightContent={actionButtons} />
 
-      <PanelGroup direction="horizontal" className="flex-1 min-h-0">
+      <Group orientation="horizontal" className="flex-1 min-h-0">
         <Panel defaultSize={55} minSize={30}>
           <aside className="h-full border-r border-border bg-card overflow-y-auto p-5">
             <ControlPanel
