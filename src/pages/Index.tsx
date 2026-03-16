@@ -95,7 +95,7 @@ const Index = () => {
       <NavHeader title="Basic Builder" rightContent={actionButtons} />
 
       <Group orientation="horizontal" className="flex-1 min-h-0">
-        <Panel defaultSize={55} minSize={30}>
+        <Panel defaultSize={40} minSize={30}>
           <aside className="h-full border-r border-border bg-card overflow-y-auto p-5">
             <ControlPanel
               onPromptsGenerated={handlePromptsGenerated}
