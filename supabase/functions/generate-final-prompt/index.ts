@@ -770,7 +770,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { sourceUrl, referenceUrl, businessType, userNotes, packageTier } = await req.json();
+    const { sourceUrl, referenceUrl, businessType, userNotes, packageTier, themeMode, primaryColor, secondaryColor, primaryFont, fontWeight } = await req.json();
 
     if (!sourceUrl) {
       return new Response(
