@@ -202,7 +202,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     setStyleUrlError(''); setConvUrlError('');
     setPackageTier('550'); setModules([]); setAdvModules([]);
     setPrimaryColor(''); setSecondaryColor('');
-    setPrimaryFont(''); setFontWeight('700'); setThemeMode('auto');
+    setPrimaryFont(''); setFontWeight(''); setThemeMode('auto');
     setSpecialInstructions(''); setBrandDetected(false);
     onClear();
   };
