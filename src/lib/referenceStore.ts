@@ -1,68 +1,141 @@
-// Reference Library Store - manages reference layouts
+// Reference Library Store - manages reference layouts with role system
 
-import dentalA from '@/assets/previews/dental-a.jpg';
-import dentalB from '@/assets/previews/dental-b.jpg';
-import constructionA from '@/assets/previews/construction-a.jpg';
-import constructionB from '@/assets/previews/construction-b.jpg';
-import luxuryService from '@/assets/previews/luxury-service.jpg';
-import restaurant from '@/assets/previews/restaurant.jpg';
-import onePageService from '@/assets/previews/one-page-service.jpg';
-import realEstate from '@/assets/previews/real-estate.jpg';
-import professionalServices from '@/assets/previews/professional-services.jpg';
+const STORAGE_KEY = 'swiftlift_references_v2';
 
-const STORAGE_KEY = 'swiftlift_references';
+export type ReferenceRole = 'style' | 'conversion_layout';
 
-export interface ReferenceLayout {
+export interface ReferenceScreenshots {
+  desktop_hero: string;
+  desktop_full: string;
+  mobile_hero: string;
+  mobile_full: string;
+}
+
+export interface StyleTokens {
+  primary_color: string;
+  secondary_color: string;
+  accent_color: string;
+  font_family_heading: string;
+  font_family_body: string;
+  font_sizes: {
+    hero_title: string;
+    page_title: string;
+    section_title: string;
+    body_text: string;
+    button_text: string;
+  };
+  font_weights: {
+    hero_title: string;
+    page_title: string;
+    section_title: string;
+    body_text: string;
+    button_text: string;
+  };
+}
+
+export interface LayoutTokens {
+  section_order: string[];
+  hero_type: string;
+  cta_pattern: string;
+  trust_block_position: string;
+  card_style: string;
+  nav_style: string;
+  footer_style: string;
+}
+
+export interface ReferenceEntry {
   id: string;
-  name: string;
+  reference_name: string;
   industry: string;
-  category: string;
-  image: string;
-  referenceUrl: string;
-  addedDate: string;
-  lastUsed: string;
+  reference_role: ReferenceRole;
+  live_url: string;
+  theme_mode: 'light' | 'dark';
+  preview_image: string;
+  screenshots: ReferenceScreenshots;
+  style_tokens: StyleTokens;
+  layout_tokens: LayoutTokens;
+  notes: string;
+  added_date: string;
+  last_used: string;
 }
 
 export const industries = [
   'Dental',
-  'Construction', 
+  'Construction',
   'Restaurant',
   'Real Estate',
   'Professional Services',
   'Luxury Service',
-  'One Page Design'
+  'One Page Design',
+  'Other'
 ];
 
-const defaultReferences: ReferenceLayout[] = [
-  { id: '1', name: 'Dental Layout A', industry: 'Dental', category: 'Dental', image: dentalA, referenceUrl: 'https://example-dental-a.com', addedDate: '2026-03-01', lastUsed: '2026-03-07' },
-  { id: '2', name: 'Dental Layout B', industry: 'Dental', category: 'Dental', image: dentalB, referenceUrl: 'https://example-dental-b.com', addedDate: '2026-02-20', lastUsed: '2026-03-05' },
-  { id: '3', name: 'Construction Layout A', industry: 'Construction', category: 'Construction', image: constructionA, referenceUrl: 'https://example-construction-a.com', addedDate: '2026-02-15', lastUsed: '2026-03-06' },
-  { id: '4', name: 'Construction Layout B', industry: 'Construction', category: 'Construction', image: constructionB, referenceUrl: 'https://example-construction-b.com', addedDate: '2026-02-10', lastUsed: '2026-03-04' },
-  { id: '5', name: 'Luxury Service Layout', industry: 'Luxury Service', category: 'Luxury Service', image: luxuryService, referenceUrl: 'https://example-luxury.com', addedDate: '2026-01-28', lastUsed: '2026-03-03' },
-  { id: '6', name: 'Restaurant Layout', industry: 'Restaurant', category: 'Restaurant', image: restaurant, referenceUrl: 'https://example-restaurant.com', addedDate: '2026-01-20', lastUsed: '2026-03-02' },
-  { id: '7', name: 'One Page Service Layout', industry: 'Professional Services', category: 'One Page Design', image: onePageService, referenceUrl: 'https://example-onepage.com', addedDate: '2026-01-15', lastUsed: '2026-02-28' },
-  { id: '8', name: 'Real Estate Layout', industry: 'Real Estate', category: 'Real Estate', image: realEstate, referenceUrl: 'https://example-realestate.com', addedDate: '2026-01-10', lastUsed: '2026-02-25' },
-  { id: '9', name: 'Professional Services Layout', industry: 'Professional Services', category: 'Professional Services', image: professionalServices, referenceUrl: 'https://example-professional.com', addedDate: '2026-01-05', lastUsed: '2026-02-20' },
-];
+function emptyStyleTokens(): StyleTokens {
+  return {
+    primary_color: '', secondary_color: '', accent_color: '',
+    font_family_heading: '', font_family_body: '',
+    font_sizes: { hero_title: '', page_title: '', section_title: '', body_text: '', button_text: '' },
+    font_weights: { hero_title: '', page_title: '', section_title: '', body_text: '', button_text: '' },
+  };
+}
 
-function getStoredReferences(): ReferenceLayout[] {
+function emptyLayoutTokens(): LayoutTokens {
+  return {
+    section_order: [], hero_type: '', cta_pattern: '',
+    trust_block_position: '', card_style: '', nav_style: '', footer_style: '',
+  };
+}
+
+function emptyScreenshots(): ReferenceScreenshots {
+  return { desktop_hero: '', desktop_full: '', mobile_hero: '', mobile_full: '' };
+}
+
+export function createEmptyReference(overrides: Partial<ReferenceEntry> = {}): ReferenceEntry {
+  return {
+    id: crypto.randomUUID(),
+    reference_name: '',
+    industry: 'Professional Services',
+    reference_role: 'style',
+    live_url: '',
+    theme_mode: 'light',
+    preview_image: '',
+    screenshots: emptyScreenshots(),
+    style_tokens: emptyStyleTokens(),
+    layout_tokens: emptyLayoutTokens(),
+    notes: '',
+    added_date: new Date().toISOString().slice(0, 10),
+    last_used: '',
+    ...overrides,
+  };
+}
+
+function getStoredReferences(): ReferenceEntry[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) return JSON.parse(stored);
   } catch {}
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultReferences));
-  return defaultReferences;
+  // Start with empty library — no fake data
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+  return [];
 }
 
-export function getReferences(): ReferenceLayout[] {
+function persist(refs: ReferenceEntry[]): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(refs));
+}
+
+export function getReferences(): ReferenceEntry[] {
   return getStoredReferences();
 }
 
-export function getReference(id: string): ReferenceLayout | undefined {
+export function getReference(id: string): ReferenceEntry | undefined {
   return getStoredReferences().find(r => r.id === id);
 }
 
-export function saveReference(ref: ReferenceLayout): void {
+export function getReferencesByRole(role: ReferenceRole): ReferenceEntry[] {
+  return getStoredReferences().filter(r => r.reference_role === role);
+}
+
+export function saveReference(ref: ReferenceEntry): void {
   const refs = getStoredReferences();
   const idx = refs.findIndex(r => r.id === ref.id);
   if (idx >= 0) {
@@ -70,19 +143,29 @@ export function saveReference(ref: ReferenceLayout): void {
   } else {
     refs.unshift(ref);
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(refs));
+  persist(refs);
 }
 
 export function deleteReference(id: string): void {
   const refs = getStoredReferences().filter(r => r.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(refs));
+  persist(refs);
 }
 
 export function updateLastUsed(id: string): void {
   const refs = getStoredReferences();
   const idx = refs.findIndex(r => r.id === id);
   if (idx >= 0) {
-    refs[idx].lastUsed = new Date().toISOString().slice(0, 10);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(refs));
+    refs[idx].last_used = new Date().toISOString().slice(0, 10);
+    persist(refs);
   }
+}
+
+export function generatePreviewPlaceholder(industry: string): string {
+  const colors: Record<string, string> = {
+    'Dental': '2B6CB0', 'Construction': 'DD6B20', 'Restaurant': 'C53030',
+    'Real Estate': '2C5282', 'Professional Services': '4A5568',
+    'Luxury Service': '1A202C', 'One Page Design': '6B46C1', 'Other': '718096'
+  };
+  const color = colors[industry] || '718096';
+  return `https://placehold.co/600x400/${color}/ffffff?text=${encodeURIComponent(industry)}`;
 }

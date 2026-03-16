@@ -4,8 +4,8 @@ import { compilePrompts, getProjectName } from '@/lib/promptCompiler';
 import { saveProject } from '@/lib/store';
 import type { SavedProject } from '@/lib/mockData';
 import ReferenceLibraryModal from './ReferenceLibraryModal';
-import { Library, Sparkles } from 'lucide-react';
-import type { ReferenceLayout } from '@/lib/mockData';
+import { Library, Sparkles, X } from 'lucide-react';
+import type { ReferenceEntry } from '@/lib/referenceStore';
 import { supabase } from '@/integrations/supabase/client';
 
 const projectBrands = ['SwiftLift', 'Bluluma', 'Sonykun', 'SwiftSite'];
@@ -34,48 +34,37 @@ function simulateBrandDetection(url: string): { primary: string; secondary: stri
 }
 
 export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGenerateError, onClear, clearSignal, saveSignal, newSignal }: Props) {
-  // Project Setup
   const [projectBrand, setProjectBrand] = useState('SwiftLift');
   const [sourceUrl, setSourceUrl] = useState('');
   const [projectName, setProjectName] = useState('');
   const [clientName, setClientName] = useState('');
 
-  // Reference Design
-  const [referenceLayout, setReferenceLayout] = useState('');
+  // Style Reference
+  const [styleRef, setStyleRef] = useState<ReferenceEntry | null>(null);
+  const [showStyleLibrary, setShowStyleLibrary] = useState(false);
+
+  // Conversion Layout Reference
+  const [convRef, setConvRef] = useState<ReferenceEntry | null>(null);
+  const [showConvLibrary, setShowConvLibrary] = useState(false);
+
+  // Legacy manual reference URL override
   const [referenceUrl, setReferenceUrl] = useState('');
-  const [showLibrary, setShowLibrary] = useState(false);
 
-  // Package Tier
   const [packageTier, setPackageTier] = useState<'350' | '550'>('550');
-
-  // Brand Override
   const [primaryColor, setPrimaryColor] = useState('');
   const [secondaryColor, setSecondaryColor] = useState('');
   const [primaryFont, setPrimaryFont] = useState('');
   const [fontWeight, setFontWeight] = useState('700');
   const [brandDetected, setBrandDetected] = useState(false);
-
-  // Content Modules
   const [modules, setModules] = useState<string[]>([]);
-
-  // Advanced Modules
   const [advModules, setAdvModules] = useState<string[]>([]);
-
-  // Special Instructions
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [generating, setGenerating] = useState(false);
-
-  // Brand confirmation popup
   const [showBrandConfirm, setShowBrandConfirm] = useState(false);
   const [confirmBrand, setConfirmBrand] = useState('SwiftLift');
 
-  const toggleModule = (id: string) => {
-    setModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  };
-
-  const toggleAdvModule = (id: string) => {
-    setAdvModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  };
+  const toggleModule = (id: string) => setModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  const toggleAdvModule = (id: string) => setAdvModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
   const handleSourceUrlChange = (url: string) => {
     setSourceUrl(url);
@@ -97,7 +86,8 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
       const { data, error } = await supabase.functions.invoke('generate-final-prompt', {
         body: {
           sourceUrl,
-          referenceUrl: referenceUrl || referenceLayout || '',
+          referenceUrl: styleRef?.live_url || referenceUrl || '',
+          conversionLayoutUrl: convRef?.live_url || '',
           businessType: '',
           userNotes: specialInstructions || '',
           packageTier,
@@ -132,13 +122,13 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
 
   const doSave = () => {
     const { promptA, promptB } = compilePrompts({
-      sourceUrl, referenceLayout, referenceUrl, packageTier,
+      sourceUrl, referenceLayout: styleRef?.reference_name || '', referenceUrl: styleRef?.live_url || referenceUrl, packageTier,
       modules: [...modules, ...advModules], primaryColor, secondaryColor, primaryFont, specialInstructions,
     });
     const project: SavedProject = {
       id: crypto.randomUUID(),
       name: projectName || getProjectName(sourceUrl),
-      sourceUrl, referenceLayout, referenceUrl, packageTier,
+      sourceUrl, referenceLayout: styleRef?.reference_name || '', referenceUrl: styleRef?.live_url || referenceUrl, packageTier,
       modules, addons: [], primaryColor, secondaryColor, primaryFont,
       specialInstructions, promptA, promptB,
       dateCreated: new Date().toISOString().slice(0, 10),
@@ -150,7 +140,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
 
   const doClear = () => {
     setProjectBrand('SwiftLift'); setSourceUrl(''); setProjectName(''); setClientName('');
-    setReferenceLayout(''); setReferenceUrl('');
+    setStyleRef(null); setConvRef(null); setReferenceUrl('');
     setPackageTier('550'); setModules([]); setAdvModules([]);
     setPrimaryColor(''); setSecondaryColor('');
     setPrimaryFont(''); setFontWeight('700');
@@ -161,10 +151,6 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   useEffect(() => { if (clearSignal > 0) doClear(); }, [clearSignal]);
   useEffect(() => { if (saveSignal > 0) doSave(); }, [saveSignal]);
   useEffect(() => { if (newSignal > 0) { doSave(); doClear(); } }, [newSignal]);
-
-  const handleSelectLayout = (layout: ReferenceLayout) => {
-    setReferenceLayout(layout.name);
-  };
 
   return (
     <>
@@ -201,19 +187,55 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
         <div className="panel-section">
           <h3 className="panel-section-title">Reference Design</h3>
           <div className="space-y-3">
+            {/* Style Reference */}
             <div>
-              <label className="control-label">Select Reference Layout</label>
+              <label className="control-label">Style Reference</label>
               <div className="flex gap-2">
-                <input type="text" value={referenceLayout} readOnly
-                  placeholder="Select from library..." className="control-input flex-1 bg-muted/50" />
-                <button onClick={() => setShowLibrary(true)}
+                <div className="control-input flex-1 bg-muted/50 flex items-center justify-between min-h-[36px]">
+                  {styleRef ? (
+                    <>
+                      <span className="text-sm truncate">{styleRef.reference_name}</span>
+                      <button onClick={() => setStyleRef(null)} className="ml-1 p-0.5 rounded hover:bg-muted transition-colors text-muted-foreground">
+                        <X size={12} />
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">Select style reference...</span>
+                  )}
+                </div>
+                <button onClick={() => setShowStyleLibrary(true)}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors whitespace-nowrap">
                   <Library size={14} /> Library
                 </button>
               </div>
             </div>
+
+            {/* Conversion Layout Reference */}
             <div>
-              <label className="control-label">Reference URL <span className="text-muted-foreground font-normal">(overrides library selection)</span></label>
+              <label className="control-label">Conversion Layout Reference <span className="text-muted-foreground font-normal">(premium)</span></label>
+              <div className="flex gap-2">
+                <div className="control-input flex-1 bg-muted/50 flex items-center justify-between min-h-[36px]">
+                  {convRef ? (
+                    <>
+                      <span className="text-sm truncate">{convRef.reference_name}</span>
+                      <button onClick={() => setConvRef(null)} className="ml-1 p-0.5 rounded hover:bg-muted transition-colors text-muted-foreground">
+                        <X size={12} />
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">Select conversion layout...</span>
+                  )}
+                </div>
+                <button onClick={() => setShowConvLibrary(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors whitespace-nowrap">
+                  <Library size={14} /> Library
+                </button>
+              </div>
+            </div>
+
+            {/* Manual URL override */}
+            <div>
+              <label className="control-label">Reference URL <span className="text-muted-foreground font-normal">(manual override)</span></label>
               <input type="text" value={referenceUrl} onChange={e => setReferenceUrl(e.target.value)}
                 placeholder="https://reference-site.com" className="control-input" />
             </div>
@@ -308,9 +330,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           <div className="space-y-1.5">
             {contentModules.map(m => (
               <label key={m.id} className="flex items-center gap-2.5 py-1.5 px-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors">
-                <input type="checkbox" checked={modules.includes(m.id)}
-                  onChange={() => toggleModule(m.id)}
-                  className="rounded accent-primary" />
+                <input type="checkbox" checked={modules.includes(m.id)} onChange={() => toggleModule(m.id)} className="rounded accent-primary" />
                 <span className="text-sm text-foreground">{m.label}</span>
               </label>
             ))}
@@ -324,9 +344,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           <div className="space-y-1.5">
             {advancedModules.map(m => (
               <label key={m.id} className="flex items-center gap-2.5 py-1.5 px-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors">
-                <input type="checkbox" checked={advModules.includes(m.id)}
-                  onChange={() => toggleAdvModule(m.id)}
-                  className="rounded accent-primary" />
+                <input type="checkbox" checked={advModules.includes(m.id)} onChange={() => toggleAdvModule(m.id)} className="rounded accent-primary" />
                 <span className="text-sm text-foreground">{m.label}</span>
               </label>
             ))}
@@ -336,13 +354,8 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
         {/* 7. Special Instructions */}
         <div className="panel-section">
           <h3 className="panel-section-title">Special Instructions</h3>
-          <textarea
-            value={specialInstructions}
-            onChange={e => setSpecialInstructions(e.target.value)}
-            placeholder="Custom instructions for the AI builder..."
-            rows={4}
-            className="control-input resize-none"
-          />
+          <textarea value={specialInstructions} onChange={e => setSpecialInstructions(e.target.value)}
+            placeholder="Custom instructions for the AI builder..." rows={4} className="control-input resize-none" />
         </div>
 
         {/* 9. Generate Button */}
@@ -384,7 +397,21 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
         </div>
       )}
 
-      <ReferenceLibraryModal open={showLibrary} onClose={() => setShowLibrary(false)} onSelect={handleSelectLayout} />
+      {/* Style Reference Library Modal */}
+      <ReferenceLibraryModal
+        open={showStyleLibrary}
+        onClose={() => setShowStyleLibrary(false)}
+        onSelect={(ref) => setStyleRef(ref)}
+        roleFilter="style"
+      />
+
+      {/* Conversion Layout Reference Library Modal */}
+      <ReferenceLibraryModal
+        open={showConvLibrary}
+        onClose={() => setShowConvLibrary(false)}
+        onSelect={(ref) => setConvRef(ref)}
+        roleFilter="conversion_layout"
+      />
     </>
   );
 }
