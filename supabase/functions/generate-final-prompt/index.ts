@@ -375,7 +375,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { sourceUrl, referenceUrl, conversionLayoutUrl, businessType, userNotes, packageTier, themeMode, primaryColor, secondaryColor, primaryFont, fontWeight, enabledModules } = await req.json();
+    const { sourceUrl, referenceUrl, conversionLayoutUrl, businessType, userNotes, packageTier, themeMode, primaryColor, secondaryColor, primaryFont, fontWeight, enabledModules, localPrompts } = await req.json();
 
     if (!sourceUrl) {
       return new Response(
@@ -388,10 +388,24 @@ Deno.serve(async (req) => {
     const tierLabelA = tier === "350" ? "$350 Standard Layout" : "$550 Standard Layout";
     const tierLabelB = tier === "350" ? "$450 Premium Conversion Layout" : "$750 Premium Conversion Layout";
 
-    // Step 1: Fetch prompts from database
-    console.log("Fetching prompts from database...");
-    const { extractionPrompt, masterPrompt, assemblyRules } = await fetchRequiredPrompts();
-    console.log("Prompts loaded from database successfully.");
+    // DEBUG MODE: Use local prompts passed from the client if available
+    let extractionPrompt: string;
+    let masterPrompt: string;
+    let assemblyRules: string;
+
+    if (localPrompts?.extractionPrompt && localPrompts?.masterPrompt && localPrompts?.assemblyRules) {
+      console.log("DEBUG MODE: Using local prompts from client.");
+      extractionPrompt = localPrompts.extractionPrompt;
+      masterPrompt = localPrompts.masterPrompt;
+      assemblyRules = localPrompts.assemblyRules;
+    } else {
+      console.log("Fetching prompts from database...");
+      const dbPrompts = await fetchRequiredPrompts();
+      extractionPrompt = dbPrompts.extractionPrompt;
+      masterPrompt = dbPrompts.masterPrompt;
+      assemblyRules = dbPrompts.assemblyRules;
+      console.log("Prompts loaded from database successfully.");
+    }
 
     // Step 2: Compile extraction user prompt
     console.log("Starting extraction for:", sourceUrl);
