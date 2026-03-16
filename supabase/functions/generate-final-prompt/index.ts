@@ -769,13 +769,17 @@ Deno.serve(async (req) => {
       console.log("Prompts loaded from database successfully.");
     }
 
+    currentStep = "fetch_source";
+    const sourceContext = await fetchSourceWebsiteContext(sourceUrl);
+
     currentStep = "compile_extraction_prompt";
     console.log("Starting extraction for:", sourceUrl);
     const userPrompt = compileExtractionUserPrompt({
-      sourceUrl,
+      sourceUrl: ensureHttpUrl(sourceUrl),
       referenceUrl: referenceUrl || "",
       businessType: businessType || "",
       userNotes: userNotes || "",
+      sourceContext,
     });
 
     currentStep = "call_claude";
@@ -791,7 +795,11 @@ Deno.serve(async (req) => {
     }
 
     currentStep = "normalize_extraction_data";
-    const normalized = normalizeExtractionData(parsedData);
+    const normalized = hydrateExtractionFallbacks(
+      normalizeExtractionData(parsedData),
+      sourceContext,
+      ensureHttpUrl(sourceUrl),
+    );
 
     currentStep = "format_prompt_blocks";
     const blocks = {
@@ -861,7 +869,6 @@ ${activeContentModules.includes('portfolio') ? `PORTFOLIO MODULE:
 
     const convUrl = conversionLayoutUrl || referenceUrl || "";
 
-    // Build the full scraped data block (all formatted sections combined)
     const fullScrapedData = [
       blocks.siteMeta && `== SITE META ==\n${blocks.siteMeta}`,
       blocks.siteStructure && `== SITE STRUCTURE ==\n${blocks.siteStructure}`,
@@ -872,15 +879,34 @@ ${activeContentModules.includes('portfolio') ? `PORTFOLIO MODULE:
       blocks.extractionNotes && `== EXTRACTION NOTES ==\n${blocks.extractionNotes}`,
     ].filter(Boolean).join("\n\n");
 
-    // Build scraped URLs block from site structure
     const scrapedUrls = (normalized.site_structure || [])
       .map((p: any) => p.url || p.slug || "")
       .filter((u: string) => u)
       .map((u: string) => `- ${u}`)
-      .join("\n") || "(no URLs extracted)";
+      .join("\n");
+
+    const hasExtractionData = Boolean(fullScrapedData.trim());
+    const hasScrapedUrls = Boolean(scrapedUrls.trim());
+
+    console.log("ASSEMBLY DEBUG", JSON.stringify({
+      sourceUrl: ensureHttpUrl(sourceUrl),
+      referenceUrl: referenceUrl || "",
+      extractionReturnedData: Boolean(parsedData && Object.keys(parsedData).length),
+      scrapedDataNonEmpty: hasExtractionData,
+      scrapedUrlsNonEmpty: hasScrapedUrls,
+      fetchedUrl: sourceContext.fetchedUrl,
+    }));
+
+    if (!hasExtractionData) {
+      throw new StepError("assembly", "scraped_data was empty, template injection skipped", 422);
+    }
+
+    if (!hasScrapedUrls) {
+      throw new StepError("assembly", "scraped_urls was empty, template injection skipped", 422);
+    }
 
     const runtimeValuesA = {
-      sourceUrl,
+      sourceUrl: ensureHttpUrl(sourceUrl),
       referenceUrl: referenceUrl || "",
       referenceScreenshot: "(not available)",
       scrapedData: fullScrapedData,
@@ -888,7 +914,7 @@ ${activeContentModules.includes('portfolio') ? `PORTFOLIO MODULE:
     };
 
     const runtimeValuesB = {
-      sourceUrl,
+      sourceUrl: ensureHttpUrl(sourceUrl),
       referenceUrl: convUrl,
       referenceScreenshot: "(not available)",
       scrapedData: fullScrapedData,
@@ -896,8 +922,23 @@ ${activeContentModules.includes('portfolio') ? `PORTFOLIO MODULE:
     };
 
     currentStep = "assemble_prompts";
-    const promptA = `SWIFTLIFT BUILD PROMPT — ${tierLabelA}\nSource: ${sourceUrl}\n\n` +
-      assemblePrompt(masterPrompt, blocks, runtimeValuesA, userNotes || "") + brandOverrideBlock + contentModuleBlock;
+    const assembledA = assemblePrompt(masterPrompt, blocks, runtimeValuesA, userNotes || "");
+    const assembledB = assemblePrompt(masterPrompt, blocks, runtimeValuesB, userNotes || "");
+    const unresolvedA = findUnresolvedPlaceholders(assembledA);
+    const unresolvedB = findUnresolvedPlaceholders(assembledB);
+    const replacementCompleted = unresolvedA.length === 0 && unresolvedB.length === 0;
+
+    console.log("PLACEHOLDER DEBUG", JSON.stringify({
+      replacementCompleted,
+      unresolvedPromptA: unresolvedA,
+      unresolvedPromptB: unresolvedB,
+    }));
+
+    if (!replacementCompleted) {
+      throw new StepError("assembly", `Placeholder replacement incomplete: ${[...unresolvedA, ...unresolvedB].join(", ")}`, 422);
+    }
+
+    const promptA = `SWIFTLIFT BUILD PROMPT — ${tierLabelA}\nSource: ${ensureHttpUrl(sourceUrl)}\n\n` + assembledA + brandOverrideBlock + contentModuleBlock;
 
     const conversionDirective = `--------------------------------------------------
 LAYOUT MODE: PREMIUM CONVERSION LAYOUT
@@ -931,9 +972,9 @@ IMPORTANT: Do NOT add conversion strategy, CRO analysis, sales funnel planning, 
 
 `;
 
-    const promptB = `SWIFTLIFT BUILD PROMPT — ${tierLabelB}\nSource: ${sourceUrl}\n\n` +
+    const promptB = `SWIFTLIFT BUILD PROMPT — ${tierLabelB}\nSource: ${ensureHttpUrl(sourceUrl)}\n\n` +
       conversionDirective +
-      assemblePrompt(masterPrompt, blocks, runtimeValuesB, userNotes || "") + brandOverrideBlock + contentModuleBlock;
+      assembledB + brandOverrideBlock + contentModuleBlock;
 
     console.log("Prompts assembled from database prompts. A length:", promptA.length, "B length:", promptB.length, "Assembly rules length:", assemblyRules?.length || 0);
 
