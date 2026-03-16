@@ -70,12 +70,174 @@ async function fetchRequiredPrompts(): Promise<{
   };
 }
 
+type SourceWebsiteContext = {
+  fetchedUrl: string;
+  pageTitle: string;
+  metaDescription: string;
+  textSnapshot: string;
+  headings: string[];
+  paragraphs: string[];
+  buttonTexts: string[];
+  imageUrls: string[];
+  discoveredUrls: string[];
+};
+
+function ensureHttpUrl(value: string): string {
+  const trimmed = (value || "").trim();
+  if (!trimmed) return "";
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
+}
+
+function stripHtmlTags(value: string): string {
+  return decodeHtmlEntities(
+    value
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+      .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, " ")
+      .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
+}
+
+function uniqueStrings(values: string[], limit = 100): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const normalized = value.trim();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push(normalized);
+    if (result.length >= limit) break;
+  }
+  return result;
+}
+
+function extractTagText(html: string, tagName: string, limit = 40): string[] {
+  const regex = new RegExp(`<${tagName}\\b[^>]*>([\\s\\S]*?)<\\/${tagName}>`, "gi");
+  return uniqueStrings(
+    Array.from(html.matchAll(regex))
+      .map((match) => stripHtmlTags(match[1] || ""))
+      .filter((value) => value.length > 1),
+    limit,
+  );
+}
+
+function extractAttributeValues(html: string, tagName: string, attribute: string, limit = 40): string[] {
+  const regex = new RegExp(`<${tagName}\\b[^>]*${attribute}=["']([^"']+)["'][^>]*>`, "gi");
+  return uniqueStrings(
+    Array.from(html.matchAll(regex))
+      .map((match) => decodeHtmlEntities(match[1] || "").trim())
+      .filter(Boolean),
+    limit,
+  );
+}
+
+function toAbsoluteUrl(baseUrl: string, rawUrl: string): string {
+  try {
+    const trimmed = (rawUrl || "").trim();
+    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("javascript:") || trimmed.startsWith("mailto:") || trimmed.startsWith("tel:")) {
+      return "";
+    }
+    return new URL(trimmed, baseUrl).toString();
+  } catch {
+    return "";
+  }
+}
+
+async function fetchSourceWebsiteContext(sourceUrl: string): Promise<SourceWebsiteContext> {
+  const normalizedUrl = ensureHttpUrl(sourceUrl);
+  if (!normalizedUrl) {
+    throw new StepError("fetch_source", "Source URL is required for scraping.", 400);
+  }
+
+  const response = await fetch(normalizedUrl, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; SwiftLiftBot/1.0; +https://lovable.dev)",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    },
+    redirect: "follow",
+  });
+
+  if (!response.ok) {
+    throw new StepError("fetch_source", `Failed to fetch source URL: ${response.status} ${response.statusText}`, 400);
+  }
+
+  const html = await response.text();
+  const fetchedUrl = response.url || normalizedUrl;
+  const titleMatch = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
+  const metaDescriptionMatch = html.match(/<meta\b[^>]*name=["']description["'][^>]*content=["']([^"']*)["'][^>]*>/i)
+    || html.match(/<meta\b[^>]*content=["']([^"']*)["'][^>]*name=["']description["'][^>]*>/i);
+
+  const headings = uniqueStrings([
+    ...extractTagText(html, "h1", 12),
+    ...extractTagText(html, "h2", 20),
+    ...extractTagText(html, "h3", 20),
+  ], 40);
+  const paragraphs = extractTagText(html, "p", 60).filter((value) => value.length > 25);
+  const buttonTexts = uniqueStrings([
+    ...extractTagText(html, "button", 30),
+    ...extractAttributeValues(html, "input", "value", 20),
+  ], 40);
+
+  const imageUrls = uniqueStrings(
+    Array.from(html.matchAll(/<(?:img|source)\b[^>]*(?:src|srcset)=["']([^"']+)["'][^>]*>/gi))
+      .flatMap((match) => (match[1] || "").split(","))
+      .map((value) => value.trim().split(" ")[0])
+      .map((value) => toAbsoluteUrl(fetchedUrl, value))
+      .filter(Boolean),
+    80,
+  );
+
+  const discoveredUrls = uniqueStrings(
+    [fetchedUrl, ...Array.from(html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>/gi))
+      .map((match) => toAbsoluteUrl(fetchedUrl, match[1] || ""))
+      .filter(Boolean)]
+      .filter((url) => {
+        try {
+          const candidate = new URL(url);
+          const origin = new URL(fetchedUrl).origin;
+          return candidate.origin === origin;
+        } catch {
+          return false;
+        }
+      }),
+    80,
+  );
+
+  const textSnapshot = stripHtmlTags(html).slice(0, 24000);
+
+  return {
+    fetchedUrl,
+    pageTitle: stripHtmlTags(titleMatch?.[1] || ""),
+    metaDescription: decodeHtmlEntities(metaDescriptionMatch?.[1] || "").trim(),
+    textSnapshot,
+    headings,
+    paragraphs,
+    buttonTexts,
+    imageUrls,
+    discoveredUrls,
+  };
+}
+
 // ── compileExtractionUserPrompt ──
 function compileExtractionUserPrompt(input: {
   sourceUrl: string;
   referenceUrl: string;
   businessType: string;
   userNotes: string;
+  sourceContext: SourceWebsiteContext;
 }): string {
   return `SOURCE URL:
 ${input.sourceUrl}
@@ -89,8 +251,35 @@ ${input.businessType || "(not specified)"}
 USER NOTES:
 ${input.userNotes || "(none)"}
 
+FETCHED SOURCE URL:
+${input.sourceContext.fetchedUrl}
+
+PAGE TITLE:
+${input.sourceContext.pageTitle || "(none)"}
+
+META DESCRIPTION:
+${input.sourceContext.metaDescription || "(none)"}
+
+DISCOVERED SOURCE URLS:
+${input.sourceContext.discoveredUrls.length ? input.sourceContext.discoveredUrls.map((url) => `- ${url}`).join("\n") : "(none)"}
+
+EXTRACTED HEADINGS:
+${input.sourceContext.headings.length ? input.sourceContext.headings.map((value) => `- ${value}`).join("\n") : "(none)"}
+
+EXTRACTED PARAGRAPHS:
+${input.sourceContext.paragraphs.length ? input.sourceContext.paragraphs.map((value) => `- ${value}`).join("\n") : "(none)"}
+
+EXTRACTED BUTTON TEXT:
+${input.sourceContext.buttonTexts.length ? input.sourceContext.buttonTexts.map((value) => `- ${value}`).join("\n") : "(none)"}
+
+EXTRACTED IMAGE URLS:
+${input.sourceContext.imageUrls.length ? input.sourceContext.imageUrls.map((url) => `- ${url}`).join("\n") : "(none)"}
+
+RAW SOURCE PAGE TEXT SNAPSHOT:
+${input.sourceContext.textSnapshot || "(none)"}
+
 TASK:
-Extract the source website as completely as possible for downstream website rebuilding.
+Extract the source website as completely as possible for downstream website rebuilding using the fetched source page content above as the primary dataset.
 
 PRIORITIES
 1. Preserve the original page URL structure and slug naming.
@@ -101,6 +290,7 @@ PRIORITIES
 6. Return only valid JSON in the required schema.
 
 IMPORTANT
+- Use the fetched source page content above; do not guess from the URL alone.
 - Do not aggressively summarize.
 - Do not omit public-facing copy.
 - Do not rewrite service names.
