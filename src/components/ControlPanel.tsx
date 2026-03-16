@@ -342,26 +342,30 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
               <div>
                 <label className="control-label">Primary Color</label>
                 <div className="flex items-center gap-1.5">
-                  <input type="color" value={primaryColor || '#000000'} onChange={e => setPrimaryColor(e.target.value)}
-                    className="w-8 h-8 rounded border border-border cursor-pointer" />
-                  <input type="text" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)}
-                    placeholder="#______" className="control-input flex-1 font-mono text-xs" />
+                  <div className="w-8 h-8 rounded border border-border shrink-0" style={{ background: primaryColor ? primaryColor : 'repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%) 50% / 8px 8px' }} />
+                  <input type="text" value={primaryColor ? primaryColor.replace(/^#/, '') : ''} onChange={e => {
+                    const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
+                    setPrimaryColor(v ? `#${v}` : '');
+                  }}
+                    placeholder="______" className="control-input flex-1 font-mono text-xs" maxLength={6} />
                 </div>
               </div>
               <div>
                 <label className="control-label">Secondary Color</label>
                 <div className="flex items-center gap-1.5">
-                  <input type="color" value={secondaryColor || '#000000'} onChange={e => setSecondaryColor(e.target.value)}
-                    className="w-8 h-8 rounded border border-border cursor-pointer" />
-                  <input type="text" value={secondaryColor} onChange={e => setSecondaryColor(e.target.value)}
-                    placeholder="#______" className="control-input flex-1 font-mono text-xs" />
+                  <div className="w-8 h-8 rounded border border-border shrink-0" style={{ background: secondaryColor ? secondaryColor : 'repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%) 50% / 8px 8px' }} />
+                  <input type="text" value={secondaryColor ? secondaryColor.replace(/^#/, '') : ''} onChange={e => {
+                    const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
+                    setSecondaryColor(v ? `#${v}` : '');
+                  }}
+                    placeholder="______" className="control-input flex-1 font-mono text-xs" maxLength={6} />
                 </div>
               </div>
             </div>
             <div>
               <label className="control-label">Primary Font</label>
               <select value={primaryFont} onChange={e => setPrimaryFont(e.target.value)} className="control-input">
-                <option value="">Use reference default</option>
+                <option value="">— No override —</option>
                 {googleFonts.map(f => (
                   <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
                 ))}
@@ -375,6 +379,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
             <div>
               <label className="control-label">Font Weight</label>
               <select value={fontWeight} onChange={e => setFontWeight(e.target.value)} className="control-input">
+                <option value="">— No override —</option>
                 <option value="600">600 — Semi Bold</option>
                 <option value="700">700 — Bold</option>
                 <option value="800">800 — Extra Bold</option>
