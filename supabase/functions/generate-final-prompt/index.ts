@@ -7,6 +7,18 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+class StepError extends Error {
+  step: string;
+  status: number;
+
+  constructor(step: string, message: string, status = 500) {
+    super(message);
+    this.name = "StepError";
+    this.step = step;
+    this.status = status;
+  }
+}
+
 // ── Fetch required prompts from database ──
 async function fetchRequiredPrompts(): Promise<{
   extractionPrompt: string;
@@ -16,7 +28,7 @@ async function fetchRequiredPrompts(): Promise<{
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !supabaseKey) {
-    throw new Error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured.");
+    throw new StepError("load_prompts", "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured.", 500);
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey);
@@ -33,17 +45,21 @@ async function fetchRequiredPrompts(): Promise<{
     .in("prompt_name", requiredNames);
 
   if (error) {
-    throw new Error(`Failed to fetch prompts from database: ${error.message}`);
+    throw new StepError("database_query", `Failed to fetch prompts from database: ${error.message}`, 500);
+  }
+
+  if (!data) {
+    throw new StepError("database_query", "prompts table returned null", 500);
   }
 
   const promptMap = new Map<string, string>();
-  for (const row of data || []) {
+  for (const row of data) {
     promptMap.set(row.prompt_name, row.content);
   }
 
   for (const name of requiredNames) {
     if (!promptMap.has(name) || !promptMap.get(name)?.trim()) {
-      throw new Error(`Required prompt missing: ${name}`);
+      throw new StepError("load_prompts", `Required prompt missing: ${name}`, 500);
     }
   }
 
@@ -397,33 +413,31 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let currentStep = "init";
+
   try {
+    currentStep = "load_secrets";
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) {
-      return new Response(
-        JSON.stringify({ success: false, error: "ANTHROPIC_API_KEY is not configured." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      throw new StepError("load_secrets", "ANTHROPIC_API_KEY is not configured.", 500);
     }
 
+    currentStep = "parse_request";
     const { sourceUrl, referenceUrl, conversionLayoutUrl, businessType, userNotes, packageTier, themeMode, primaryColor, secondaryColor, primaryFont, fontWeight, enabledModules, localPrompts } = await req.json();
 
     if (!sourceUrl) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Source URL is required." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      throw new StepError("parse_request", "Source URL is required.", 400);
     }
 
     const tier = packageTier === "350" ? "350" : "550";
     const tierLabelA = tier === "350" ? "$350 Standard Layout" : "$550 Standard Layout";
     const tierLabelB = tier === "350" ? "$450 Premium Conversion Layout" : "$750 Premium Conversion Layout";
 
-    // DEBUG MODE: Use local prompts passed from the client if available
     let extractionPrompt: string;
     let masterPrompt: string;
     let assemblyRules: string;
 
+    currentStep = "load_prompts";
     if (localPrompts?.extractionPrompt && localPrompts?.masterPrompt && localPrompts?.assemblyRules) {
       console.log("DEBUG MODE: Using local prompts from client.");
       extractionPrompt = localPrompts.extractionPrompt;
@@ -438,7 +452,7 @@ Deno.serve(async (req) => {
       console.log("Prompts loaded from database successfully.");
     }
 
-    // Step 2: Compile extraction user prompt
+    currentStep = "compile_extraction_prompt";
     console.log("Starting extraction for:", sourceUrl);
     const userPrompt = compileExtractionUserPrompt({
       sourceUrl,
@@ -447,25 +461,22 @@ Deno.serve(async (req) => {
       userNotes: userNotes || "",
     });
 
-    // Step 3: Call Claude for extraction using DB extraction prompt
+    currentStep = "call_claude";
     const rawText = await callClaudeExtraction(apiKey, extractionPrompt, userPrompt);
     console.log("Claude response received, length:", rawText.length);
 
-    // Step 4: Parse JSON
+    currentStep = "parse_extraction_response";
     const parsedData = parseClaudeTextToJson(rawText);
 
-    // Step 5: Validate
+    currentStep = "validate_extraction_data";
     if (!validateExtractionJson(parsedData)) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Claude returned invalid extraction data." }),
-        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      throw new StepError("validate_extraction_data", "Claude returned invalid extraction data.", 422);
     }
 
-    // Step 6: Normalize
+    currentStep = "normalize_extraction_data";
     const normalized = normalizeExtractionData(parsedData);
 
-    // Step 7: Format blocks (shared between both prompts)
+    currentStep = "format_prompt_blocks";
     const blocks = {
       siteMeta: formatSiteMeta(normalized),
       siteStructure: formatSiteStructure(normalized),
@@ -476,7 +487,6 @@ Deno.serve(async (req) => {
       extractionNotes: formatExtractionNotes(normalized),
     };
 
-    // Build brand override block
     const brandOverrideParts: string[] = [];
     if (primaryColor) brandOverrideParts.push(`Primary Color: ${primaryColor}`);
     if (secondaryColor) brandOverrideParts.push(`Secondary Color: ${secondaryColor}`);
@@ -489,7 +499,6 @@ Deno.serve(async (req) => {
       ? `\n\n--------------------------------------------------\nBRAND & THEME OVERRIDE\n--------------------------------------------------\n\n${brandOverrideParts.join('\n')}\n\nApply these brand overrides to the final design. Brand colors take priority over extracted design system colors. Theme mode affects page background, section backgrounds, surface/card tones, and text contrast — but does NOT override brand colors.`
       : '';
 
-    // Build content module design continuity block
     const contentModuleNames: Record<string, string> = {
       portfolio: 'Portfolio / Projects',
       blog: 'Blog',
@@ -533,20 +542,12 @@ ${activeContentModules.includes('portfolio') ? `PORTFOLIO MODULE:
 ` : ''}`;
     }
 
-    // Use conversion layout URL for prompt B if provided
     const convUrl = conversionLayoutUrl || referenceUrl || "";
 
-    // Step 8: Assemble BOTH prompts using the Master Prompt from the database
-    // Prompt A = Standard Layout (uses masterPrompt as-is)
-    // Prompt B = Premium Conversion Layout (uses masterPrompt with conversion layout modifications)
-    
-    // The master prompt template contains placeholders like {{SITE_META}}, {{COPYWRITING}}, etc.
-    // Assembly Rules V1 governs how we fill those placeholders — we use deterministic formatting (already done above).
-    
+    currentStep = "assemble_prompts";
     const promptA = `SWIFTLIFT BUILD PROMPT — ${tierLabelA}\nSource: ${sourceUrl}\n\n` +
       assemblePrompt(masterPrompt, blocks, referenceUrl || "", userNotes || "") + brandOverrideBlock + contentModuleBlock;
 
-    // For Prompt B, prepend a conversion layout directive before the master prompt
     const conversionDirective = `--------------------------------------------------
 LAYOUT MODE: PREMIUM CONVERSION LAYOUT
 --------------------------------------------------
@@ -583,7 +584,7 @@ IMPORTANT: Do NOT add conversion strategy, CRO analysis, sales funnel planning, 
       conversionDirective +
       assemblePrompt(masterPrompt, blocks, convUrl, userNotes || "") + brandOverrideBlock + contentModuleBlock;
 
-    console.log("Prompts assembled from database prompts. A length:", promptA.length, "B length:", promptB.length);
+    console.log("Prompts assembled from database prompts. A length:", promptA.length, "B length:", promptB.length, "Assembly rules length:", assemblyRules?.length || 0);
 
     return new Response(
       JSON.stringify({ success: true, promptA, promptB }),
@@ -591,10 +592,13 @@ IMPORTANT: Do NOT add conversion strategy, CRO analysis, sales funnel planning, 
     );
   } catch (error) {
     console.error("Generation error:", error);
+    const step = error instanceof StepError ? error.step : currentStep;
+    const status = error instanceof StepError ? error.status : 500;
     const message = error instanceof Error ? error.message : "Unknown error occurred";
+
     return new Response(
-      JSON.stringify({ success: false, error: message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      JSON.stringify({ success: false, step, error: message }),
+      { status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });
