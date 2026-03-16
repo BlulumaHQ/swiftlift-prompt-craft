@@ -95,7 +95,7 @@ const Index = () => {
       <NavHeader title="Basic Builder" rightContent={actionButtons} />
 
       <Group orientation="horizontal" className="flex-1 min-h-0">
-        <Panel defaultSize={55} minSize={30}>
+        <Panel defaultSize={40} minSize={30}>
           <aside className="h-full border-r border-border bg-card overflow-y-auto p-5">
             <ControlPanel
               onPromptsGenerated={handlePromptsGenerated}
@@ -111,7 +111,7 @@ const Index = () => {
 
         <Separator className="w-1.5 bg-border hover:bg-primary/30 transition-colors cursor-col-resize" />
 
-        <Panel defaultSize={45} minSize={20}>
+        <Panel defaultSize={60} minSize={20}>
           <main className="h-full flex flex-col gap-4 p-5 overflow-y-auto">
             {/* Loading State */}
             {generating && (
