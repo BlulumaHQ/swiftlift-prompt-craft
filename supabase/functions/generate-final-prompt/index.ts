@@ -377,6 +377,23 @@ function formatExtractionNotes(data: any): string {
   return sections.join("\n\n");
 }
 
+// ── Safe string replace (avoids $ interpretation in replacement strings) ──
+function safeReplace(str: string, search: string, replacement: string): string {
+  const idx = str.indexOf(search);
+  if (idx === -1) return str;
+  return str.substring(0, idx) + replacement + str.substring(idx + search.length);
+}
+
+function safeReplaceAll(str: string, search: string, replacement: string): string {
+  let result = str;
+  let safety = 0;
+  while (result.includes(search) && safety < 50) {
+    result = safeReplace(result, search, replacement);
+    safety++;
+  }
+  return result;
+}
+
 // ── assemblePrompt — fill template with formatted blocks ──
 function assemblePrompt(
   template: string,
@@ -389,22 +406,44 @@ function assemblePrompt(
     images: string;
     extractionNotes: string;
   },
-  referenceUrl: string,
+  runtimeValues: {
+    sourceUrl: string;
+    referenceUrl: string;
+    referenceScreenshot: string;
+    scrapedData: string;
+    scrapedUrls: string;
+  },
   userNotes: string,
 ): string {
-  return template
-    .replace("{{SITE_META}}", blocks.siteMeta || "")
-    .replace("{{SITE_STRUCTURE}}", blocks.siteStructure || "")
-    .replace("{{COPYWRITING}}", blocks.copywriting || "")
-    .replace("{{BUSINESS_INFO}}", blocks.businessInfo || "")
-    .replace("{{DESIGN_SYSTEM}}", blocks.designSystem || "")
-    .replace("{{IMAGES}}", blocks.images || "")
-    .replace("{{EXTRACTION_NOTES}}", blocks.extractionNotes || "")
-    .replace("{{REFERENCE_URL}}", referenceUrl || "(none)")
-    .replace("{{USER_NOTES}}", userNotes || "(none)")
-    .replace("{{SOURCE_URL}}", blocks.siteMeta || "")
-    .replace("{{REFERENCE_URL}}", referenceUrl || "(none)")
-    .replace("{{SCRAPED_DATA}}", blocks.siteMeta || "");
+  let result = template;
+
+  // Replace all placeholder variants (both {SINGLE} and {{DOUBLE}} braces)
+  const replacements: [string, string][] = [
+    // Core runtime placeholders
+    ["SOURCE_URL", runtimeValues.sourceUrl],
+    ["REFERENCE_URL", runtimeValues.referenceUrl || "(none)"],
+    ["REFERENCE_SCREENSHOT", runtimeValues.referenceScreenshot || "(none)"],
+    ["SCRAPED_DATA", runtimeValues.scrapedData],
+    ["SCRAPED_URLS", runtimeValues.scrapedUrls],
+    // Formatted block placeholders
+    ["SITE_META", blocks.siteMeta || ""],
+    ["SITE_STRUCTURE", blocks.siteStructure || ""],
+    ["COPYWRITING", blocks.copywriting || ""],
+    ["BUSINESS_INFO", blocks.businessInfo || ""],
+    ["DESIGN_SYSTEM", blocks.designSystem || ""],
+    ["IMAGES", blocks.images || ""],
+    ["EXTRACTION_NOTES", blocks.extractionNotes || ""],
+    ["USER_NOTES", userNotes || "(none)"],
+  ];
+
+  for (const [key, value] of replacements) {
+    // Replace {{KEY}} variant
+    result = safeReplaceAll(result, `{{${key}}}`, value);
+    // Replace {KEY} variant
+    result = safeReplaceAll(result, `{${key}}`, value);
+  }
+
+  return result;
 }
 
 // ── Main handler ──
