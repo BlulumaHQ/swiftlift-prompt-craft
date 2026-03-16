@@ -32,7 +32,7 @@ function simulateBrandDetection(url: string): { primary: string; secondary: stri
   return { primary: `hsl(${hue}, 65%, 45%)`, secondary: `hsl(${(hue + 120) % 360}, 55%, 40%)`, font: googleFonts[hash % googleFonts.length] };
 }
 
-export default function ControlPanel({ onPromptsGenerated, onClear, clearSignal, saveSignal, newSignal }: Props) {
+export default function ControlPanel({ onPromptsGenerated, onClear, onClaudeGenerated, clearSignal, saveSignal, newSignal }: Props) {
   // Project Setup
   const [projectBrand, setProjectBrand] = useState('SwiftLift');
   const [sourceUrl, setSourceUrl] = useState('');
