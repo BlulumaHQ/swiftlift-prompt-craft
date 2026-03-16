@@ -145,7 +145,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     setStyleRef(null); setConvRef(null); setReferenceUrl('');
     setPackageTier('550'); setModules([]); setAdvModules([]);
     setPrimaryColor(''); setSecondaryColor('');
-    setPrimaryFont(''); setFontWeight('700');
+    setPrimaryFont(''); setFontWeight('700'); setThemeMode('auto');
     setSpecialInstructions(''); setBrandDetected(false);
     onClear();
   };
