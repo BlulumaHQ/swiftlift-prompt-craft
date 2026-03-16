@@ -115,31 +115,62 @@ async function callClaudeExtraction(
 
 // ── parseClaudeTextToJson ──
 function parseClaudeTextToJson(text: string): any {
+  // Strip markdown code blocks
+  let cleaned = text
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .trim();
+
+  // Try direct parse first
   try {
-    return JSON.parse(text);
-  } catch {
-    const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (match) {
-      return JSON.parse(match[1].trim());
-    }
-    const start = text.indexOf("{");
-    const end = text.lastIndexOf("}");
-    if (start !== -1 && end !== -1) {
-      return JSON.parse(text.slice(start, end + 1));
-    }
-    throw new Error("Could not parse Claude response as JSON");
+    return JSON.parse(cleaned);
+  } catch { /* continue */ }
+
+  // Find JSON boundaries
+  const jsonStart = cleaned.search(/[\{\[]/);
+  if (jsonStart === -1) throw new Error("No JSON found in Claude response");
+
+  const isArray = cleaned[jsonStart] === "[";
+  const jsonEnd = cleaned.lastIndexOf(isArray ? "]" : "}");
+
+  if (jsonEnd > jsonStart) {
+    cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+    try {
+      return JSON.parse(cleaned);
+    } catch { /* continue to repair */ }
+  } else {
+    cleaned = cleaned.substring(jsonStart);
   }
+
+  // Repair common issues: trailing commas, control characters
+  cleaned = cleaned
+    .replace(/,\s*}/g, "}")
+    .replace(/,\s*]/g, "]")
+    .replace(/[\x00-\x1F\x7F]/g, (ch) => ch === "\n" || ch === "\r" || ch === "\t" ? ch : "");
+
+  try {
+    return JSON.parse(cleaned);
+  } catch { /* continue to truncation repair */ }
+
+  // Attempt truncated JSON repair
+  const openBraces = (cleaned.match(/{/g) || []).length;
+  const closeBraces = (cleaned.match(/}/g) || []).length;
+  if (openBraces > closeBraces) {
+    let repaired = cleaned;
+    for (let i = 0; i < openBraces - closeBraces; i++) repaired += "}";
+    try {
+      console.warn("Recovered truncated JSON by closing braces");
+      return JSON.parse(repaired);
+    } catch { /* final fallback */ }
+  }
+
+  throw new Error("Could not parse Claude response as JSON after repair attempts");
 }
 
 // ── validateExtractionJson ──
+// Accept any non-empty object — the normalization step will handle missing keys
 function validateExtractionJson(data: any): boolean {
-  return (
-    data &&
-    typeof data === "object" &&
-    data.site_meta !== undefined &&
-    data.copywriting !== undefined &&
-    data.business_info !== undefined
-  );
+  return data && typeof data === "object" && Object.keys(data).length > 0;
 }
 
 // ── normalizeExtractionData ──
