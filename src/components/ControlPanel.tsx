@@ -13,6 +13,7 @@ const projectBrands = ['SwiftLift', 'Bluluma', 'Sonykun', 'SwiftSite'];
 interface Props {
   onPromptsGenerated: (promptA: string, promptB: string, tier: '350' | '550') => void;
   onClear: () => void;
+  onClaudeGenerated?: (finalPrompt: string, extractedData: any, error?: string) => void;
   clearSignal: number;
   saveSignal: number;
   newSignal: number;
