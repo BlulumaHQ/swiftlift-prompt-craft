@@ -5,6 +5,7 @@ import {
   getClientAssets, uploadClientAsset, deleteClientAsset,
   type ClientProject, type ClientAsset, type AssetType
 } from '@/lib/clientAssetStore';
+import { importClientZip } from '@/lib/zipImporter';
 import {
   Plus, Trash2, Upload, X, Loader2, Image, FolderOpen,
   Pencil, FileArchive, ChevronRight, Briefcase, FileText,
