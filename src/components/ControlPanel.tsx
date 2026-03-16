@@ -263,9 +263,17 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
                 </div>
                 <button onClick={() => setShowStyleLibrary(true)}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors whitespace-nowrap">
-                  <Library size={14} /> Library
+                  <LayoutGrid size={14} /> Demo Sites
                 </button>
               </div>
+            </div>
+
+            {/* Style Reference URL (manual override) */}
+            <div>
+              <label className="control-label">Style Reference URL <span className="text-muted-foreground font-normal">(manual override)</span></label>
+              <input type="text" value={styleRefUrl} onChange={e => { setStyleRefUrl(e.target.value); setStyleUrlError(''); }}
+                placeholder="https://reference-site.com" className="control-input" />
+              {styleUrlError && <p className="text-xs text-destructive mt-1">{styleUrlError}</p>}
             </div>
 
             {/* Conversion Layout Reference */}
@@ -286,16 +294,18 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
                 </div>
                 <button onClick={() => setShowConvLibrary(true)}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors whitespace-nowrap">
-                  <Library size={14} /> Library
+                  <LayoutGrid size={14} /> Demo Sites
                 </button>
               </div>
             </div>
 
-            {/* Manual URL override */}
+            {/* Conversion Reference URL (manual override) */}
             <div>
-              <label className="control-label">Reference URL <span className="text-muted-foreground font-normal">(manual override)</span></label>
-              <input type="text" value={referenceUrl} onChange={e => setReferenceUrl(e.target.value)}
-                placeholder="https://reference-site.com" className="control-input" />
+              <label className="control-label">Conversion Reference URL <span className="text-muted-foreground font-normal">(manual override)</span></label>
+              <input type="text" value={convRefUrl} onChange={e => { setConvRefUrl(e.target.value); setConvUrlError(''); }}
+                placeholder="https://conversion-reference.com" className="control-input" />
+              {convUrlError && <p className="text-xs text-destructive mt-1">{convUrlError}</p>}
+            </div>
             </div>
           </div>
         </div>
