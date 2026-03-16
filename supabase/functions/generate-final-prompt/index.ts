@@ -70,12 +70,174 @@ async function fetchRequiredPrompts(): Promise<{
   };
 }
 
+type SourceWebsiteContext = {
+  fetchedUrl: string;
+  pageTitle: string;
+  metaDescription: string;
+  textSnapshot: string;
+  headings: string[];
+  paragraphs: string[];
+  buttonTexts: string[];
+  imageUrls: string[];
+  discoveredUrls: string[];
+};
+
+function ensureHttpUrl(value: string): string {
+  const trimmed = (value || "").trim();
+  if (!trimmed) return "";
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
+}
+
+function stripHtmlTags(value: string): string {
+  return decodeHtmlEntities(
+    value
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+      .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, " ")
+      .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
+}
+
+function uniqueStrings(values: string[], limit = 100): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const normalized = value.trim();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push(normalized);
+    if (result.length >= limit) break;
+  }
+  return result;
+}
+
+function extractTagText(html: string, tagName: string, limit = 40): string[] {
+  const regex = new RegExp(`<${tagName}\\b[^>]*>([\\s\\S]*?)<\\/${tagName}>`, "gi");
+  return uniqueStrings(
+    Array.from(html.matchAll(regex))
+      .map((match) => stripHtmlTags(match[1] || ""))
+      .filter((value) => value.length > 1),
+    limit,
+  );
+}
+
+function extractAttributeValues(html: string, tagName: string, attribute: string, limit = 40): string[] {
+  const regex = new RegExp(`<${tagName}\\b[^>]*${attribute}=["']([^"']+)["'][^>]*>`, "gi");
+  return uniqueStrings(
+    Array.from(html.matchAll(regex))
+      .map((match) => decodeHtmlEntities(match[1] || "").trim())
+      .filter(Boolean),
+    limit,
+  );
+}
+
+function toAbsoluteUrl(baseUrl: string, rawUrl: string): string {
+  try {
+    const trimmed = (rawUrl || "").trim();
+    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("javascript:") || trimmed.startsWith("mailto:") || trimmed.startsWith("tel:")) {
+      return "";
+    }
+    return new URL(trimmed, baseUrl).toString();
+  } catch {
+    return "";
+  }
+}
+
+async function fetchSourceWebsiteContext(sourceUrl: string): Promise<SourceWebsiteContext> {
+  const normalizedUrl = ensureHttpUrl(sourceUrl);
+  if (!normalizedUrl) {
+    throw new StepError("fetch_source", "Source URL is required for scraping.", 400);
+  }
+
+  const response = await fetch(normalizedUrl, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; SwiftLiftBot/1.0; +https://lovable.dev)",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    },
+    redirect: "follow",
+  });
+
+  if (!response.ok) {
+    throw new StepError("fetch_source", `Failed to fetch source URL: ${response.status} ${response.statusText}`, 400);
+  }
+
+  const html = await response.text();
+  const fetchedUrl = response.url || normalizedUrl;
+  const titleMatch = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
+  const metaDescriptionMatch = html.match(/<meta\b[^>]*name=["']description["'][^>]*content=["']([^"']*)["'][^>]*>/i)
+    || html.match(/<meta\b[^>]*content=["']([^"']*)["'][^>]*name=["']description["'][^>]*>/i);
+
+  const headings = uniqueStrings([
+    ...extractTagText(html, "h1", 12),
+    ...extractTagText(html, "h2", 20),
+    ...extractTagText(html, "h3", 20),
+  ], 40);
+  const paragraphs = extractTagText(html, "p", 60).filter((value) => value.length > 25);
+  const buttonTexts = uniqueStrings([
+    ...extractTagText(html, "button", 30),
+    ...extractAttributeValues(html, "input", "value", 20),
+  ], 40);
+
+  const imageUrls = uniqueStrings(
+    Array.from(html.matchAll(/<(?:img|source)\b[^>]*(?:src|srcset)=["']([^"']+)["'][^>]*>/gi))
+      .flatMap((match) => (match[1] || "").split(","))
+      .map((value) => value.trim().split(" ")[0])
+      .map((value) => toAbsoluteUrl(fetchedUrl, value))
+      .filter(Boolean),
+    80,
+  );
+
+  const discoveredUrls = uniqueStrings(
+    [fetchedUrl, ...Array.from(html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>/gi))
+      .map((match) => toAbsoluteUrl(fetchedUrl, match[1] || ""))
+      .filter(Boolean)]
+      .filter((url) => {
+        try {
+          const candidate = new URL(url);
+          const origin = new URL(fetchedUrl).origin;
+          return candidate.origin === origin;
+        } catch {
+          return false;
+        }
+      }),
+    80,
+  );
+
+  const textSnapshot = stripHtmlTags(html).slice(0, 24000);
+
+  return {
+    fetchedUrl,
+    pageTitle: stripHtmlTags(titleMatch?.[1] || ""),
+    metaDescription: decodeHtmlEntities(metaDescriptionMatch?.[1] || "").trim(),
+    textSnapshot,
+    headings,
+    paragraphs,
+    buttonTexts,
+    imageUrls,
+    discoveredUrls,
+  };
+}
+
 // ── compileExtractionUserPrompt ──
 function compileExtractionUserPrompt(input: {
   sourceUrl: string;
   referenceUrl: string;
   businessType: string;
   userNotes: string;
+  sourceContext: SourceWebsiteContext;
 }): string {
   return `SOURCE URL:
 ${input.sourceUrl}
@@ -89,8 +251,35 @@ ${input.businessType || "(not specified)"}
 USER NOTES:
 ${input.userNotes || "(none)"}
 
+FETCHED SOURCE URL:
+${input.sourceContext.fetchedUrl}
+
+PAGE TITLE:
+${input.sourceContext.pageTitle || "(none)"}
+
+META DESCRIPTION:
+${input.sourceContext.metaDescription || "(none)"}
+
+DISCOVERED SOURCE URLS:
+${input.sourceContext.discoveredUrls.length ? input.sourceContext.discoveredUrls.map((url) => `- ${url}`).join("\n") : "(none)"}
+
+EXTRACTED HEADINGS:
+${input.sourceContext.headings.length ? input.sourceContext.headings.map((value) => `- ${value}`).join("\n") : "(none)"}
+
+EXTRACTED PARAGRAPHS:
+${input.sourceContext.paragraphs.length ? input.sourceContext.paragraphs.map((value) => `- ${value}`).join("\n") : "(none)"}
+
+EXTRACTED BUTTON TEXT:
+${input.sourceContext.buttonTexts.length ? input.sourceContext.buttonTexts.map((value) => `- ${value}`).join("\n") : "(none)"}
+
+EXTRACTED IMAGE URLS:
+${input.sourceContext.imageUrls.length ? input.sourceContext.imageUrls.map((url) => `- ${url}`).join("\n") : "(none)"}
+
+RAW SOURCE PAGE TEXT SNAPSHOT:
+${input.sourceContext.textSnapshot || "(none)"}
+
 TASK:
-Extract the source website as completely as possible for downstream website rebuilding.
+Extract the source website as completely as possible for downstream website rebuilding using the fetched source page content above as the primary dataset.
 
 PRIORITIES
 1. Preserve the original page URL structure and slug naming.
@@ -101,6 +290,7 @@ PRIORITIES
 6. Return only valid JSON in the required schema.
 
 IMPORTANT
+- Use the fetched source page content above; do not guess from the URL alone.
 - Do not aggressively summarize.
 - Do not omit public-facing copy.
 - Do not rewrite service names.
@@ -242,6 +432,94 @@ function normalizeExtractionData(data: any): any {
   normalized.images = obj(data.images, template.images);
   normalized.extraction_notes = obj(data.extraction_notes, template.extraction_notes);
   return normalized;
+}
+
+function buildFallbackSiteStructure(urls: string[]): any[] {
+  return urls.map((url, index) => {
+    try {
+      const parsed = new URL(url);
+      const isHome = parsed.pathname === "/" || parsed.pathname === "";
+      return {
+        page_title: index === 0 ? "Home" : "",
+        page_type: isHome ? "home" : "page",
+        url,
+        slug: isHome ? "/" : parsed.pathname,
+        nav_label: "",
+        meta_title: "",
+        meta_description: "",
+      };
+    } catch {
+      return {
+        page_title: index === 0 ? "Home" : "",
+        page_type: index === 0 ? "home" : "page",
+        url,
+        slug: "",
+        nav_label: "",
+        meta_title: "",
+        meta_description: "",
+      };
+    }
+  });
+}
+
+function hydrateExtractionFallbacks(normalized: any, sourceContext: SourceWebsiteContext, sourceUrl: string): any {
+  const hydrated = structuredClone(normalized);
+  hydrated.site_meta.source_url = hydrated.site_meta.source_url || sourceContext.fetchedUrl || sourceUrl;
+  hydrated.site_meta.site_name = hydrated.site_meta.site_name || sourceContext.pageTitle || "";
+  hydrated.site_meta.primary_domain = hydrated.site_meta.primary_domain || (() => {
+    try {
+      return new URL(sourceContext.fetchedUrl || sourceUrl).hostname;
+    } catch {
+      return "";
+    }
+  })();
+
+  if (!hydrated.site_structure.length && sourceContext.discoveredUrls.length) {
+    hydrated.site_structure = buildFallbackSiteStructure(sourceContext.discoveredUrls);
+  }
+
+  if (!hydrated.copywriting.all_headings.length && sourceContext.headings.length) {
+    hydrated.copywriting.all_headings = sourceContext.headings;
+  }
+  if (!hydrated.copywriting.all_paragraphs.length && sourceContext.paragraphs.length) {
+    hydrated.copywriting.all_paragraphs = sourceContext.paragraphs;
+  }
+  if (!hydrated.copywriting.all_button_texts.length && sourceContext.buttonTexts.length) {
+    hydrated.copywriting.all_button_texts = sourceContext.buttonTexts;
+  }
+
+  if (!hydrated.images.all_image_urls.length && sourceContext.imageUrls.length) {
+    hydrated.images.all_image_urls = sourceContext.imageUrls;
+  }
+  if (!hydrated.images.hero_images.length && sourceContext.imageUrls.length) {
+    hydrated.images.hero_images = sourceContext.imageUrls.slice(0, 6);
+  }
+
+  if (!Array.isArray(hydrated.extraction_notes.warnings)) hydrated.extraction_notes.warnings = [];
+  if (!hydrated.extraction_notes.warnings.includes("Direct source-page scrape was used to backfill empty extraction fields.")) {
+    hydrated.extraction_notes.warnings.push("Direct source-page scrape was used to backfill empty extraction fields.");
+  }
+
+  return hydrated;
+}
+
+function findUnresolvedPlaceholders(value: string): string[] {
+  const requiredTokens = [
+    "{SOURCE_URL}", "{{SOURCE_URL}}",
+    "{REFERENCE_URL}", "{{REFERENCE_URL}}",
+    "{REFERENCE_SCREENSHOT}", "{{REFERENCE_SCREENSHOT}}",
+    "{SCRAPED_DATA}", "{{SCRAPED_DATA}}",
+    "{SCRAPED_URLS}", "{{SCRAPED_URLS}}",
+    "{SITE_META}", "{{SITE_META}}",
+    "{SITE_STRUCTURE}", "{{SITE_STRUCTURE}}",
+    "{COPYWRITING}", "{{COPYWRITING}}",
+    "{BUSINESS_INFO}", "{{BUSINESS_INFO}}",
+    "{DESIGN_SYSTEM}", "{{DESIGN_SYSTEM}}",
+    "{IMAGES}", "{{IMAGES}}",
+    "{EXTRACTION_NOTES}", "{{EXTRACTION_NOTES}}",
+    "{USER_NOTES}", "{{USER_NOTES}}",
+  ];
+  return requiredTokens.filter((token) => value.includes(token));
 }
 
 // ── Formatting functions ──
@@ -491,13 +769,17 @@ Deno.serve(async (req) => {
       console.log("Prompts loaded from database successfully.");
     }
 
+    currentStep = "fetch_source";
+    const sourceContext = await fetchSourceWebsiteContext(sourceUrl);
+
     currentStep = "compile_extraction_prompt";
     console.log("Starting extraction for:", sourceUrl);
     const userPrompt = compileExtractionUserPrompt({
-      sourceUrl,
+      sourceUrl: ensureHttpUrl(sourceUrl),
       referenceUrl: referenceUrl || "",
       businessType: businessType || "",
       userNotes: userNotes || "",
+      sourceContext,
     });
 
     currentStep = "call_claude";
@@ -513,7 +795,11 @@ Deno.serve(async (req) => {
     }
 
     currentStep = "normalize_extraction_data";
-    const normalized = normalizeExtractionData(parsedData);
+    const normalized = hydrateExtractionFallbacks(
+      normalizeExtractionData(parsedData),
+      sourceContext,
+      ensureHttpUrl(sourceUrl),
+    );
 
     currentStep = "format_prompt_blocks";
     const blocks = {
@@ -583,7 +869,6 @@ ${activeContentModules.includes('portfolio') ? `PORTFOLIO MODULE:
 
     const convUrl = conversionLayoutUrl || referenceUrl || "";
 
-    // Build the full scraped data block (all formatted sections combined)
     const fullScrapedData = [
       blocks.siteMeta && `== SITE META ==\n${blocks.siteMeta}`,
       blocks.siteStructure && `== SITE STRUCTURE ==\n${blocks.siteStructure}`,
@@ -594,15 +879,34 @@ ${activeContentModules.includes('portfolio') ? `PORTFOLIO MODULE:
       blocks.extractionNotes && `== EXTRACTION NOTES ==\n${blocks.extractionNotes}`,
     ].filter(Boolean).join("\n\n");
 
-    // Build scraped URLs block from site structure
     const scrapedUrls = (normalized.site_structure || [])
       .map((p: any) => p.url || p.slug || "")
       .filter((u: string) => u)
       .map((u: string) => `- ${u}`)
-      .join("\n") || "(no URLs extracted)";
+      .join("\n");
+
+    const hasExtractionData = Boolean(fullScrapedData.trim());
+    const hasScrapedUrls = Boolean(scrapedUrls.trim());
+
+    console.log("ASSEMBLY DEBUG", JSON.stringify({
+      sourceUrl: ensureHttpUrl(sourceUrl),
+      referenceUrl: referenceUrl || "",
+      extractionReturnedData: Boolean(parsedData && Object.keys(parsedData).length),
+      scrapedDataNonEmpty: hasExtractionData,
+      scrapedUrlsNonEmpty: hasScrapedUrls,
+      fetchedUrl: sourceContext.fetchedUrl,
+    }));
+
+    if (!hasExtractionData) {
+      throw new StepError("assembly", "scraped_data was empty, template injection skipped", 422);
+    }
+
+    if (!hasScrapedUrls) {
+      throw new StepError("assembly", "scraped_urls was empty, template injection skipped", 422);
+    }
 
     const runtimeValuesA = {
-      sourceUrl,
+      sourceUrl: ensureHttpUrl(sourceUrl),
       referenceUrl: referenceUrl || "",
       referenceScreenshot: "(not available)",
       scrapedData: fullScrapedData,
@@ -610,7 +914,7 @@ ${activeContentModules.includes('portfolio') ? `PORTFOLIO MODULE:
     };
 
     const runtimeValuesB = {
-      sourceUrl,
+      sourceUrl: ensureHttpUrl(sourceUrl),
       referenceUrl: convUrl,
       referenceScreenshot: "(not available)",
       scrapedData: fullScrapedData,
@@ -618,8 +922,23 @@ ${activeContentModules.includes('portfolio') ? `PORTFOLIO MODULE:
     };
 
     currentStep = "assemble_prompts";
-    const promptA = `SWIFTLIFT BUILD PROMPT — ${tierLabelA}\nSource: ${sourceUrl}\n\n` +
-      assemblePrompt(masterPrompt, blocks, runtimeValuesA, userNotes || "") + brandOverrideBlock + contentModuleBlock;
+    const assembledA = assemblePrompt(masterPrompt, blocks, runtimeValuesA, userNotes || "");
+    const assembledB = assemblePrompt(masterPrompt, blocks, runtimeValuesB, userNotes || "");
+    const unresolvedA = findUnresolvedPlaceholders(assembledA);
+    const unresolvedB = findUnresolvedPlaceholders(assembledB);
+    const replacementCompleted = unresolvedA.length === 0 && unresolvedB.length === 0;
+
+    console.log("PLACEHOLDER DEBUG", JSON.stringify({
+      replacementCompleted,
+      unresolvedPromptA: unresolvedA,
+      unresolvedPromptB: unresolvedB,
+    }));
+
+    if (!replacementCompleted) {
+      throw new StepError("assembly", `Placeholder replacement incomplete: ${[...unresolvedA, ...unresolvedB].join(", ")}`, 422);
+    }
+
+    const promptA = `SWIFTLIFT BUILD PROMPT — ${tierLabelA}\nSource: ${ensureHttpUrl(sourceUrl)}\n\n` + assembledA + brandOverrideBlock + contentModuleBlock;
 
     const conversionDirective = `--------------------------------------------------
 LAYOUT MODE: PREMIUM CONVERSION LAYOUT
@@ -653,9 +972,9 @@ IMPORTANT: Do NOT add conversion strategy, CRO analysis, sales funnel planning, 
 
 `;
 
-    const promptB = `SWIFTLIFT BUILD PROMPT — ${tierLabelB}\nSource: ${sourceUrl}\n\n` +
+    const promptB = `SWIFTLIFT BUILD PROMPT — ${tierLabelB}\nSource: ${ensureHttpUrl(sourceUrl)}\n\n` +
       conversionDirective +
-      assemblePrompt(masterPrompt, blocks, runtimeValuesB, userNotes || "") + brandOverrideBlock + contentModuleBlock;
+      assembledB + brandOverrideBlock + contentModuleBlock;
 
     console.log("Prompts assembled from database prompts. A length:", promptA.length, "B length:", promptB.length, "Assembly rules length:", assemblyRules?.length || 0);
 
