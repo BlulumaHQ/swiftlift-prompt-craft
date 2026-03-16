@@ -12,8 +12,9 @@ const projectBrands = ['SwiftLift', 'Bluluma', 'Sonykun', 'SwiftSite'];
 
 interface Props {
   onPromptsGenerated: (promptA: string, promptB: string, tier: '350' | '550') => void;
+  onGenerateStart: (tier: '350' | '550') => void;
+  onGenerateError: (error: string) => void;
   onClear: () => void;
-  onClaudeGenerated?: (finalPrompt: string, extractedData: any, error?: string) => void;
   clearSignal: number;
   saveSignal: number;
   newSignal: number;
@@ -32,7 +33,7 @@ function simulateBrandDetection(url: string): { primary: string; secondary: stri
   return { primary: `hsl(${hue}, 65%, 45%)`, secondary: `hsl(${(hue + 120) % 360}, 55%, 40%)`, font: googleFonts[hash % googleFonts.length] };
 }
 
-export default function ControlPanel({ onPromptsGenerated, onClear, onClaudeGenerated, clearSignal, saveSignal, newSignal }: Props) {
+export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGenerateError, onClear, clearSignal, saveSignal, newSignal }: Props) {
   // Project Setup
   const [projectBrand, setProjectBrand] = useState('SwiftLift');
   const [sourceUrl, setSourceUrl] = useState('');
@@ -64,7 +65,6 @@ export default function ControlPanel({ onPromptsGenerated, onClear, onClaudeGene
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [generating, setGenerating] = useState(false);
 
-
   // Brand confirmation popup
   const [showBrandConfirm, setShowBrandConfirm] = useState(false);
   const [confirmBrand, setConfirmBrand] = useState('SwiftLift');
@@ -91,42 +91,35 @@ export default function ControlPanel({ onPromptsGenerated, onClear, onClaudeGene
 
   const executeGenerate = async () => {
     setGenerating(true);
+    onGenerateStart(packageTier);
 
-    // Legacy local prompt compilation (keeps existing Prompt A/B output)
-    const { promptA, promptB } = compilePrompts({
-      sourceUrl, referenceLayout, referenceUrl, packageTier,
-      modules: [...modules, ...advModules], primaryColor, secondaryColor, primaryFont, specialInstructions,
-    });
-    onPromptsGenerated(promptA, promptB, packageTier);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-final-prompt', {
+        body: {
+          sourceUrl,
+          referenceUrl: referenceUrl || referenceLayout || '',
+          businessType: '',
+          userNotes: specialInstructions || '',
+          packageTier,
+        },
+      });
 
-    // Claude-powered extraction + assembly
-    if (onClaudeGenerated && sourceUrl) {
-      try {
-        const { data, error } = await supabase.functions.invoke('generate-final-prompt', {
-          body: {
-            sourceUrl,
-            referenceUrl: referenceUrl || referenceLayout || '',
-            businessType: '', // not in current form, pass empty
-            userNotes: specialInstructions || '',
-          },
-        });
-
-        if (error) {
-          onClaudeGenerated('', null, error.message || 'Edge function call failed');
-        } else if (data?.success) {
-          onClaudeGenerated(data.finalPrompt, data.extractedData);
-        } else {
-          onClaudeGenerated('', null, data?.error || 'Generation failed');
-        }
-      } catch (err: any) {
-        onClaudeGenerated('', null, err.message || 'Network error');
+      if (error) {
+        onGenerateError(error.message || 'Edge function call failed');
+      } else if (data?.success) {
+        onPromptsGenerated(data.promptA, data.promptB, packageTier);
+      } else {
+        onGenerateError(data?.error || 'Generation failed');
       }
+    } catch (err: any) {
+      onGenerateError(err.message || 'Network error');
     }
 
     setGenerating(false);
   };
 
   const handleGenerate = () => {
+    if (!sourceUrl) return;
     setConfirmBrand(projectBrand);
     setShowBrandConfirm(true);
   };
@@ -162,7 +155,6 @@ export default function ControlPanel({ onPromptsGenerated, onClear, onClaudeGene
     setPrimaryColor(''); setSecondaryColor('');
     setPrimaryFont(''); setFontWeight('700');
     setSpecialInstructions(''); setBrandDetected(false);
-    
     onClear();
   };
 
@@ -353,10 +345,9 @@ export default function ControlPanel({ onPromptsGenerated, onClear, onClaudeGene
           />
         </div>
 
-
         {/* 9. Generate Button */}
         <div className="pb-2">
-          <button onClick={handleGenerate} disabled={generating}
+          <button onClick={handleGenerate} disabled={generating || !sourceUrl}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-sm">
             <Sparkles size={16} />
             {generating ? 'Generating...' : 'Generate Prompts'}
@@ -385,7 +376,7 @@ export default function ControlPanel({ onPromptsGenerated, onClear, onClaudeGene
                 Cancel
               </button>
               <button onClick={handleConfirmGenerate}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
                 Confirm & Generate
               </button>
             </div>
@@ -393,11 +384,7 @@ export default function ControlPanel({ onPromptsGenerated, onClear, onClaudeGene
         </div>
       )}
 
-      <ReferenceLibraryModal
-        open={showLibrary}
-        onClose={() => setShowLibrary(false)}
-        onSelect={handleSelectLayout}
-      />
+      <ReferenceLibraryModal open={showLibrary} onClose={() => setShowLibrary(false)} onSelect={handleSelectLayout} />
     </>
   );
 }
