@@ -149,13 +149,19 @@ export default function PromptLibrary() {
   const handleSyncToCloud = async () => {
     setSyncing(true);
     try {
+      // Load existing cloud prompts to match by name
+      const existingCloud = await getCloudPrompts();
+      const cloudByName = new Map(existingCloud.map(c => [c.prompt_name, c]));
+
       // Only sync operational prompts, not system ones
       const localPrompts = getPromptLibrary().filter(p => !SYSTEM_PROMPT_IDS.includes(p.id));
       for (const p of localPrompts) {
+        const existing = cloudByName.get(p.name);
         await saveCloudPrompt({
+          id: existing?.id,                       // pass existing id → UPDATE, not INSERT
           prompt_name: p.name,
-          file_path: '',
-          version: 1,
+          file_path: existing?.file_path || '',    // preserve existing file path
+          version: existing ? existing.version : 1,
           content: p.content,
           category: p.category,
         });
