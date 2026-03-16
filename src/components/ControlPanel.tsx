@@ -62,8 +62,11 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const [convRef, setConvRef] = useState<RefSelection | null>(null);
   const [showConvLibrary, setShowConvLibrary] = useState(false);
 
-  // Legacy manual reference URL override
-  const [referenceUrl, setReferenceUrl] = useState('');
+  // Manual reference URL overrides
+  const [styleRefUrl, setStyleRefUrl] = useState('');
+  const [convRefUrl, setConvRefUrl] = useState('');
+  const [styleUrlError, setStyleUrlError] = useState('');
+  const [convUrlError, setConvUrlError] = useState('');
 
   const [packageTier, setPackageTier] = useState<'350' | '550'>('550');
   const [primaryColor, setPrimaryColor] = useState('');
