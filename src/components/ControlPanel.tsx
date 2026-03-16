@@ -182,10 +182,11 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   };
 
   const doSave = () => {
+    const resolvedStyleRef = normalizeUrl(styleRefUrl) || styleRef?.live_url || '';
     const project: SavedProject = {
       id: crypto.randomUUID(),
       name: projectName || getProjectName(sourceUrl),
-      sourceUrl, referenceLayout: styleRef?.reference_name || '', referenceUrl: styleRef?.live_url || referenceUrl, packageTier,
+      sourceUrl, referenceLayout: styleRef?.reference_name || '', referenceUrl: resolvedStyleRef, packageTier,
       modules, addons: [], primaryColor, secondaryColor, primaryFont,
       specialInstructions, promptA: '', promptB: '',
       dateCreated: new Date().toISOString().slice(0, 10),
