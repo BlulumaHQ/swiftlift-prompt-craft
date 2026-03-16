@@ -1,1 +1,4 @@
 project_id = "svdjbycnsygkaiwnymms"
+
+[functions.generate-final-prompt]
+verify_jwt = false

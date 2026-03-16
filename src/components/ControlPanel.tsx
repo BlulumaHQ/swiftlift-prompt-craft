@@ -89,16 +89,41 @@ export default function ControlPanel({ onPromptsGenerated, onClear, onClaudeGene
     if (!url) setBrandDetected(false);
   };
 
-  const executeGenerate = () => {
+  const executeGenerate = async () => {
     setGenerating(true);
-    setTimeout(() => {
-      const { promptA, promptB } = compilePrompts({
-        sourceUrl, referenceLayout, referenceUrl, packageTier,
-        modules: [...modules, ...advModules], primaryColor, secondaryColor, primaryFont, specialInstructions,
-      });
-      onPromptsGenerated(promptA, promptB, packageTier);
-      setGenerating(false);
-    }, 1200);
+
+    // Legacy local prompt compilation (keeps existing Prompt A/B output)
+    const { promptA, promptB } = compilePrompts({
+      sourceUrl, referenceLayout, referenceUrl, packageTier,
+      modules: [...modules, ...advModules], primaryColor, secondaryColor, primaryFont, specialInstructions,
+    });
+    onPromptsGenerated(promptA, promptB, packageTier);
+
+    // Claude-powered extraction + assembly
+    if (onClaudeGenerated && sourceUrl) {
+      try {
+        const { data, error } = await supabase.functions.invoke('generate-final-prompt', {
+          body: {
+            sourceUrl,
+            referenceUrl: referenceUrl || referenceLayout || '',
+            businessType: '', // not in current form, pass empty
+            userNotes: specialInstructions || '',
+          },
+        });
+
+        if (error) {
+          onClaudeGenerated('', null, error.message || 'Edge function call failed');
+        } else if (data?.success) {
+          onClaudeGenerated(data.finalPrompt, data.extractedData);
+        } else {
+          onClaudeGenerated('', null, data?.error || 'Generation failed');
+        }
+      } catch (err: any) {
+        onClaudeGenerated('', null, err.message || 'Network error');
+      }
+    }
+
+    setGenerating(false);
   };
 
   const handleGenerate = () => {
