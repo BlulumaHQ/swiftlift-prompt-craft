@@ -3,6 +3,7 @@ import NavHeader from '@/components/NavHeader';
 import ControlPanel from '@/components/ControlPanel';
 import PromptOutputPanel from '@/components/PromptOutputPanel';
 import { Trash2, Save, FilePlus, Loader2 } from 'lucide-react';
+import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
 
 const LOADING_STEPS = [
   'Scraping Source URL...',
