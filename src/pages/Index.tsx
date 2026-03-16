@@ -154,7 +154,7 @@ const Index = () => {
             )}
           </main>
         </Panel>
-      </PanelGroup>
+      </Group>
     </div>
   );
 };
