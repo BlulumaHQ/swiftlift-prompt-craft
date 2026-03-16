@@ -7,6 +7,18 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+class StepError extends Error {
+  step: string;
+  status: number;
+
+  constructor(step: string, message: string, status = 500) {
+    super(message);
+    this.name = "StepError";
+    this.step = step;
+    this.status = status;
+  }
+}
+
 // ── Fetch required prompts from database ──
 async function fetchRequiredPrompts(): Promise<{
   extractionPrompt: string;
@@ -16,7 +28,7 @@ async function fetchRequiredPrompts(): Promise<{
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !supabaseKey) {
-    throw new Error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured.");
+    throw new StepError("load_prompts", "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured.", 500);
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey);
@@ -33,17 +45,21 @@ async function fetchRequiredPrompts(): Promise<{
     .in("prompt_name", requiredNames);
 
   if (error) {
-    throw new Error(`Failed to fetch prompts from database: ${error.message}`);
+    throw new StepError("database_query", `Failed to fetch prompts from database: ${error.message}`, 500);
+  }
+
+  if (!data) {
+    throw new StepError("database_query", "prompts table returned null", 500);
   }
 
   const promptMap = new Map<string, string>();
-  for (const row of data || []) {
+  for (const row of data) {
     promptMap.set(row.prompt_name, row.content);
   }
 
   for (const name of requiredNames) {
     if (!promptMap.has(name) || !promptMap.get(name)?.trim()) {
-      throw new Error(`Required prompt missing: ${name}`);
+      throw new StepError("load_prompts", `Required prompt missing: ${name}`, 500);
     }
   }
 
