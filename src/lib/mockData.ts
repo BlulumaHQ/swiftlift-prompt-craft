@@ -1,38 +1,8 @@
-import dentalA from '@/assets/previews/dental-a.jpg';
-import dentalB from '@/assets/previews/dental-b.jpg';
-import constructionA from '@/assets/previews/construction-a.jpg';
-import constructionB from '@/assets/previews/construction-b.jpg';
-import luxuryService from '@/assets/previews/luxury-service.jpg';
-import restaurant from '@/assets/previews/restaurant.jpg';
-import onePageService from '@/assets/previews/one-page-service.jpg';
-import realEstate from '@/assets/previews/real-estate.jpg';
-import professionalServices from '@/assets/previews/professional-services.jpg';
+// Re-export reference types from the new store for backward compatibility
+export type { ReferenceEntry as ReferenceLayout } from '@/lib/referenceStore';
+export { getReferences as getReferenceLayouts, industries as categories } from '@/lib/referenceStore';
 
-export interface ReferenceLayout {
-  id: string;
-  name: string;
-  industry: string;
-  category: string;
-  image: string;
-  addedDate: string;
-  lastUsed: string;
-}
-
-export const referenceLayouts: ReferenceLayout[] = [
-  { id: '1', name: 'Dental Layout A', industry: 'Dental', category: 'Dental', image: dentalA, addedDate: '2026-03-01', lastUsed: '2026-03-07' },
-  { id: '2', name: 'Dental Layout B', industry: 'Dental', category: 'Dental', image: dentalB, addedDate: '2026-02-20', lastUsed: '2026-03-05' },
-  { id: '3', name: 'Construction Layout A', industry: 'Construction', category: 'Construction', image: constructionA, addedDate: '2026-02-15', lastUsed: '2026-03-06' },
-  { id: '4', name: 'Construction Layout B', industry: 'Construction', category: 'Construction', image: constructionB, addedDate: '2026-02-10', lastUsed: '2026-03-04' },
-  { id: '5', name: 'Luxury Service Layout', industry: 'Luxury Service', category: 'Luxury Service', image: luxuryService, addedDate: '2026-01-28', lastUsed: '2026-03-03' },
-  { id: '6', name: 'Restaurant Layout', industry: 'Restaurant', category: 'Restaurant', image: restaurant, addedDate: '2026-01-20', lastUsed: '2026-03-02' },
-  { id: '7', name: 'One Page Service Layout', industry: 'Professional Services', category: 'One Page Design', image: onePageService, addedDate: '2026-01-15', lastUsed: '2026-02-28' },
-  { id: '8', name: 'Real Estate Layout', industry: 'Real Estate', category: 'Real Estate', image: realEstate, addedDate: '2026-01-10', lastUsed: '2026-02-25' },
-  { id: '9', name: 'Professional Services Layout', industry: 'Professional Services', category: 'Professional Services', image: professionalServices, addedDate: '2026-01-05', lastUsed: '2026-02-20' },
-];
-
-export const categories = ['All', 'Dental', 'Construction', 'Restaurant', 'Real Estate', 'Luxury Service', 'Professional Services', 'One Page Design'];
-
-export const sortOptions = ['Recently Added', 'Recently Used', 'A–Z', 'Industry'];
+export const sortOptions = ['Recently Added', 'A–Z', 'Industry'];
 
 export const googleFonts = [
   'Inter', 'Montserrat', 'Poppins', 'DM Sans', 'Manrope', 'Outfit',
