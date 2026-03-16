@@ -55,6 +55,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const [secondaryColor, setSecondaryColor] = useState('');
   const [primaryFont, setPrimaryFont] = useState('');
   const [fontWeight, setFontWeight] = useState('700');
+  const [themeMode, setThemeMode] = useState<'auto' | 'force_light' | 'force_dark'>('auto');
   const [brandDetected, setBrandDetected] = useState(false);
   const [modules, setModules] = useState<string[]>([]);
   const [advModules, setAdvModules] = useState<string[]>([]);
@@ -91,6 +92,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           businessType: '',
           userNotes: specialInstructions || '',
           packageTier,
+          themeMode,
         },
       });
 
@@ -143,7 +145,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     setStyleRef(null); setConvRef(null); setReferenceUrl('');
     setPackageTier('550'); setModules([]); setAdvModules([]);
     setPrimaryColor(''); setSecondaryColor('');
-    setPrimaryFont(''); setFontWeight('700');
+    setPrimaryFont(''); setFontWeight('700'); setThemeMode('auto');
     setSpecialInstructions(''); setBrandDetected(false);
     onClear();
   };
@@ -269,9 +271,9 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           </div>
         </div>
 
-        {/* 4. Brand Override */}
+        {/* 4. Brand & Theme Override */}
         <div className="panel-section">
-          <h3 className="panel-section-title">Brand Override</h3>
+          <h3 className="panel-section-title">Brand & Theme Override</h3>
           {brandDetected && (
             <div className="mb-3 px-3 py-2 rounded-md bg-accent text-accent-foreground text-xs">
               ✨ Colors and font auto-detected from source URL
@@ -320,6 +322,19 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
                 <option value="800">800 — Extra Bold</option>
                 <option value="900">900 — Black</option>
               </select>
+            </div>
+            <div>
+              <label className="control-label">Theme Mode</label>
+              <select value={themeMode} onChange={e => setThemeMode(e.target.value as any)} className="control-input">
+                <option value="auto">Auto — Follow source / reference</option>
+                <option value="force_light">Force Light</option>
+                <option value="force_dark">Force Dark</option>
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                {themeMode === 'auto' && 'Inherits theme from the source site or reference design.'}
+                {themeMode === 'force_light' && 'Forces light backgrounds, light surfaces, and dark text.'}
+                {themeMode === 'force_dark' && 'Forces dark backgrounds, dark surfaces, and light text.'}
+              </p>
             </div>
           </div>
         </div>

@@ -1,0 +1,1 @@
+INSERT INTO storage.buckets (id, name, public) VALUES ('reference-library', 'reference-library', true) ON CONFLICT (id) DO NOTHING;
