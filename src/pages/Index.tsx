@@ -3,6 +3,7 @@ import NavHeader from '@/components/NavHeader';
 import ControlPanel from '@/components/ControlPanel';
 import PromptOutputPanel from '@/components/PromptOutputPanel';
 import { Trash2, Save, FilePlus, Loader2 } from 'lucide-react';
+import { Group, Panel, Separator } from 'react-resizable-panels';
 
 const LOADING_STEPS = [
   'Scraping Source URL...',
@@ -93,61 +94,67 @@ const Index = () => {
     <div className="flex flex-col h-screen">
       <NavHeader title="Basic Builder" rightContent={actionButtons} />
 
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <aside className="w-[400px] shrink-0 border-r border-border bg-card overflow-y-auto p-5">
-          <ControlPanel
-            onPromptsGenerated={handlePromptsGenerated}
-            onGenerateStart={handleGenerateStart}
-            onGenerateError={handleGenerateError}
-            onClear={handleClear}
-            clearSignal={clearSignal}
-            saveSignal={saveSignal}
-            newSignal={newSignal}
-          />
-        </aside>
+      <Group orientation="horizontal" className="flex-1 min-h-0">
+        <Panel defaultSize={55} minSize={30}>
+          <aside className="h-full border-r border-border bg-card overflow-y-auto p-5">
+            <ControlPanel
+              onPromptsGenerated={handlePromptsGenerated}
+              onGenerateStart={handleGenerateStart}
+              onGenerateError={handleGenerateError}
+              onClear={handleClear}
+              clearSignal={clearSignal}
+              saveSignal={saveSignal}
+              newSignal={newSignal}
+            />
+          </aside>
+        </Panel>
 
-        <main className="flex-1 flex flex-col gap-4 p-5 overflow-y-auto">
-          {/* Loading State */}
-          {generating && (
-            <div className="flex flex-col items-center justify-center py-16 gap-4">
-              <Loader2 size={36} className="animate-spin text-primary" />
-              <div className="text-center space-y-2">
-                <p className="text-sm font-semibold text-foreground">
-                  {LOADING_STEPS[loadingStep]}
-                </p>
-                <div className="flex gap-1.5 justify-center">
-                  {LOADING_STEPS.map((_, i) => (
-                    <div
-                      key={i}
-                      className={`h-1.5 w-8 rounded-full transition-colors ${
-                        i <= loadingStep ? 'bg-primary' : 'bg-muted'
-                      }`}
-                    />
-                  ))}
+        <Separator className="w-1.5 bg-border hover:bg-primary/30 transition-colors cursor-col-resize" />
+
+        <Panel defaultSize={45} minSize={20}>
+          <main className="h-full flex flex-col gap-4 p-5 overflow-y-auto">
+            {/* Loading State */}
+            {generating && (
+              <div className="flex flex-col items-center justify-center py-16 gap-4">
+                <Loader2 size={36} className="animate-spin text-primary" />
+                <div className="text-center space-y-2">
+                  <p className="text-sm font-semibold text-foreground">
+                    {LOADING_STEPS[loadingStep]}
+                  </p>
+                  <div className="flex gap-1.5 justify-center">
+                    {LOADING_STEPS.map((_, i) => (
+                      <div
+                        key={i}
+                        className={`h-1.5 w-8 rounded-full transition-colors ${
+                          i <= loadingStep ? 'bg-primary' : 'bg-muted'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    This may take 15–30 seconds
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  This may take 15–30 seconds
-                </p>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Error */}
-          {claudeError && !generating && (
-            <div className="px-4 py-3 rounded-lg border border-destructive/50 bg-destructive/10 text-destructive text-sm">
-              <strong>Error:</strong> {claudeError}
-            </div>
-          )}
+            {/* Error */}
+            {claudeError && !generating && (
+              <div className="px-4 py-3 rounded-lg border border-destructive/50 bg-destructive/10 text-destructive text-sm">
+                <strong>Error:</strong> {claudeError}
+              </div>
+            )}
 
-          {/* Prompt A/B Output (only when not generating) */}
-          {!generating && (
-            <>
-              <PromptOutputPanel title={tierLabels.a} content={promptA} />
-              <PromptOutputPanel title={tierLabels.b} content={promptB} />
-            </>
-          )}
-        </main>
-      </div>
+            {/* Prompt A/B Output (only when not generating) */}
+            {!generating && (
+              <>
+                <PromptOutputPanel title={tierLabels.a} content={promptA} />
+                <PromptOutputPanel title={tierLabels.b} content={promptB} />
+              </>
+            )}
+          </main>
+        </Panel>
+      </Group>
     </div>
   );
 };
