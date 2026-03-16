@@ -92,6 +92,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           businessType: '',
           userNotes: specialInstructions || '',
           packageTier,
+          themeMode,
         },
       });
 
