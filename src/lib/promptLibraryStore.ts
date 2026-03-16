@@ -1,53 +1,41 @@
-// Prompt Library Store V5 — Prompts + Workflows dual-mode system
+// Prompt Library Store — Clean 4-prompt system
 
-const STORAGE_KEY = 'swiftlift_prompt_library_v5';
+const STORAGE_KEY = 'swiftlift_prompt_library_v6';
 
-export type PromptCategory = 'core' | 'preview' | 'module' | 'advanced' | 'revision' | 'qc';
-export type WorkflowCategory = 'ai_internal' | 'ai_pipeline' | 'future_automation';
-export type LibraryMode = 'prompts' | 'workflows';
+export type PromptCategory = 'core';
+export type LibraryMode = 'prompts';
+export type PromptStatus = 'CONFIRMED';
+export type EntryType = 'Output Prompt';
 
-export type PromptStatus = 'CONFIRMED' | 'TO BE DETERMINED';
-export type EntryType = 'Output Prompt' | 'Internal Workflow Prompt' | 'Workflow Placeholder';
+// Backward compat aliases
+export type WorkflowCategory = string;
+export type PromptSection = PromptCategory;
 
 export interface PromptBlock {
   id: string;
   name: string;
-  category: PromptCategory | WorkflowCategory;
+  category: PromptCategory;
   mode: LibraryMode;
   type: EntryType;
   status: PromptStatus;
   content: string;
 }
 
-// Keep old type for backward compat in promptCompiler
-export type PromptSection = PromptCategory;
-
 export const categoryLabels: Record<PromptCategory, string> = {
-  core: 'Core System Prompts',
-  preview: 'Preview Prompts',
-  module: 'Module Prompts',
-  advanced: 'Advanced Module Prompts',
-  revision: 'Revision Prompts',
-  qc: 'Quality Control Prompts',
+  core: 'Core Prompt Library',
 };
 
-export const workflowCategoryLabels: Record<WorkflowCategory, string> = {
-  ai_internal: 'AI Internal System Prompts',
-  ai_pipeline: 'AI Pipeline Workflows',
-  future_automation: 'Future Automation Workflows',
-};
+export const workflowCategoryLabels: Record<string, string> = {};
 
-export const categoryOrder: PromptCategory[] = ['core', 'preview', 'module', 'advanced', 'revision', 'qc'];
-export const workflowCategoryOrder: WorkflowCategory[] = ['ai_internal', 'ai_pipeline', 'future_automation'];
+export const categoryOrder: PromptCategory[] = ['core'];
+export const workflowCategoryOrder: string[] = [];
 
-// Alias for backward compat
 export const sectionLabels = categoryLabels;
 
 const defaultPrompts: PromptBlock[] = [
-  // ═══ CORE SYSTEM PROMPTS ═══
   {
-    id: 'core_master_v3',
-    name: 'SwiftLift Core Master Prompt V3',
+    id: 'final_build_master_v1',
+    name: 'SwiftLift Final Build Master Prompt V1',
     category: 'core',
     mode: 'prompts',
     type: 'Output Prompt',
@@ -56,887 +44,884 @@ const defaultPrompts: PromptBlock[] = [
 
 Your goal is to generate a COMPLETE, CLIENT-READY WEBSITE in a single build.
 
-The website must appear fully finished, professional, and intentionally designed.
+The website must appear fully finished, professional, intentional, and conversion-focused.
 
 No placeholder text.
 No lorem ipsum.
 No unfinished sections.
+No generic filler copy.
 
+--------------------------------------------------
 BUILD FORMULA
+--------------------------------------------------
 
 New Website =
-Reference Design
+Reference Design Direction
 +
-Source Business Content
+Extracted Source Business Content
++
+Preserved Source URL Structure
++
+Preserved Source Copywriting Database
 
-The Reference design defines the visual design direction.
+--------------------------------------------------
+CORE BUILD RULES
+--------------------------------------------------
 
-Use it for:
-- layout
-- section order
-- grid system
-- hero style
-- spacing
-- CTA placement
-- footer structure
-- overall visual rhythm
-- visual design richness
+1. Use the extracted source business content as the primary source of truth.
+2. Preserve the original public page URL structure and slug naming from the source website whenever available.
+3. Do not rename source page URLs unless explicitly required.
+4. Preserve important business wording, service names, CTA text, and trust signals whenever possible.
+5. Do not invent unsupported claims, certifications, awards, offers, or service details.
+6. Rebuild the website with a modern, polished, high-conversion presentation while keeping the business identity intact.
+7. Use the reference design direction for layout and visual refinement, but do not overwrite source business facts.
+8. Every public-facing page must feel complete and intentional.
+9. All pages must be mobile responsive and visually consistent.
+10. The final site must feel fully designed, not templated.
+11. Use only valid public-facing pages from the extracted source structure.
+12. Preserve page intent from the source site.
+13. Preserve important CTA wording, buttons, testimonials, FAQs, offers, and trust signals when available.
+14. Use the extracted design system as a continuity guide where appropriate.
+15. Do not omit meaningful button labels, navigation labels, form labels, or footer text when they are relevant to the site structure.
+16. If some design assets cannot be extracted, generate visually appropriate equivalents that maintain the same level of polish.
+17. Social media icons must only appear if valid social links exist in the extracted source data.
+18. If no social links are found, do not display social icons anywhere.
+19. Use clean, modern, visually consistent iconography only.
+20. Mobile-first execution is required.
 
-The Source provides the business content.
+--------------------------------------------------
+SOURCE SITE META
+--------------------------------------------------
 
-If Source layout conflicts with Reference layout, always follow the Reference layout.
+{{SITE_META}}
 
-DESIGN SKELETON MODE
+--------------------------------------------------
+SOURCE SITE STRUCTURE
+--------------------------------------------------
 
-Step 1
-Analyze the Reference design.
+Use this as the required public page structure and preserve the original page slugs wherever possible:
 
-Step 2
-Extract the layout skeleton.
+{{SITE_STRUCTURE}}
 
-Step 3
-Lock section order, grid logic, layout rhythm, and structural layout.
+--------------------------------------------------
+SOURCE COPYWRITING DATABASE
+--------------------------------------------------
 
-Step 4
-Insert Source business content into this skeleton.
+Use this extracted copywriting database as the main source of business content. Preserve useful original wording whenever possible.
 
-URL STRUCTURE PRESERVATION (CRITICAL)
+{{COPYWRITING}}
 
-If Source URL structure exists, preserve the exact URL paths.
+--------------------------------------------------
+SOURCE BUSINESS INFORMATION
+--------------------------------------------------
 
-Examples:
-/about
-/services
-/contact
+{{BUSINESS_INFO}}
 
-Do not modify or rename existing URL paths unnecessarily.
+--------------------------------------------------
+SOURCE DESIGN SYSTEM
+--------------------------------------------------
 
-If no Source URL structure exists, do not artificially create preservation rules.
+Use the extracted design system as a source reference for maintaining brand continuity where appropriate:
 
-SOURCE CONTENT AND IMAGE PRIORITY
+{{DESIGN_SYSTEM}}
 
-Always prioritize Source business content.
-Always prioritize Source images whenever relevant.
+--------------------------------------------------
+SOURCE IMAGE URL DATABASE
+--------------------------------------------------
 
-Do not ignore Source images simply because they are less polished.
+Use these extracted image URLs where relevant. Preserve meaningful brand and content imagery.
 
-Images representing real people, staff, business interiors, equipment, location photos, or real environments must use Source images.
+{{IMAGES}}
 
-Generated images may only be used for:
-- decorative visuals
-- generic service imagery
-- hero or background support when no suitable Source image exists
+--------------------------------------------------
+EXTRACTION WARNINGS AND MISSING INFORMATION
+--------------------------------------------------
 
-If images must be generated, they must clearly match the business industry and service context.
-Do not generate imagery that conflicts with the industry.
+Respect these limitations. Do not invent missing facts.
 
-REFERENCE DESIGN ELEMENT ENFORCEMENT
+{{EXTRACTION_NOTES}}
 
-If the Reference design includes decorative background elements such as:
-patterns
-textures
-repeating motifs
-background shapes
-grid overlays
-layered visual elements
+--------------------------------------------------
+REFERENCE DESIGN DIRECTION
+--------------------------------------------------
 
-they must be recreated.
+Reference URL:
+{{REFERENCE_URL}}
 
-Do not omit these design-supporting elements.
+Use the reference site only as inspiration for layout quality, section flow, spacing, hierarchy, visual polish, and modern presentation.
 
-If original assets cannot be extracted, generate visually similar design elements that recreate the same level of polish and intentional design.
+Do not copy the source content from the reference site.
+Do not replace the source business identity with the reference site.
 
-If the Reference design contains subtle motion or design-enhancing visual effects, recreate a similar level of visual richness where appropriate.
+--------------------------------------------------
+USER NOTES
+--------------------------------------------------
 
-ICON STYLE RULE
+{{USER_NOTES}}
 
-Use only modern line icons throughout the website.
-Do not use emoji-like icons, outdated icons, cartoonish icons, or heavy decorative icon styles.
-Icons must appear clean, modern, subtle, and stylistically consistent with the website design.
+--------------------------------------------------
+FINAL BUILD INSTRUCTION
+--------------------------------------------------
 
-SOCIAL MEDIA ICON RULE
+Build the complete website using the extracted source website database above.
 
-Social media icons must only appear if valid social media links exist in the Source data.
-If no social media links are found in the Source website or scraped data, do not display any social media icons anywhere on the website.
-Do not generate, guess, or invent social media links.
-If social media links exist, display the corresponding social icons and link them correctly.
-
-MOBILE-FIRST EXECUTION
-
-Mobile layout takes priority over desktop layout.
-Validate layout at 375px width.
-Sticky header required.
-Scroll-to-top button required.
-
-All page navigation must reset scroll position to the top.
-
-This applies to:
-header navigation
-footer navigation
-internal page links
-
-Anchor links must function correctly.
-
-LAYOUT CONSISTENCY
-
-Card grids must maintain clean alignment.
-When cards appear in the same grid, maintain consistent height and width where visually appropriate.
-The homepage must feel complete, intentional, and conversion-ready.
-
-CONTENT SCALE RULE
-
-For repeating content sections such as:
-blog posts
-portfolio projects
-gallery images
-
-limit the visible items to a maximum of 6.
-
-This prevents excessive placeholder content and keeps the layout clean.
-
-BASE SITE REQUIREMENTS
-
-Each page must include a unique Page Title.
-
-Format:
-Page Name | Company Name
-
-The homepage must include a meta description.
-A basic favicon must be included.
-A social graph / open graph preview image must be included.
-
-FORM ROUTING
-
-All forms must submit to the following testing endpoint:
-https://formspree.io/f/mbdabbql
-
-This allows immediate testing after site generation.
-
-FOOTER STRUCTURE
-
-Footer layout should follow the Reference design.
-
-FOOTER CREDIT RULE
-
-Footer credit must follow project settings:
-{WEB_DESIGN_CREDIT}
-
-If footer credit is disabled, remove it completely.
-
-When displayed:
-- place a vertical separator before the credit
-- the "Web Design by ..." text must be smaller than normal paragraph text
-- the credit must appear visually subtle and unobtrusive
-- the credit must hyperlink to the corresponding brand website
-
-The company copyright text such as:
-© YEAR Company Name. All rights reserved.
-may remain clearly visible and does not need to be reduced in size.
-
-FINAL EXECUTION CHECK
-
-Verify:
-homepage meta description exists
-unique page titles exist
-Source images are prioritized
-URL structure preserved if Source exists
-navigation resets scroll to top
-anchor links function correctly
-favicon exists
-social graph exists
-forms route correctly
-footer follows Reference design
-footer credit follows project settings
-no broken links
-no unfinished sections`
+Requirements:
+- preserve source page intent
+- preserve source URL structure
+- preserve critical service wording
+- preserve important CTA wording
+- preserve testimonials, FAQs, offers, and trust signals when available
+- use the extracted design system as a continuity guide
+- use the reference design direction to improve presentation quality
+- output a fully built, client-ready website`,
   },
   {
-    id: 'core_scraping_v2',
-    name: 'SwiftLift Website Scraping Prompt V2',
+    id: 'source_extraction_v1',
+    name: 'SwiftLift Source Extraction Prompt V1',
     category: 'core',
     mode: 'prompts',
     type: 'Output Prompt',
     status: 'CONFIRMED',
-    content: `You are a structured website scraping engine.
+    content: `You are a deterministic website source extraction engine.
 
-Your task is to analyze a business website and extract structured information for an AI website builder pipeline.
+Your task is to extract ALL usable business, structural, design, and asset information from the Source URL so the website can be rebuilt as accurately as possible.
 
-This data will be used to generate a preview website.
+This output will be used as a structured database for rebuilding the website and generating a final website build prompt.
 
-Only extract information that can be used to build a website preview.
+CRITICAL RULES
 
-Do not generate or invent information.
+1. Use the Source URL as the primary source of truth.
+2. Preserve original wording whenever possible.
+3. Do not summarize aggressively.
+4. Do not omit meaningful public-facing copywriting.
+5. Extract and preserve the original public URL structure and slug naming whenever available.
+6. Do not rename page URLs unless the source clearly does not provide a usable public slug.
+7. Extract all meaningful page titles, headings, subheadings, paragraph copy, button labels, navigation labels, form labels, footer text, CTA copy, FAQ content, testimonial content, and offer text.
+8. Extract all meaningful business information including services, service details, locations served, contact information, hours, trust signals, and social links.
+9. Extract design-related information including primary color, secondary color, accent color, additional colors, heading font family, body font family, font size hierarchy, font weight hierarchy, button style, border radius style, and overall visual direction.
+10. Extract all usable public image URLs including logo, favicon, hero images, section images, service images, gallery images, team images, background images, and any other meaningful image assets.
+11. Ignore privacy policy, terms, login, account, cart, checkout, cookie notices, and unrelated blog clutter unless they contain important business facts.
+12. Do not invent facts.
+13. Merge duplicate information cleanly while preserving important wording.
+14. Return valid JSON only.
+15. Do not output markdown.
+16. Do not output explanations.
+17. Leave missing values blank or as empty arrays.
 
-INPUT
+RETURN THIS EXACT JSON STRUCTURE
 
-SOURCE_URL
+{
+  "site_meta": {
+    "source_url": "",
+    "site_name": "",
+    "logo_url": "",
+    "favicon_url": "",
+    "primary_domain": ""
+  },
+  "site_structure": [
+    {
+      "page_title": "",
+      "page_type": "",
+      "url": "",
+      "slug": "",
+      "nav_label": "",
+      "meta_title": "",
+      "meta_description": ""
+    }
+  ],
+  "copywriting": {
+    "global_value_proposition": "",
+    "brand_summary": "",
+    "tone_of_voice": "",
+    "all_headings": [],
+    "all_subheadings": [],
+    "all_paragraphs": [],
+    "all_button_texts": [],
+    "all_ctas": [],
+    "all_form_labels": [],
+    "all_nav_labels": [],
+    "all_footer_text": [],
+    "all_faqs": [],
+    "all_testimonials": [],
+    "all_offers": []
+  },
+  "business_info": {
+    "business_name": "",
+    "services": [],
+    "service_details": [],
+    "target_audience": [],
+    "locations_served": [],
+    "contact_info": {
+      "phone": "",
+      "email": "",
+      "address": ""
+    },
+    "hours": [],
+    "social_links": [],
+    "trust_signals": []
+  },
+  "design_system": {
+    "primary_color": "",
+    "secondary_color": "",
+    "accent_color": "",
+    "additional_colors": [],
+    "heading_font_family": "",
+    "body_font_family": "",
+    "font_sizes": {
+      "hero_title": "",
+      "page_title": "",
+      "section_title": "",
+      "body_text": "",
+      "button_text": ""
+    },
+    "font_weights": {
+      "hero_title": "",
+      "page_title": "",
+      "section_title": "",
+      "body_text": "",
+      "button_text": ""
+    },
+    "button_style": "",
+    "border_radius_style": "",
+    "overall_visual_direction": ""
+  },
+  "images": {
+    "hero_images": [],
+    "logo_images": [],
+    "section_images": [],
+    "gallery_images": [],
+    "team_images": [],
+    "service_images": [],
+    "background_images": [],
+    "all_image_urls": []
+  },
+  "extraction_notes": {
+    "missing_information": [],
+    "warnings": []
+  }
+}`,
+  },
+  {
+    id: 'assembly_rules_v1',
+    name: 'SwiftLift Prompt Assembly Rules V1',
+    category: 'core',
+    mode: 'prompts',
+    type: 'Output Prompt',
+    status: 'CONFIRMED',
+    content: `ASSEMBLY RULES
 
-OUTPUT FORMAT
+1. Do not rewrite the locked Master Prompt structure.
+2. Replace each placeholder block with formatted extracted data.
+3. Arrays must be formatted as plain text bullet lines beginning with "- ".
+4. Nested objects must be formatted as labeled plain text lines.
+5. Empty values must remain blank.
+6. Preserve original source URLs and slugs exactly as extracted.
+7. Do not summarize or compress extracted content during assembly.
+8. The final output must be one complete copy-paste-ready Lovable website build prompt.
 
-Return structured JSON only.
-Do not add explanations.
+BLOCK FORMATTING RULES
 
-BUSINESS INFORMATION
+SITE_META
+- format as labeled lines
 
-Extract:
-business_name
-industry
-short_business_description
-tagline
-services_list
+SITE_STRUCTURE
+- format each page as:
+  - Page Title: ...
+    Page Type: ...
+    URL: ...
+    Slug: ...
+    Nav Label: ...
+    Meta Title: ...
+    Meta Description: ...
 
-CONTACT INFORMATION
+COPYWRITING
+- format all arrays as bullet lists
+- keep original wording
+- group into:
+  - Global Value Proposition
+  - Brand Summary
+  - Tone of Voice
+  - Headings
+  - Subheadings
+  - Paragraphs
+  - Button Texts
+  - CTAs
+  - Form Labels
+  - Navigation Labels
+  - Footer Text
+  - FAQs
+  - Testimonials
+  - Offers
 
-Extract if available:
-address
-phone
-email
-business_hours
+BUSINESS_INFO
+- format as labeled sections with bullet lists
 
-SOCIAL MEDIA
-
-Extract only if real links exist:
-facebook
-instagram
-linkedin
-youtube
-twitter
-tiktok
-
-If none exist return empty.
-
-BRAND SIGNALS
-
-Extract if detectable:
-logo_url
-primary_colors
-secondary_colors
-heading_font
-body_font
-
-NAVIGATION STRUCTURE
-
-Extract top level pages only.
-
-Example:
-Home
-About
-Services
-Portfolio
-Blog
-Contact
-
-URL STRUCTURE
-
-Extract real page paths.
-
-Example:
-/
-/about
-/services
-/contact
+DESIGN_SYSTEM
+- format as labeled lines and nested sections
+- preserve color values and font data exactly as extracted
 
 IMAGES
+- format by category with bullet lists of URLs
 
-Extract real images from the site.
-
-Prioritize:
-logo
-hero images
-service images
-team photos
-location photos
-project images
-
-Do NOT extract icons or decorative graphics.
-
-Maximum images: 15
-
-PORTFOLIO / BLOG / GALLERY CONTENT
-
-If the website contains:
-portfolio
-blog
-gallery
-
-Extract up to 6 real items only.
-These must come from the source website.
-Do NOT generate fake items.
-
-CALL TO ACTION SIGNALS
-
-Detect if the website contains:
-contact form
-book appointment
-request quote
-call now
-free consultation
-
-Return detected CTA signals.
-
-MULTI LANGUAGE
-
-Detect languages available on the website.
-If multiple languages exist, extract all languages.
-
-Example:
-["English","Chinese"]
-
-STYLE SIGNALS
-
-Analyze the visual tone of the site.
-
-Examples:
-modern
-corporate
-minimal
-luxury
-medical
-industrial
-creative
-
-SCRAPING RULES
-
-Do not fabricate content.
-If information cannot be found return null.
-Only extract real data from the source website.`
+EXTRACTION_NOTES
+- format as bullet lists`,
   },
-
-  // ═══ PREVIEW PROMPTS ═══
   {
-    id: 'preview_a_standard',
-    name: 'Preview Prompt A — Standard Layout Preview',
-    category: 'preview',
+    id: 'generator_app_build_v1',
+    name: 'SwiftLift Generator App Build Prompt V1',
+    category: 'core',
     mode: 'prompts',
     type: 'Output Prompt',
     status: 'CONFIRMED',
-    content: `Generate a complete preview business website.
+    content: `You are building a production-ready internal web app called:
 
-Use the following build formula:
+SwiftLift Prompt Generator
 
-Reference Design
+GOAL
+
+Rebuild the Prompt Library and backend workflow from scratch into a minimal, clean, fully usable system focused on one primary function only:
+
+The user enters:
+- Source URL
+- Reference URL
+- Business Type
+- User Notes
+
+Then clicks:
+- Generate
+
+The app must automatically:
+1. send a structured extraction request to Claude
+2. extract website data from the Source URL
+3. validate and normalize the extracted JSON
+4. format the extracted data into structured text blocks
+5. inject those blocks into a locked Master Prompt template
+6. output one final copy-paste-ready Lovable website build prompt
+
+DO NOT build extra future features.
+DO NOT create empty placeholder workflows.
+DO NOT create speculative prompt categories.
+DO NOT add unnecessary modules.
+
+Only build the minimum production-ready system required for this Generate flow.
+
+--------------------------------------------------
+PROMPT LIBRARY REQUIREMENTS
+--------------------------------------------------
+
+Delete the previous cluttered library structure and rebuild the Prompt Library using only these 4 entries:
+
+1. SwiftLift Final Build Master Prompt V1
+2. SwiftLift Source Extraction Prompt V1
+3. SwiftLift Prompt Assembly Rules V1
+4. SwiftLift Generator App Build Prompt V1
+
+Do not create additional empty prompts.
+Do not create future placeholder workflows.
+This library must remain minimal and immediately usable.
+
+--------------------------------------------------
+APP FUNCTIONAL REQUIREMENTS
+--------------------------------------------------
+
+Build a clean internal admin-style interface.
+
+The app must have these input fields:
+- Source URL
+- Reference URL
+- Business Type
+- User Notes
+
+Main action:
+- Generate
+
+Output panels:
+- Final Lovable Prompt
+- Extraction Preview JSON
+- Status / Error Panel
+
+Buttons:
+- Generate
+- Copy Final Prompt
+- Copy Extraction JSON
+
+The user should not need to manually trigger scraping or assembly.
+There must be only one main generation flow.
+
+--------------------------------------------------
+BACKEND GENERATION FLOW
+--------------------------------------------------
+
+Create one main API route:
+POST /api/generate-final-prompt
+
+This route must:
+1. accept:
+   - sourceUrl
+   - referenceUrl
+   - businessType
+   - userNotes
+2. compile a Claude extraction request
+3. call Anthropic API securely from the backend
+4. parse the returned JSON
+5. validate the JSON structure
+6. normalize missing fields to blank strings or empty arrays
+7. format extracted data into these assembly blocks:
+   - SITE_META
+   - SITE_STRUCTURE
+   - COPYWRITING
+   - BUSINESS_INFO
+   - DESIGN_SYSTEM
+   - IMAGES
+   - EXTRACTION_NOTES
+8. inject the formatted blocks into the locked Master Prompt template
+9. return:
+   - success
+   - finalPrompt
+   - extractedData
+   - error if failed
+
+--------------------------------------------------
+ANTHROPIC API INTEGRATION
+--------------------------------------------------
+
+Use Anthropic official SDK with a backend environment variable.
+
+Environment variable:
+ANTHROPIC_API_KEY
+
+Do not expose the API key on the frontend.
+The app should be ready to work once the user adds the real API key in the environment.
+
+Use the Messages API architecture.
+Claude should be used only for source extraction.
+Final Master Prompt assembly must be deterministic and programmatic, not AI rewritten.
+
+--------------------------------------------------
+CLAUDE EXTRACTION SYSTEM PROMPT
+--------------------------------------------------
+
+Store this prompt in the Prompt Library as:
+SwiftLift Source Extraction Prompt V1
+
+Use this exact content:
+
+You are a deterministic website source extraction engine.
+
+Your task is to extract ALL usable business, structural, design, and asset information from the Source URL so the website can be rebuilt as accurately as possible.
+
+This output will be used as a structured database for rebuilding the website and generating a final website build prompt.
+
+CRITICAL RULES
+
+1. Use the Source URL as the primary source of truth.
+2. Preserve original wording whenever possible.
+3. Do not summarize aggressively.
+4. Do not omit meaningful public-facing copywriting.
+5. Extract and preserve the original public URL structure and slug naming whenever available.
+6. Do not rename page URLs unless the source clearly does not provide a usable public slug.
+7. Extract all meaningful page titles, headings, subheadings, paragraph copy, button labels, navigation labels, form labels, footer text, CTA copy, FAQ content, testimonial content, and offer text.
+8. Extract all meaningful business information including services, service details, locations served, contact information, hours, trust signals, and social links.
+9. Extract design-related information including primary color, secondary color, accent color, additional colors, heading font family, body font family, font size hierarchy, font weight hierarchy, button style, border radius style, and overall visual direction.
+10. Extract all usable public image URLs including logo, favicon, hero images, section images, service images, gallery images, team images, background images, and any other meaningful image assets.
+11. Ignore privacy policy, terms, login, account, cart, checkout, cookie notices, and unrelated blog clutter unless they contain important business facts.
+12. Do not invent facts.
+13. Merge duplicate information cleanly while preserving important wording.
+14. Return valid JSON only.
+15. Do not output markdown.
+16. Do not output explanations.
+17. Leave missing values blank or as empty arrays.
+
+RETURN THIS EXACT JSON STRUCTURE
+
+{
+  "site_meta": {
+    "source_url": "",
+    "site_name": "",
+    "logo_url": "",
+    "favicon_url": "",
+    "primary_domain": ""
+  },
+  "site_structure": [
+    {
+      "page_title": "",
+      "page_type": "",
+      "url": "",
+      "slug": "",
+      "nav_label": "",
+      "meta_title": "",
+      "meta_description": ""
+    }
+  ],
+  "copywriting": {
+    "global_value_proposition": "",
+    "brand_summary": "",
+    "tone_of_voice": "",
+    "all_headings": [],
+    "all_subheadings": [],
+    "all_paragraphs": [],
+    "all_button_texts": [],
+    "all_ctas": [],
+    "all_form_labels": [],
+    "all_nav_labels": [],
+    "all_footer_text": [],
+    "all_faqs": [],
+    "all_testimonials": [],
+    "all_offers": []
+  },
+  "business_info": {
+    "business_name": "",
+    "services": [],
+    "service_details": [],
+    "target_audience": [],
+    "locations_served": [],
+    "contact_info": {
+      "phone": "",
+      "email": "",
+      "address": ""
+    },
+    "hours": [],
+    "social_links": [],
+    "trust_signals": []
+  },
+  "design_system": {
+    "primary_color": "",
+    "secondary_color": "",
+    "accent_color": "",
+    "additional_colors": [],
+    "heading_font_family": "",
+    "body_font_family": "",
+    "font_sizes": {
+      "hero_title": "",
+      "page_title": "",
+      "section_title": "",
+      "body_text": "",
+      "button_text": ""
+    },
+    "font_weights": {
+      "hero_title": "",
+      "page_title": "",
+      "section_title": "",
+      "body_text": "",
+      "button_text": ""
+    },
+    "button_style": "",
+    "border_radius_style": "",
+    "overall_visual_direction": ""
+  },
+  "images": {
+    "hero_images": [],
+    "logo_images": [],
+    "section_images": [],
+    "gallery_images": [],
+    "team_images": [],
+    "service_images": [],
+    "background_images": [],
+    "all_image_urls": []
+  },
+  "extraction_notes": {
+    "missing_information": [],
+    "warnings": []
+  }
+}
+
+--------------------------------------------------
+CLAUDE EXTRACTION USER PROMPT TEMPLATE
+--------------------------------------------------
+
+Create a backend function that dynamically compiles this request:
+
+SOURCE URL:
+{sourceUrl}
+
+REFERENCE URL:
+{referenceUrl}
+
+BUSINESS TYPE:
+{businessType}
+
+USER NOTES:
+{userNotes}
+
+TASK:
+Extract the source website as completely as possible for downstream website rebuilding.
+
+PRIORITIES
+1. Preserve the original page URL structure and slug naming.
+2. Extract all useful public-facing copywriting, including buttons, navigation, and section text.
+3. Extract all business information, services, locations, testimonials, FAQs, offers, and contact details.
+4. Extract design attributes including color palette, font families, font sizes, font weights, and visual direction.
+5. Extract all usable public image URLs and classify them where possible.
+6. Return only valid JSON in the required schema.
+
+IMPORTANT
+- Do not aggressively summarize.
+- Do not omit public-facing copy.
+- Do not rewrite service names.
+- Do not invent facts.
+- If information is missing, leave it blank.
+- Return valid JSON only.
+
+--------------------------------------------------
+MASTER PROMPT TEMPLATE
+--------------------------------------------------
+
+Store this prompt in the Prompt Library as:
+SwiftLift Final Build Master Prompt V1
+
+Use this exact content:
+
+You are a deterministic website builder operating in PRODUCTION MODE.
+
+Your goal is to generate a COMPLETE, CLIENT-READY WEBSITE in a single build.
+
+The website must appear fully finished, professional, intentional, and conversion-focused.
+
+No placeholder text.
+No lorem ipsum.
+No unfinished sections.
+No generic filler copy.
+
+--------------------------------------------------
+BUILD FORMULA
+--------------------------------------------------
+
+New Website =
+Reference Design Direction
 +
-Source Business Content
+Extracted Source Business Content
++
+Preserved Source URL Structure
++
+Preserved Source Copywriting Database
 
-Follow the SwiftLift Core Master Prompt rules.
+--------------------------------------------------
+CORE BUILD RULES
+--------------------------------------------------
 
-Use the reference layout structure to build the site.
-Insert the scraped business content.
+1. Use the extracted source business content as the primary source of truth.
+2. Preserve the original public page URL structure and slug naming from the source website whenever available.
+3. Do not rename source page URLs unless explicitly required.
+4. Preserve important business wording, service names, CTA text, and trust signals whenever possible.
+5. Do not invent unsupported claims, certifications, awards, offers, or service details.
+6. Rebuild the website with a modern, polished, high-conversion presentation while keeping the business identity intact.
+7. Use the reference design direction for layout and visual refinement, but do not overwrite source business facts.
+8. Every public-facing page must feel complete and intentional.
+9. All pages must be mobile responsive and visually consistent.
+10. The final site must feel fully designed, not templated.
+11. Use only valid public-facing pages from the extracted source structure.
+12. Preserve page intent from the source site.
+13. Preserve important CTA wording, buttons, testimonials, FAQs, offers, and trust signals when available.
+14. Use the extracted design system as a continuity guide where appropriate.
+15. Do not omit meaningful button labels, navigation labels, form labels, or footer text when they are relevant to the site structure.
+16. If some design assets cannot be extracted, generate visually appropriate equivalents that maintain the same level of polish.
+17. Social media icons must only appear if valid social links exist in the extracted source data.
+18. If no social links are found, do not display social icons anywhere.
+19. Use clean, modern, visually consistent iconography only.
+20. Mobile-first execution is required.
 
-The website must look fully finished and professional.
+--------------------------------------------------
+SOURCE SITE META
+--------------------------------------------------
 
-Use up to 6 portfolio items if available.
-Use up to 6 blog posts if available.
-Use up to 6 gallery images if available.
+{{SITE_META}}
 
-Prioritize real images from the source website.
-If images are missing, generate industry-appropriate visuals.
+--------------------------------------------------
+SOURCE SITE STRUCTURE
+--------------------------------------------------
 
-Ensure the site contains:
-hero section
-services section
-about section
-content section if available
-contact section
+Use this as the required public page structure and preserve the original page slugs wherever possible:
 
-Follow the reference layout rhythm and visual structure.`
-  },
-  {
-    id: 'preview_b_conversion',
-    name: 'Preview Prompt B — Conversion Layout Preview',
-    category: 'preview',
-    mode: 'prompts',
-    type: 'Output Prompt',
-    status: 'CONFIRMED',
-    content: `Generate a conversion-focused preview business website.
+{{SITE_STRUCTURE}}
 
-This layout must be clearly different from the standard preview.
-It should look like a high-conversion landing style website.
+--------------------------------------------------
+SOURCE COPYWRITING DATABASE
+--------------------------------------------------
 
-The purpose is to visually demonstrate a "conversion optimized layout".
-Do not analyze real conversion strategy.
-Just create a convincing conversion-style layout.
+Use this extracted copywriting database as the main source of business content. Preserve useful original wording whenever possible.
 
-Required elements:
-large hero section with call-to-action
-form in hero section
-sticky call-to-action button
-testimonial section
-trust badges section
-benefits section
-service overview
-contact form
+{{COPYWRITING}}
 
-The layout should feel sales-focused.
-Use strong visual hierarchy.
+--------------------------------------------------
+SOURCE BUSINESS INFORMATION
+--------------------------------------------------
 
-Use call-to-action language such as:
-Book Now
-Get a Quote
-Start Your Project
+{{BUSINESS_INFO}}
 
-This preview should look visually different from the standard layout preview.`
-  },
+--------------------------------------------------
+SOURCE DESIGN SYSTEM
+--------------------------------------------------
 
-  // ═══ MODULE PROMPTS ═══
-  {
-    id: 'mod_portfolio',
-    name: 'Portfolio Module',
-    category: 'module',
-    mode: 'prompts',
-    type: 'Output Prompt',
-    status: 'CONFIRMED',
-    content: `PORTFOLIO MODULE
+Use the extracted design system as a source reference for maintaining brand continuity where appropriate:
 
-Add a portfolio or projects section.
+{{DESIGN_SYSTEM}}
 
-Use real portfolio items scraped from the source website.
+--------------------------------------------------
+SOURCE IMAGE URL DATABASE
+--------------------------------------------------
 
-Display up to 6 portfolio items.
+Use these extracted image URLs where relevant. Preserve meaningful brand and content imagery.
 
-Do not generate fake projects.
+{{IMAGES}}
 
-Create a grid layout suitable for project previews.
+--------------------------------------------------
+EXTRACTION WARNINGS AND MISSING INFORMATION
+--------------------------------------------------
 
-Each project card may include:
-image
-title
-short description
+Respect these limitations. Do not invent missing facts.
 
-No login system is required.
-Portfolio management features are not included in this preview.`
-  },
-  {
-    id: 'mod_blog',
-    name: 'Blog Module',
-    category: 'module',
-    mode: 'prompts',
-    type: 'Output Prompt',
-    status: 'CONFIRMED',
-    content: `BLOG MODULE
+{{EXTRACTION_NOTES}}
 
-Add a blog section to the website.
+--------------------------------------------------
+REFERENCE DESIGN DIRECTION
+--------------------------------------------------
 
-Use real blog posts scraped from the source website.
+Reference URL:
+{{REFERENCE_URL}}
 
-Display up to 6 posts.
+Use the reference site only as inspiration for layout quality, section flow, spacing, hierarchy, visual polish, and modern presentation.
 
-Do not generate fake blog content.
+Do not copy the source content from the reference site.
+Do not replace the source business identity with the reference site.
 
-Each blog card may include:
-image
-title
-short excerpt
+--------------------------------------------------
+USER NOTES
+--------------------------------------------------
 
-No login system or CMS editor is required for this preview.`
-  },
-  {
-    id: 'mod_gallery',
-    name: 'Gallery Module',
-    category: 'module',
-    mode: 'prompts',
-    type: 'Output Prompt',
-    status: 'CONFIRMED',
-    content: `GALLERY MODULE
+{{USER_NOTES}}
 
-Add a gallery section.
+--------------------------------------------------
+FINAL BUILD INSTRUCTION
+--------------------------------------------------
 
-Use real images scraped from the source website.
+Build the complete website using the extracted source website database above.
 
-Display up to 6 images.
+Requirements:
+- preserve source page intent
+- preserve source URL structure
+- preserve critical service wording
+- preserve important CTA wording
+- preserve testimonials, FAQs, offers, and trust signals when available
+- use the extracted design system as a continuity guide
+- use the reference design direction to improve presentation quality
+- output a fully built, client-ready website
 
-Do not generate fake gallery images.
+--------------------------------------------------
+ASSEMBLY RULES
+--------------------------------------------------
 
-Use a clean responsive grid layout.
+Store this prompt in the Prompt Library as:
+SwiftLift Prompt Assembly Rules V1
 
-No upload or management system is required in the preview.`
-  },
-  {
-    id: 'mod_multilanguage',
-    name: 'Multi-language Module',
-    category: 'module',
-    mode: 'prompts',
-    type: 'Output Prompt',
-    status: 'CONFIRMED',
-    content: `MULTI LANGUAGE MODULE
-
-If multiple languages exist on the source website, include them.
-
-Create a language switcher in the header.
-
-Each language should have its own page structure.
-
-Use the real language content scraped from the source site.
-
-If translation is incomplete, preserve the original language content.
-
-The language switcher must remain visible in the header navigation.`
-  },
-
-  // ═══ ADVANCED MODULE PROMPTS ═══
-  {
-    id: 'adv_trust_badges',
-    name: 'Trust Badge Section',
-    category: 'advanced',
-    mode: 'prompts',
-    type: 'Output Prompt',
-    status: 'CONFIRMED',
-    content: `TRUST BADGE SECTION
-
-Add trust badges, certification indicators, awards, guarantees, or credibility elements where appropriate.
-
-Use clean, modern presentation.`
-  },
-  {
-    id: 'adv_full_seo',
-    name: 'Full SEO Package',
-    category: 'advanced',
-    mode: 'prompts',
-    type: 'Output Prompt',
-    status: 'CONFIRMED',
-    content: `FULL SEO OPTIMIZATION
-
-Apply advanced SEO best practices.
-
-Ensure:
-proper heading hierarchy
-H1, H2, H3 structure
-clear semantic HTML structure
-unique page titles
-meta descriptions for key pages
-clean internal linking
-image alt tags
-fast loading image usage
-logical section structure
-semantic content grouping
-
-Ensure all pages remain readable and structured for search engines.
-Focus on technical SEO structure rather than keyword stuffing.`
-  },
-  {
-    id: 'adv_service_comparison',
-    name: 'Service Comparison',
-    category: 'advanced',
-    mode: 'prompts',
-    type: 'Output Prompt',
-    status: 'TO BE DETERMINED',
-    content: `TO BE DETERMINED`
-  },
-  {
-    id: 'adv_case_study',
-    name: 'Case Study Section',
-    category: 'advanced',
-    mode: 'prompts',
-    type: 'Output Prompt',
-    status: 'TO BE DETERMINED',
-    content: `TO BE DETERMINED`
-  },
-  {
-    id: 'adv_lead_capture',
-    name: 'Lead Capture Upgrade',
-    category: 'advanced',
-    mode: 'prompts',
-    type: 'Output Prompt',
-    status: 'TO BE DETERMINED',
-    content: `TO BE DETERMINED`
-  },
-  {
-    id: 'adv_conversion_layout',
-    name: 'Conversion Layout Upgrade',
-    category: 'advanced',
-    mode: 'prompts',
-    type: 'Output Prompt',
-    status: 'TO BE DETERMINED',
-    content: `TO BE DETERMINED`
-  },
-
-  // ═══ REVISION PROMPTS ═══
-  {
-    id: 'rev_generator',
-    name: 'Revision Prompt Generator',
-    category: 'revision',
-    mode: 'prompts',
-    type: 'Output Prompt',
-    status: 'TO BE DETERMINED',
-    content: `TO BE DETERMINED`
-  },
-  {
-    id: 'rev_quick_fix',
-    name: 'Quick Fix Prompt',
-    category: 'revision',
-    mode: 'prompts',
-    type: 'Output Prompt',
-    status: 'CONFIRMED',
-    content: `Fix common website issues:
-
-scroll-to-top behavior
-broken links
-mobile spacing
-form routing issues`
-  },
-
-  // ═══ QUALITY CONTROL PROMPTS ═══
-  {
-    id: 'qc_basic',
-    name: 'Basic Website QA',
-    category: 'qc',
-    mode: 'prompts',
-    type: 'Output Prompt',
-    status: 'CONFIRMED',
-    content: `Perform a basic website quality check.
-
-Verify:
-internal links work
-no broken navigation
-forms submit correctly
-scroll-to-top works
-mobile spacing is readable
-footer links work
-anchor links scroll correctly`
-  },
-  {
-    id: 'qc_advanced',
-    name: 'Advanced System Audit',
-    category: 'qc',
-    mode: 'prompts',
-    type: 'Output Prompt',
-    status: 'CONFIRMED',
-    content: `Perform a structured technical audit of the website.
-
-Verify:
-HTML structure integrity
-heading hierarchy
-semantic layout
-link structure
-image optimization
-page weight
-mobile responsiveness
-navigation consistency
-
-Detect:
-broken links
-duplicate titles
-missing alt tags
-missing metadata
-
-Focus on technical quality rather than conversion strategy.`
-  },
-
-  // ═══════════════════════════════════════════
-  // WORKFLOWS MODE
-  // ═══════════════════════════════════════════
-
-  // ═══ AI INTERNAL SYSTEM PROMPTS ═══
-  {
-    id: 'wf_scrape_v2',
-    name: 'AI_SCRAPE_WEBSITE_V2',
-    category: 'ai_internal',
-    mode: 'workflows',
-    type: 'Internal Workflow Prompt',
-    status: 'CONFIRMED',
-    content: `Use SwiftLift Website Scraping Prompt V2 as the source website extraction engine.`
-  },
-  {
-    id: 'wf_assembler_v1',
-    name: 'AI_PROMPT_ASSEMBLER_V1',
-    category: 'ai_internal',
-    mode: 'workflows',
-    type: 'Internal Workflow Prompt',
-    status: 'CONFIRMED',
-    content: `You are the SwiftLift Prompt Assembly Engine.
-
-Your task is to assemble multiple prompt blocks into a single final prompt that will be sent to the AI website builder.
-
-INPUT BLOCKS
-
-CORE_PROMPT
-PREVIEW_PROMPT
-MODULE_PROMPTS
-BRAND_OVERRIDES
-SCRAPED_DATA
+Use this exact content:
 
 ASSEMBLY RULES
 
-1. Always start with CORE_PROMPT.
-2. Insert PREVIEW_PROMPT immediately after.
-3. Insert enabled MODULE_PROMPTS in logical order.
+1. Do not rewrite the locked Master Prompt structure.
+2. Replace each placeholder block with formatted extracted data.
+3. Arrays must be formatted as plain text bullet lines beginning with "- ".
+4. Nested objects must be formatted as labeled plain text lines.
+5. Empty values must remain blank.
+6. Preserve original source URLs and slugs exactly as extracted.
+7. Do not summarize or compress extracted content during assembly.
+8. The final output must be one complete copy-paste-ready Lovable website build prompt.
 
-Example order:
-portfolio
-blog
-gallery
-multi-language
+BLOCK FORMATTING RULES
 
-4. Insert BRAND_OVERRIDES if provided.
+SITE_META
+- format as labeled lines
 
-Example:
-brand colors
-fonts
-logo
+SITE_STRUCTURE
+- format each page as:
+  - Page Title: ...
+    Page Type: ...
+    URL: ...
+    Slug: ...
+    Nav Label: ...
+    Meta Title: ...
+    Meta Description: ...
 
-5. Insert SCRAPED_DATA at the end.
+COPYWRITING
+- format all arrays as bullet lists
+- keep original wording
+- group into:
+  - Global Value Proposition
+  - Brand Summary
+  - Tone of Voice
+  - Headings
+  - Subheadings
+  - Paragraphs
+  - Button Texts
+  - CTAs
+  - Form Labels
+  - Navigation Labels
+  - Footer Text
+  - FAQs
+  - Testimonials
+  - Offers
 
-OUTPUT RULES
+BUSINESS_INFO
+- format as labeled sections with bullet lists
 
-Return a single unified prompt.
-Do not repeat rules.
-Do not duplicate sections.
-Maintain clear section separation.
+DESIGN_SYSTEM
+- format as labeled lines and nested sections
+- preserve color values and font data exactly as extracted
 
-FINAL FORMAT
+IMAGES
+- format by category with bullet lists of URLs
 
-CORE PROMPT
-PREVIEW PROMPT
-MODULE PROMPTS
-SCRAPED DATA`
-  },
-  {
-    id: 'wf_sanitizer',
-    name: 'AI_PROMPT_SANITIZER',
-    category: 'ai_internal',
-    mode: 'workflows',
-    type: 'Internal Workflow Prompt',
-    status: 'TO BE DETERMINED',
-    content: `TO BE DETERMINED`
-  },
-  {
-    id: 'wf_conversion_gen',
-    name: 'AI_CONVERSION_LAYOUT_GENERATOR',
-    category: 'ai_internal',
-    mode: 'workflows',
-    type: 'Internal Workflow Prompt',
-    status: 'TO BE DETERMINED',
-    content: `TO BE DETERMINED`
-  },
-  {
-    id: 'wf_revision_gen',
-    name: 'AI_REVISION_PROMPT_GENERATOR',
-    category: 'ai_internal',
-    mode: 'workflows',
-    type: 'Internal Workflow Prompt',
-    status: 'TO BE DETERMINED',
-    content: `TO BE DETERMINED`
-  },
-  {
-    id: 'wf_qa_basic',
-    name: 'AI_QA_BASIC_CHECK',
-    category: 'ai_internal',
-    mode: 'workflows',
-    type: 'Internal Workflow Prompt',
-    status: 'CONFIRMED',
-    content: `Use Basic Website QA as the internal quick validation engine after preview build.`
-  },
-  {
-    id: 'wf_qa_audit',
-    name: 'AI_QA_SYSTEM_AUDIT',
-    category: 'ai_internal',
-    mode: 'workflows',
-    type: 'Internal Workflow Prompt',
-    status: 'CONFIRMED',
-    content: `Use Advanced System Audit as the internal technical audit engine.`
-  },
+EXTRACTION_NOTES
+- format as bullet lists
 
-  // ═══ AI PIPELINE WORKFLOWS ═══
-  {
-    id: 'wf_pipe_scrape',
-    name: 'Source Website Scraping Workflow',
-    category: 'ai_pipeline',
-    mode: 'workflows',
-    type: 'Workflow Placeholder',
-    status: 'TO BE DETERMINED',
-    content: `TO BE DETERMINED`
-  },
-  {
-    id: 'wf_pipe_assembly',
-    name: 'Prompt Assembly Workflow',
-    category: 'ai_pipeline',
-    mode: 'workflows',
-    type: 'Workflow Placeholder',
-    status: 'TO BE DETERMINED',
-    content: `TO BE DETERMINED`
-  },
-  {
-    id: 'wf_pipe_build',
-    name: 'Lovable Build Workflow',
-    category: 'ai_pipeline',
-    mode: 'workflows',
-    type: 'Workflow Placeholder',
-    status: 'TO BE DETERMINED',
-    content: `TO BE DETERMINED`
-  },
-  {
-    id: 'wf_pipe_revision',
-    name: 'Revision Workflow',
-    category: 'ai_pipeline',
-    mode: 'workflows',
-    type: 'Workflow Placeholder',
-    status: 'TO BE DETERMINED',
-    content: `TO BE DETERMINED`
-  },
-  {
-    id: 'wf_pipe_qa_basic',
-    name: 'Basic QA Workflow',
-    category: 'ai_pipeline',
-    mode: 'workflows',
-    type: 'Workflow Placeholder',
-    status: 'TO BE DETERMINED',
-    content: `TO BE DETERMINED`
-  },
-  {
-    id: 'wf_pipe_qa_advanced',
-    name: 'Advanced Audit Workflow',
-    category: 'ai_pipeline',
-    mode: 'workflows',
-    type: 'Workflow Placeholder',
-    status: 'TO BE DETERMINED',
-    content: `TO BE DETERMINED`
-  },
-  {
-    id: 'wf_pipe_deploy',
-    name: 'Deployment Workflow',
-    category: 'ai_pipeline',
-    mode: 'workflows',
-    type: 'Workflow Placeholder',
-    status: 'TO BE DETERMINED',
-    content: `TO BE DETERMINED`
-  },
+--------------------------------------------------
+IMPLEMENTATION DETAILS
+--------------------------------------------------
 
-  // ═══ FUTURE AUTOMATION WORKFLOWS ═══
-  {
-    id: 'wf_future_screenshot',
-    name: 'Screenshot Reference Workflow',
-    category: 'future_automation',
-    mode: 'workflows',
-    type: 'Workflow Placeholder',
-    status: 'TO BE DETERMINED',
-    content: `TO BE DETERMINED`
-  },
-  {
-    id: 'wf_future_portfolio',
-    name: 'Portfolio Mockup Workflow',
-    category: 'future_automation',
-    mode: 'workflows',
-    type: 'Workflow Placeholder',
-    status: 'TO BE DETERMINED',
-    content: `TO BE DETERMINED`
-  },
-  {
-    id: 'wf_future_social',
-    name: 'Social Publishing Workflow',
-    category: 'future_automation',
-    mode: 'workflows',
-    type: 'Workflow Placeholder',
-    status: 'TO BE DETERMINED',
-    content: `TO BE DETERMINED`
-  },
-  {
-    id: 'wf_future_api_backup',
-    name: 'API Provider Backup Workflow',
-    category: 'future_automation',
-    mode: 'workflows',
-    type: 'Workflow Placeholder',
-    status: 'TO BE DETERMINED',
-    content: `TO BE DETERMINED`
+Build helper functions for:
+- compileExtractionPrompt(input)
+- callClaudeExtraction(input)
+- validateExtractionJson(data)
+- normalizeExtractionData(data)
+- formatSiteMeta(data)
+- formatSiteStructure(data)
+- formatCopywriting(data)
+- formatBusinessInfo(data)
+- formatDesignSystem(data)
+- formatImages(data)
+- formatExtractionNotes(data)
+- assembleFinalPrompt(blocks)
+
+Use deterministic programmatic assembly for the final prompt.
+Do not use AI to rewrite the final assembled Master Prompt.
+
+--------------------------------------------------
+UI / UX REQUIREMENTS
+--------------------------------------------------
+
+The app should look clean, modern, minimal, and internal-tool focused.
+
+Requirements:
+- keep the existing app layout unchanged
+- keep the existing app functions unchanged except for the prompt library cleanup requested here
+- keep the existing top bar unchanged
+- keep the existing builder / revision / demo sites / quality control / lock preview areas unchanged
+- do not redesign the prompt editor
+- do not add new layout sections
+- do not remove existing functional UI outside this prompt library cleanup scope
+
+Within that restriction:
+- keep the prompt library clean
+- show only the 4 final prompts
+- allow easy prompt editing for the 4 core prompt entries only
+
+--------------------------------------------------
+FINAL DELIVERY REQUIREMENT
+--------------------------------------------------
+
+Deliver the app with the Prompt Library fully cleaned and replaced by these exact 4 prompts only.
+Do not leave old prompt entries behind.
+Do not create additional empty prompts.
+Do not modify anything outside the requested cleanup and prompt replacement scope.`,
   },
 ];
 
