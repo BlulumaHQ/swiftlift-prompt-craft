@@ -3,14 +3,15 @@ import NavHeader from '@/components/NavHeader';
 import {
   getDemoSites, addDemoSite, deleteDemoSite, type DemoSite
 } from '@/lib/demoSiteStore';
-import {
-  getReferences, saveReference, deleteReference as deleteLocalRef,
-  createEmptyReference, generatePreviewPlaceholder,
-  industries, type ReferenceEntry, type ReferenceRole
-} from '@/lib/referenceStore';
-import { uploadReferenceScreenshots } from '@/lib/referenceUpload';
 import { Plus, Trash2, X, Search, ExternalLink, Upload, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+
+const industries = [
+  'Dental', 'Construction', 'Restaurant', 'Real Estate',
+  'Professional Services', 'Luxury Service', 'One Page Design', 'Other'
+];
+
+type ReferenceRole = 'style' | 'conversion_layout';
 
 const categoryFilters = ['All', ...industries];
 const roleFilters: Array<{ value: 'all' | ReferenceRole; label: string }> = [
@@ -21,22 +22,19 @@ const roleFilters: Array<{ value: 'all' | ReferenceRole; label: string }> = [
 
 type SortOption = 'recent' | 'az' | 'industry';
 
-// Unified display item
-interface DisplayRef {
-  id: string;
-  name: string;
-  industry: string;
-  role: ReferenceRole;
-  live_url: string;
-  preview_image: string;
-  source: 'cloud' | 'local';
-  cloudId?: string;
-  created: string;
+function generatePreviewPlaceholder(industry: string): string {
+  const colors: Record<string, string> = {
+    'Dental': '2B6CB0', 'Construction': 'DD6B20', 'Restaurant': 'C53030',
+    'Real Estate': '2C5282', 'Professional Services': '4A5568',
+    'Luxury Service': '1A202C', 'One Page Design': '6B46C1', 'Other': '718096'
+  };
+  const color = colors[industry] || '718096';
+  return `https://placehold.co/600x400/${color}/ffffff?text=${encodeURIComponent(industry)}`;
 }
 
 export default function ReferenceLibraryManager() {
   const { toast } = useToast();
-  const [items, setItems] = useState<DisplayRef[]>([]);
+  const [items, setItems] = useState<DemoSite[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -56,53 +54,33 @@ export default function ReferenceLibraryManager() {
 
   // Bulk import state
   const [bulkJsonFile, setBulkJsonFile] = useState<File | null>(null);
-  const [bulkScreenshotFiles, setBulkScreenshotFiles] = useState<File[]>([]);
   const [bulkStatus, setBulkStatus] = useState('');
-  const bulkFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
     setLoading(true);
-    let allItems: DisplayRef[] = [];
-
-    // Load from cloud
     try {
       const cloudSites = await getDemoSites();
-      allItems.push(...cloudSites.map(s => ({
-        id: `cloud-${s.id}`, name: s.site_name, industry: s.industry,
-        role: s.reference_role as ReferenceRole, live_url: s.live_url,
-        preview_image: s.preview_image || s.desktop_screenshot_url || generatePreviewPlaceholder(s.industry),
-        source: 'cloud' as const, cloudId: s.id, created: s.created_at,
-      })));
+      setItems(cloudSites);
     } catch (err) {
-      console.warn('Could not load cloud demo sites:', err);
+      console.warn('Could not load demo sites:', err);
+      setItems([]);
     }
-
-    // Load local references
-    const localRefs = getReferences();
-    allItems.push(...localRefs.map(r => ({
-      id: r.id, name: r.reference_name, industry: r.industry,
-      role: r.reference_role, live_url: r.live_url,
-      preview_image: r.preview_image || generatePreviewPlaceholder(r.industry),
-      source: 'local' as const, created: r.added_date,
-    })));
-
-    setItems(allItems);
     setLoading(false);
   }
 
   const filtered = useMemo(() => {
     let result = items.filter(r => {
       const q = searchQuery.toLowerCase();
-      const matchesSearch = !q || r.name.toLowerCase().includes(q) || r.industry.toLowerCase().includes(q);
+      const matchesSearch = !q || r.site_name.toLowerCase().includes(q) || r.industry.toLowerCase().includes(q);
       const matchesCategory = filterCategory === 'All' || r.industry === filterCategory;
-      const matchesRole = filterRole === 'all' || r.role === filterRole;
+      const matchesRole = filterRole === 'all' || r.reference_role === filterRole;
       return matchesSearch && matchesCategory && matchesRole;
     });
     switch (sortBy) {
-      case 'recent': result.sort((a, b) => b.created.localeCompare(a.created)); break;
-      case 'az': result.sort((a, b) => a.name.localeCompare(b.name)); break;
+      case 'recent': result.sort((a, b) => b.created_at.localeCompare(a.created_at)); break;
+      case 'az': result.sort((a, b) => a.site_name.localeCompare(b.site_name)); break;
       case 'industry': result.sort((a, b) => a.industry.localeCompare(b.industry)); break;
     }
     return result;
@@ -164,7 +142,6 @@ export default function ReferenceLibraryManager() {
         setShowBulkModal(false);
         setBulkStatus('');
         setBulkJsonFile(null);
-        setBulkScreenshotFiles([]);
       }, 1500);
     } catch (err: any) {
       setBulkStatus(`❌ Error: ${err.message}`);
@@ -172,13 +149,9 @@ export default function ReferenceLibraryManager() {
     setUploading(false);
   };
 
-  const handleDelete = async (item: DisplayRef) => {
+  const handleDelete = async (item: DemoSite) => {
     try {
-      if (item.source === 'cloud' && item.cloudId) {
-        await deleteDemoSite(item.cloudId, item.name, item.role);
-      } else {
-        deleteLocalRef(item.id);
-      }
+      await deleteDemoSite(item.id, item.site_name, item.reference_role);
       await loadAll();
       setDeleteConfirm(null);
       toast({ title: 'Reference deleted' });
@@ -187,19 +160,11 @@ export default function ReferenceLibraryManager() {
     }
   };
 
-  const roleBadge = (role: ReferenceRole) => (
+  const roleBadge = (role: string) => (
     <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
       role === 'style' ? 'bg-primary/10 text-primary' : 'bg-accent text-accent-foreground'
     }`}>
       {role === 'style' ? 'Style' : 'Conversion Layout'}
-    </span>
-  );
-
-  const sourceBadge = (source: 'cloud' | 'local') => (
-    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
-      source === 'cloud' ? 'bg-blue-500/10 text-blue-600' : 'bg-muted text-muted-foreground'
-    }`}>
-      {source === 'cloud' ? 'Cloud' : 'Local'}
     </span>
   );
 
@@ -264,18 +229,17 @@ export default function ReferenceLibraryManager() {
               {filtered.map(ref => (
                 <div key={ref.id} className="rounded-lg border border-border bg-card overflow-hidden group relative">
                   <div className="aspect-[4/3] bg-muted overflow-hidden">
-                    <img src={ref.preview_image} alt={ref.name} className="w-full h-full object-cover" />
+                    <img src={ref.preview_image || ref.desktop_screenshot_url || generatePreviewPlaceholder(ref.industry)} alt={ref.site_name} className="w-full h-full object-cover" />
                   </div>
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-foreground truncate">{ref.name}</h3>
+                        <h3 className="font-semibold text-foreground truncate">{ref.site_name}</h3>
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                           <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-secondary text-secondary-foreground">
                             {ref.industry}
                           </span>
-                          {roleBadge(ref.role)}
-                          {sourceBadge(ref.source)}
+                          {roleBadge(ref.reference_role)}
                         </div>
                       </div>
                     </div>
@@ -284,9 +248,6 @@ export default function ReferenceLibraryManager() {
                       <button onClick={() => window.open(ref.live_url, '_blank')}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
                         <ExternalLink size={12} /> Live View
-                      </button>
-                      <button className="flex-1 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-                        Select Reference
                       </button>
                       {deleteConfirm === ref.id ? (
                         <div className="flex items-center gap-1">

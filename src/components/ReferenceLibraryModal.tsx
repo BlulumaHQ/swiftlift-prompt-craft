@@ -1,38 +1,56 @@
-import { useState, useMemo } from 'react';
-import {
-  getReferences, industries, generatePreviewPlaceholder,
-  type ReferenceEntry, type ReferenceRole
-} from '@/lib/referenceStore';
+import { useState, useMemo, useEffect } from 'react';
+import { getDemoSites, type DemoSite } from '@/lib/demoSiteStore';
 import { Search, X } from 'lucide-react';
 
+const industries = [
+  'Dental', 'Construction', 'Restaurant', 'Real Estate',
+  'Professional Services', 'Luxury Service', 'One Page Design', 'Other'
+];
 const categoryFilters = ['All', ...industries];
+
+type ReferenceRole = 'style' | 'conversion_layout';
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  onSelect: (ref: ReferenceEntry) => void;
+  onSelect: (ref: DemoSite) => void;
   roleFilter?: ReferenceRole;
   title?: string;
+}
+
+function generatePreviewPlaceholder(industry: string): string {
+  const colors: Record<string, string> = {
+    'Dental': '2B6CB0', 'Construction': 'DD6B20', 'Restaurant': 'C53030',
+    'Real Estate': '2C5282', 'Professional Services': '4A5568',
+    'Luxury Service': '1A202C', 'One Page Design': '6B46C1', 'Other': '718096'
+  };
+  const color = colors[industry] || '718096';
+  return `https://placehold.co/600x400/${color}/ffffff?text=${encodeURIComponent(industry)}`;
 }
 
 export default function ReferenceLibraryModal({ open, onClose, onSelect, roleFilter, title }: Props) {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [sort, setSort] = useState('Recently Added');
+  const [references, setReferences] = useState<DemoSite[]>([]);
 
-  const references = useMemo(() => getReferences(), [open]);
+  useEffect(() => {
+    if (open) {
+      getDemoSites().then(setReferences).catch(() => setReferences([]));
+    }
+  }, [open]);
 
   const filtered = useMemo(() => {
     let items = references.filter(r => {
-      const matchesSearch = r.reference_name.toLowerCase().includes(search.toLowerCase()) ||
+      const matchesSearch = r.site_name.toLowerCase().includes(search.toLowerCase()) ||
         r.industry.toLowerCase().includes(search.toLowerCase());
       const matchesCategory = category === 'All' || r.industry === category;
       const matchesRole = !roleFilter || r.reference_role === roleFilter;
       return matchesSearch && matchesCategory && matchesRole;
     });
     switch (sort) {
-      case 'Recently Added': items.sort((a, b) => b.added_date.localeCompare(a.added_date)); break;
-      case 'A–Z': items.sort((a, b) => a.reference_name.localeCompare(b.reference_name)); break;
+      case 'Recently Added': items.sort((a, b) => b.created_at.localeCompare(a.created_at)); break;
+      case 'A–Z': items.sort((a, b) => a.site_name.localeCompare(b.site_name)); break;
       case 'Industry': items.sort((a, b) => a.industry.localeCompare(b.industry)); break;
     }
     return items;
@@ -86,12 +104,12 @@ export default function ReferenceLibraryModal({ open, onClose, onSelect, roleFil
             {filtered.map(ref => (
               <div key={ref.id} className="group rounded-lg border border-border overflow-hidden bg-card hover:shadow-md transition-shadow">
                 <div className="aspect-[4/3] overflow-hidden bg-muted">
-                  <img src={ref.preview_image || generatePreviewPlaceholder(ref.industry)} alt={ref.reference_name}
+                  <img src={ref.preview_image || ref.desktop_screenshot_url || generatePreviewPlaceholder(ref.industry)} alt={ref.site_name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                 </div>
                 <div className="p-3 space-y-2">
                   <div>
-                    <p className="text-sm font-medium text-foreground">{ref.reference_name}</p>
+                    <p className="text-sm font-medium text-foreground">{ref.site_name}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span className="text-xs text-muted-foreground">{ref.industry}</span>
                       <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${

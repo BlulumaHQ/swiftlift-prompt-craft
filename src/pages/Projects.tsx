@@ -1,9 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import NavHeader from '@/components/NavHeader';
-import { getProjects, deleteProject } from '@/lib/store';
+import { getProjects, deleteProject, saveProject } from '@/lib/store';
 import { SavedProject, contentModules } from '@/lib/mockData';
-import { compilePrompts } from '@/lib/promptCompiler';
-import { saveProject } from '@/lib/store';
 import { ArrowLeft, Copy, Check, Files, Search, Trash2, Eye, PenLine } from 'lucide-react';
 
 const moduleLabel = (id: string) => contentModules.find(m => m.id === id)?.label || id;
@@ -44,11 +42,6 @@ export default function Projects() {
     if (selected?.id === id) setSelected(null);
   };
 
-  const getPrompts = (p: SavedProject) => {
-    if (p.promptA && p.promptB) return { promptA: p.promptA, promptB: p.promptB };
-    return compilePrompts(p);
-  };
-
   const filtered = useMemo(() => {
     let items = projects.filter(p => {
       const q = searchQuery.toLowerCase();
@@ -56,7 +49,7 @@ export default function Projects() {
     });
     switch (sortBy) {
       case 'recent': items.sort((a, b) => b.dateCreated.localeCompare(a.dateCreated)); break;
-      case 'updated': items.sort((a, b) => b.dateCreated.localeCompare(a.dateCreated)); break;
+      case 'updated': items.sort((a, b) => (b.lastModified || b.dateCreated).localeCompare(a.lastModified || a.dateCreated)); break;
       case 'az': items.sort((a, b) => a.name.localeCompare(b.name)); break;
       case 'tier': items.sort((a, b) => a.packageTier.localeCompare(b.packageTier)); break;
     }
@@ -65,7 +58,8 @@ export default function Projects() {
 
   // Detail view
   if (selected) {
-    const { promptA, promptB } = getPrompts(selected);
+    const promptA = selected.promptA || '';
+    const promptB = selected.promptB || '';
     const tierLabel = selected.packageTier === '350'
       ? { a: 'Prompt A — $350 Standard Layout Preview', b: 'Prompt B — $475 Conversion Style Layout Preview' }
       : { a: 'Prompt A — $550 Standard Layout Preview', b: 'Prompt B — $750 Conversion Style Layout Preview' };
@@ -104,7 +98,7 @@ export default function Projects() {
                   </button>
                 </div>
                 <div className="prompt-output-body">
-                  <pre className="whitespace-pre-wrap break-words">{p.content}</pre>
+                  <pre className="whitespace-pre-wrap break-words">{p.content || 'No prompt generated yet.'}</pre>
                 </div>
               </div>
             ))}
@@ -148,7 +142,7 @@ export default function Projects() {
         </div>
 
         {filtered.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No projects found.</p>
+          <p className="text-muted-foreground text-sm">No generated projects yet.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filtered.map(p => (

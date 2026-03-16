@@ -16,6 +16,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 
+// System prompt IDs that should be hidden from the operational library
+const SYSTEM_PROMPT_IDS = ['generator_app_build_v1'];
+
 // Unified prompt item that can come from local or cloud
 interface PromptItem {
   id: string;
@@ -45,8 +48,8 @@ export default function PromptLibrary() {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    // Load local prompts
-    const localPrompts = getPromptLibrary();
+    // Load local prompts — filter out system prompts
+    const localPrompts = getPromptLibrary().filter(p => !SYSTEM_PROMPT_IDS.includes(p.id));
     const localItems: PromptItem[] = localPrompts.map(p => ({
       id: p.id, name: p.name, content: p.content, category: p.category,
       source: 'local' as const, type: p.type, status: p.status,
@@ -146,7 +149,8 @@ export default function PromptLibrary() {
   const handleSyncToCloud = async () => {
     setSyncing(true);
     try {
-      const localPrompts = getPromptLibrary();
+      // Only sync operational prompts, not system ones
+      const localPrompts = getPromptLibrary().filter(p => !SYSTEM_PROMPT_IDS.includes(p.id));
       for (const p of localPrompts) {
         await saveCloudPrompt({
           prompt_name: p.name,
