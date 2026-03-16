@@ -306,7 +306,6 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
                 placeholder="https://conversion-reference.com" className="control-input" />
               {convUrlError && <p className="text-xs text-destructive mt-1">{convUrlError}</p>}
             </div>
-            </div>
           </div>
         </div>
 
