@@ -280,7 +280,26 @@ export default function ClientAssets() {
                     <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 cursor-pointer transition-colors">
                       <FileArchive size={12} />
                       Upload ZIP
-                      <input type="file" accept=".zip" className="hidden" onChange={() => toast({ title: 'ZIP upload received', description: 'ZIP parsing will be implemented in a future revision.' })} />
+                      <input type="file" accept=".zip" className="hidden" onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        toast({ title: 'Processing ZIP...', description: 'Extracting and uploading assets.' });
+                        try {
+                          const result = await importClientZip(file);
+                          await loadProjects();
+                          if (result.clientSlug) {
+                            setSelectedSlug(result.clientSlug);
+                            if (result.clientSlug === selectedSlug) await loadAssets(result.clientSlug);
+                          }
+                          toast({
+                            title: `ZIP imported: ${result.itemsCreated} items, ${result.imagesUploaded} images`,
+                            description: result.errors.length > 0 ? `${result.errors.length} error(s) occurred` : undefined,
+                          });
+                        } catch (err: any) {
+                          toast({ title: 'ZIP import failed', description: err.message, variant: 'destructive' });
+                        }
+                        e.target.value = '';
+                      }} />
                     </label>
                     <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer transition-colors">
                       <Plus size={12} />
