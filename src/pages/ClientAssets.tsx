@@ -1,11 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import NavHeader from '@/components/NavHeader';
 import {
   getClientProjects, createClientProject, deleteClientProject,
   getClientAssets, uploadClientAsset, deleteClientAsset,
   type ClientProject, type ClientAsset, type AssetType
 } from '@/lib/clientAssetStore';
-import { Plus, Trash2, Upload, X, Loader2, Image, FolderOpen } from 'lucide-react';
+import {
+  Plus, Trash2, Upload, X, Loader2, Image, FolderOpen,
+  Pencil, FileArchive, ChevronRight, Briefcase, FileText,
+  Images, Palette, ArrowLeft
+} from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -13,11 +17,18 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 
-const assetTypes: { value: AssetType; label: string }[] = [
-  { value: 'portfolio', label: 'Portfolio' },
-  { value: 'blog', label: 'Blog' },
-  { value: 'gallery', label: 'Gallery' },
-  { value: 'logo', label: 'Logo' },
+type ContentType = {
+  key: AssetType;
+  label: string;
+  folderLabel: string;
+  icon: typeof Briefcase;
+};
+
+const contentTypes: ContentType[] = [
+  { key: 'portfolio', label: 'Portfolio / Projects', folderLabel: 'Portfolio', icon: Briefcase },
+  { key: 'blog', label: 'Blog', folderLabel: 'Blog', icon: FileText },
+  { key: 'gallery', label: 'Gallery', folderLabel: 'Gallery', icon: Images },
+  { key: 'logo', label: 'Branding', folderLabel: 'Branding', icon: Palette },
 ];
 
 export default function ClientAssets() {
@@ -28,31 +39,34 @@ export default function ClientAssets() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
+  const [selectedContentType, setSelectedContentType] = useState<AssetType | null>(null);
+
   // New project modal
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectLimit, setNewProjectLimit] = useState(20);
 
+  // Rename modal
+  const [renameTarget, setRenameTarget] = useState<ClientProject | null>(null);
+  const [renameName, setRenameName] = useState('');
+
   // Upload form
-  const [uploadType, setUploadType] = useState<AssetType>('portfolio');
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadCaption, setUploadCaption] = useState('');
   const [uploadAlt, setUploadAlt] = useState('');
+
+  // Detail view
+  const [detailAsset, setDetailAsset] = useState<ClientAsset | null>(null);
 
   // Delete
   const [deleteAssetTarget, setDeleteAssetTarget] = useState<ClientAsset | null>(null);
   const [deleteProjectTarget, setDeleteProjectTarget] = useState<string | null>(null);
 
-  // Filter
-  const [filterType, setFilterType] = useState<AssetType | 'all'>('all');
-
-  useEffect(() => {
-    loadProjects();
-  }, []);
+  useEffect(() => { loadProjects(); }, []);
 
   useEffect(() => {
     if (selectedSlug) loadAssets(selectedSlug);
-    else setAssets([]);
+    else { setAssets([]); setSelectedContentType(null); }
   }, [selectedSlug]);
 
   async function loadProjects() {
@@ -82,8 +96,10 @@ export default function ClientAssets() {
       const p = await createClientProject(newProjectName, newProjectLimit);
       setProjects(prev => [p, ...prev]);
       setSelectedSlug(p.client_slug);
+      setSelectedContentType(null);
       setShowNewProject(false);
       setNewProjectName('');
+      setNewProjectLimit(20);
       toast({ title: 'Project created' });
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
@@ -95,7 +111,10 @@ export default function ClientAssets() {
     try {
       await deleteClientProject(deleteProjectTarget);
       setProjects(prev => prev.filter(p => p.client_slug !== deleteProjectTarget));
-      if (selectedSlug === deleteProjectTarget) setSelectedSlug(null);
+      if (selectedSlug === deleteProjectTarget) {
+        setSelectedSlug(null);
+        setSelectedContentType(null);
+      }
       setDeleteProjectTarget(null);
       toast({ title: 'Project deleted' });
     } catch (err: any) {
@@ -104,11 +123,11 @@ export default function ClientAssets() {
   }
 
   async function handleUpload() {
-    if (!selectedSlug || uploadFiles.length === 0) return;
+    if (!selectedSlug || !selectedContentType || uploadFiles.length === 0) return;
     setUploading(true);
     try {
       for (const file of uploadFiles) {
-        await uploadClientAsset(selectedSlug, uploadType, file, uploadCaption, uploadAlt);
+        await uploadClientAsset(selectedSlug, selectedContentType, file, uploadCaption, uploadAlt);
       }
       await loadAssets(selectedSlug);
       await loadProjects();
@@ -127,6 +146,7 @@ export default function ClientAssets() {
     try {
       await deleteClientAsset(deleteAssetTarget.id, deleteAssetTarget.file_url, selectedSlug);
       setAssets(prev => prev.filter(a => a.id !== deleteAssetTarget.id));
+      if (detailAsset?.id === deleteAssetTarget.id) setDetailAsset(null);
       await loadProjects();
       setDeleteAssetTarget(null);
       toast({ title: 'Asset deleted' });
@@ -136,147 +156,285 @@ export default function ClientAssets() {
   }
 
   const selectedProject = projects.find(p => p.client_slug === selectedSlug);
-  const filteredAssets = filterType === 'all' ? assets : assets.filter(a => a.asset_type === filterType);
+
+  const contentTypeCounts = useMemo(() => {
+    const counts: Record<string, number> = { portfolio: 0, blog: 0, gallery: 0, logo: 0 };
+    assets.forEach(a => { counts[a.asset_type] = (counts[a.asset_type] || 0) + 1; });
+    return counts;
+  }, [assets]);
+
+  const filteredAssets = useMemo(() => {
+    if (!selectedContentType) return [];
+    return assets.filter(a => a.asset_type === selectedContentType);
+  }, [assets, selectedContentType]);
+
+  const activeContentLabel = contentTypes.find(c => c.key === selectedContentType)?.folderLabel || '';
 
   return (
     <div className="flex flex-col h-screen">
       <NavHeader title="Client Assets" />
 
       <div className="flex flex-1 min-h-0">
-        {/* Sidebar - Projects */}
-        <aside className="w-[260px] shrink-0 border-r border-border bg-card overflow-y-auto">
-          <div className="p-3">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Projects</h3>
-              <button onClick={() => setShowNewProject(true)}
-                className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
-                <Plus size={14} />
+        {/* LEFT PANEL — Client Projects */}
+        <aside className="w-[240px] shrink-0 border-r border-border bg-card flex flex-col">
+          <div className="px-3 pt-3 pb-2 border-b border-border">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Client Projects</h3>
+              <button
+                onClick={() => setShowNewProject(true)}
+                className="px-2 py-1 rounded-md text-[10px] font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-1"
+              >
+                <Plus size={10} /> New Client
               </button>
             </div>
-            {loading && <p className="text-xs text-muted-foreground">Loading...</p>}
+          </div>
+          <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+            {loading && <p className="text-xs text-muted-foreground p-2">Loading...</p>}
             {projects.map(p => (
-              <button key={p.client_slug} onClick={() => setSelectedSlug(p.client_slug)}
-                className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors mb-1 ${
+              <div
+                key={p.client_slug}
+                onClick={() => { setSelectedSlug(p.client_slug); setSelectedContentType(null); setDetailAsset(null); }}
+                className={`group flex items-center gap-2 px-3 py-2.5 rounded-md text-sm cursor-pointer transition-colors ${
                   selectedSlug === p.client_slug
                     ? 'bg-primary/10 text-primary font-medium'
                     : 'text-foreground hover:bg-muted/60'
-                }`}>
+                }`}
+              >
                 <FolderOpen size={14} className="shrink-0 opacity-50" />
                 <div className="flex-1 min-w-0">
-                  <span className="truncate block">{p.client_name}</span>
-                  <span className="text-[10px] text-muted-foreground">{p.uploaded_image_count}/{p.included_image_limit} images</span>
+                  <span className="truncate block text-[13px]">{p.client_name}</span>
+                  <span className="text-[10px] text-muted-foreground">{p.uploaded_image_count} images</span>
                 </div>
-                <button onClick={e => { e.stopPropagation(); setDeleteProjectTarget(p.client_slug); }}
-                  className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all">
-                  <Trash2 size={12} />
-                </button>
-              </button>
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={e => { e.stopPropagation(); setRenameTarget(p); setRenameName(p.client_name); }}
+                    className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                  >
+                    <Pencil size={11} />
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); setDeleteProjectTarget(p.client_slug); }}
+                    className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 size={11} />
+                  </button>
+                </div>
+              </div>
             ))}
             {!loading && projects.length === 0 && (
-              <p className="text-xs text-muted-foreground text-center py-4">No projects yet</p>
+              <p className="text-xs text-muted-foreground text-center py-6">No projects yet</p>
             )}
           </div>
         </aside>
 
-        {/* Main content */}
-        <main className="flex-1 overflow-y-auto p-6">
-          {selectedProject ? (
-            <div className="max-w-5xl mx-auto">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-xl font-bold text-foreground">{selectedProject.client_name}</h2>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedProject.uploaded_image_count} / {selectedProject.included_image_limit} images uploaded
-                  </p>
-                </div>
-              </div>
-
-              {/* Upload Section */}
-              <div className="rounded-lg border border-border bg-card p-4 mb-6">
-                <h3 className="text-sm font-semibold text-foreground mb-3">Upload Assets</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Asset Type</label>
-                    <select value={uploadType} onChange={e => setUploadType(e.target.value as AssetType)}
-                      className="control-input text-xs">
-                      {assetTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Caption</label>
-                    <input type="text" value={uploadCaption} onChange={e => setUploadCaption(e.target.value)}
-                      placeholder="Optional caption" className="control-input text-xs" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Alt Text</label>
-                    <input type="text" value={uploadAlt} onChange={e => setUploadAlt(e.target.value)}
-                      placeholder="Alt text for SEO" className="control-input text-xs" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Files</label>
-                    <input type="file" accept="image/*" multiple
-                      onChange={e => setUploadFiles(Array.from(e.target.files || []))}
-                      className="text-xs w-full file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-secondary file:text-secondary-foreground" />
-                  </div>
-                </div>
-                {uploadFiles.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-primary">✓ {uploadFiles.length} file(s) selected</span>
-                    <button onClick={handleUpload} disabled={uploading}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors">
-                      {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-                      {uploading ? 'Uploading...' : 'Upload'}
+        {/* CENTER PANEL — Content Types */}
+        <aside className="w-[220px] shrink-0 border-r border-border bg-background flex flex-col">
+          <div className="px-3 pt-3 pb-2 border-b border-border">
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Content Types</h3>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2">
+            {selectedProject ? (
+              <div className="space-y-0.5">
+                {contentTypes.map(ct => {
+                  const count = contentTypeCounts[ct.key] || 0;
+                  const Icon = ct.icon;
+                  return (
+                    <button
+                      key={ct.key}
+                      onClick={() => { setSelectedContentType(ct.key); setDetailAsset(null); }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md text-sm transition-colors ${
+                        selectedContentType === ct.key
+                          ? 'bg-primary/10 text-primary font-medium'
+                          : 'text-foreground hover:bg-muted/60'
+                      }`}
+                    >
+                      <Icon size={14} className="shrink-0 opacity-60" />
+                      <span className="flex-1 text-left text-[13px]">{ct.label}</span>
+                      <span className="text-[11px] text-muted-foreground tabular-nums">({count})</span>
+                      <ChevronRight size={12} className="opacity-30" />
                     </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center py-6">Select a project</p>
+            )}
+          </div>
+        </aside>
+
+        {/* RIGHT PANEL — Content Manager */}
+        <main className="flex-1 overflow-y-auto flex flex-col">
+          {selectedProject && selectedContentType ? (
+            <>
+              {/* Header */}
+              <div className="px-5 pt-4 pb-3 border-b border-border bg-card/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Content Manager</h2>
+                    <p className="text-sm font-medium text-foreground">
+                      {selectedProject.client_name} — {activeContentLabel}
+                    </p>
                   </div>
-                )}
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 cursor-pointer transition-colors">
+                      <FileArchive size={12} />
+                      Upload ZIP
+                      <input type="file" accept=".zip" className="hidden" onChange={() => toast({ title: 'ZIP upload received', description: 'ZIP parsing will be implemented in a future revision.' })} />
+                    </label>
+                    <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer transition-colors">
+                      <Plus size={12} />
+                      Add Item
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={e => {
+                          const files = Array.from(e.target.files || []);
+                          if (files.length > 0) {
+                            setUploadFiles(files);
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
               </div>
 
-              {/* Filter */}
-              <div className="flex gap-1.5 mb-4">
-                <button onClick={() => setFilterType('all')}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                    filterType === 'all' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-secondary'
-                  }`}>All</button>
-                {assetTypes.map(t => (
-                  <button key={t.value} onClick={() => setFilterType(t.value)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                      filterType === t.value ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-secondary'
-                    }`}>{t.label}</button>
-                ))}
-              </div>
-
-              {/* Asset Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                {filteredAssets.map(asset => (
-                  <div key={asset.id} className="rounded-lg border border-border bg-card overflow-hidden group relative">
-                    <div className="aspect-square bg-muted overflow-hidden">
-                      <img src={asset.file_url} alt={asset.alt_text || asset.caption} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="p-2">
-                      <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary text-secondary-foreground capitalize">
-                        {asset.asset_type}
-                      </span>
-                      {asset.caption && <p className="text-xs text-foreground mt-1 truncate">{asset.caption}</p>}
-                      <button onClick={() => setDeleteAssetTarget(asset)}
-                        className="absolute top-2 right-2 p-1.5 rounded-md bg-card/80 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all">
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
+              {/* Upload bar */}
+              {uploadFiles.length > 0 && (
+                <div className="px-5 py-3 bg-accent/30 border-b border-border flex items-center gap-3">
+                  <span className="text-xs text-primary font-medium">✓ {uploadFiles.length} file(s) selected</span>
+                  <div className="flex-1 flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={uploadCaption}
+                      onChange={e => setUploadCaption(e.target.value)}
+                      placeholder="Caption (optional)"
+                      className="control-input text-xs max-w-[180px]"
+                    />
+                    <input
+                      type="text"
+                      value={uploadAlt}
+                      onChange={e => setUploadAlt(e.target.value)}
+                      placeholder="Alt text"
+                      className="control-input text-xs max-w-[180px]"
+                    />
                   </div>
-                ))}
-              </div>
-              {filteredAssets.length === 0 && (
-                <div className="text-center py-16">
-                  <Image size={32} className="mx-auto text-muted-foreground/30 mb-2" />
-                  <p className="text-muted-foreground text-sm">No assets uploaded yet</p>
+                  <button
+                    onClick={() => setUploadFiles([])}
+                    className="p-1 rounded hover:bg-muted text-muted-foreground"
+                  >
+                    <X size={14} />
+                  </button>
+                  <button
+                    onClick={handleUpload}
+                    disabled={uploading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                  >
+                    {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                    {uploading ? 'Uploading...' : 'Upload'}
+                  </button>
                 </div>
               )}
-            </div>
+
+              {/* Detail view */}
+              {detailAsset ? (
+                <div className="flex-1 p-5">
+                  <button
+                    onClick={() => setDetailAsset(null)}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-4 transition-colors"
+                  >
+                    <ArrowLeft size={12} /> Back to list
+                  </button>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="rounded-lg border border-border bg-muted overflow-hidden">
+                      <img src={detailAsset.file_url} alt={detailAsset.alt_text || detailAsset.caption} className="w-full h-auto object-contain max-h-[400px]" />
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="control-label">Title</label>
+                        <input type="text" defaultValue={detailAsset.caption || ''} className="control-input" readOnly />
+                      </div>
+                      <div>
+                        <label className="control-label">Slug</label>
+                        <input type="text" defaultValue={detailAsset.folder_slug || ''} className="control-input" readOnly />
+                      </div>
+                      <div>
+                        <label className="control-label">Alt Text</label>
+                        <input type="text" defaultValue={detailAsset.alt_text || ''} className="control-input" readOnly />
+                      </div>
+                      <div>
+                        <label className="control-label">Description</label>
+                        <textarea defaultValue="" className="control-input min-h-[80px]" placeholder="Item description..." readOnly />
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          onClick={() => setDeleteAssetTarget(detailAsset)}
+                          className="px-3 py-1.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Content item grid */
+                <div className="flex-1 p-5">
+                  {filteredAssets.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                      {filteredAssets.map(asset => (
+                        <div
+                          key={asset.id}
+                          className="rounded-lg border border-border bg-card overflow-hidden group relative cursor-pointer hover:border-primary/30 transition-colors"
+                          onClick={() => setDetailAsset(asset)}
+                        >
+                          <div className="aspect-square bg-muted overflow-hidden">
+                            <img src={asset.file_url} alt={asset.alt_text || asset.caption} className="w-full h-full object-cover" />
+                          </div>
+                          <div className="p-2.5">
+                            <p className="text-[13px] font-medium text-foreground truncate">
+                              {asset.caption || 'Untitled'}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">1 image</p>
+                          </div>
+                          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={e => { e.stopPropagation(); setDetailAsset(asset); }}
+                              className="p-1.5 rounded-md bg-card/90 text-muted-foreground hover:text-foreground shadow-sm"
+                            >
+                              <Pencil size={12} />
+                            </button>
+                            <button
+                              onClick={e => { e.stopPropagation(); setDeleteAssetTarget(asset); }}
+                              className="p-1.5 rounded-md bg-card/90 text-muted-foreground hover:text-destructive shadow-sm"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center h-full min-h-[300px]">
+                      <div className="text-center">
+                        <Image size={32} className="mx-auto text-muted-foreground/30 mb-2" />
+                        <p className="text-muted-foreground text-sm">No {activeContentLabel.toLowerCase()} items yet</p>
+                        <p className="text-muted-foreground/60 text-xs mt-1">Click "Add Item" to upload content</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           ) : (
-            <div className="flex-1 flex items-center justify-center h-full">
+            <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
                 <FolderOpen size={32} className="mx-auto text-muted-foreground/30 mb-2" />
-                <p className="text-muted-foreground">Select or create a client project</p>
+                <p className="text-muted-foreground text-sm">
+                  {selectedProject ? 'Select a content type' : 'Select a client project'}
+                </p>
               </div>
             </div>
           )}
@@ -297,7 +455,7 @@ export default function ClientAssets() {
               <div>
                 <label className="control-label">Client Name</label>
                 <input type="text" value={newProjectName} onChange={e => setNewProjectName(e.target.value)}
-                  placeholder="e.g., kchen-construction" className="control-input" />
+                  placeholder="e.g., KChen Construction" className="control-input" />
               </div>
               <div>
                 <label className="control-label">Image Limit</label>
@@ -312,6 +470,51 @@ export default function ClientAssets() {
                 <button onClick={handleCreateProject} disabled={!newProjectName.trim()}
                   className="flex-1 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors">
                   Create
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename Modal */}
+      {renameTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-sm">
+          <div className="bg-card rounded-xl shadow-2xl border border-border w-[400px] max-w-[95vw]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-foreground">Rename Project</h2>
+              <button onClick={() => setRenameTarget(null)} className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="control-label">Client Name</label>
+                <input type="text" value={renameName} onChange={e => setRenameName(e.target.value)} className="control-input" />
+              </div>
+              <p className="text-xs text-muted-foreground">Note: Rename updates the display name only. The project slug remains unchanged.</p>
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => setRenameTarget(null)}
+                  className="flex-1 px-4 py-2 rounded-lg text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!renameName.trim()) return;
+                    try {
+                      const { supabase } = await import('@/integrations/supabase/client');
+                      await supabase.from('client_projects').update({ client_name: renameName.trim() }).eq('client_slug', renameTarget.client_slug);
+                      setProjects(prev => prev.map(p => p.client_slug === renameTarget.client_slug ? { ...p, client_name: renameName.trim() } : p));
+                      setRenameTarget(null);
+                      toast({ title: 'Project renamed' });
+                    } catch (err: any) {
+                      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+                    }
+                  }}
+                  disabled={!renameName.trim()}
+                  className="flex-1 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                >
+                  Save
                 </button>
               </div>
             </div>
