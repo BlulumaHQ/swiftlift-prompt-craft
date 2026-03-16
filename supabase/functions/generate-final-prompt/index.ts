@@ -583,9 +583,43 @@ ${activeContentModules.includes('portfolio') ? `PORTFOLIO MODULE:
 
     const convUrl = conversionLayoutUrl || referenceUrl || "";
 
+    // Build the full scraped data block (all formatted sections combined)
+    const fullScrapedData = [
+      blocks.siteMeta && `== SITE META ==\n${blocks.siteMeta}`,
+      blocks.siteStructure && `== SITE STRUCTURE ==\n${blocks.siteStructure}`,
+      blocks.copywriting && `== COPYWRITING ==\n${blocks.copywriting}`,
+      blocks.businessInfo && `== BUSINESS INFO ==\n${blocks.businessInfo}`,
+      blocks.designSystem && `== DESIGN SYSTEM ==\n${blocks.designSystem}`,
+      blocks.images && `== IMAGES ==\n${blocks.images}`,
+      blocks.extractionNotes && `== EXTRACTION NOTES ==\n${blocks.extractionNotes}`,
+    ].filter(Boolean).join("\n\n");
+
+    // Build scraped URLs block from site structure
+    const scrapedUrls = (normalized.site_structure || [])
+      .map((p: any) => p.url || p.slug || "")
+      .filter((u: string) => u)
+      .map((u: string) => `- ${u}`)
+      .join("\n") || "(no URLs extracted)";
+
+    const runtimeValuesA = {
+      sourceUrl,
+      referenceUrl: referenceUrl || "",
+      referenceScreenshot: "(not available)",
+      scrapedData: fullScrapedData,
+      scrapedUrls,
+    };
+
+    const runtimeValuesB = {
+      sourceUrl,
+      referenceUrl: convUrl,
+      referenceScreenshot: "(not available)",
+      scrapedData: fullScrapedData,
+      scrapedUrls,
+    };
+
     currentStep = "assemble_prompts";
     const promptA = `SWIFTLIFT BUILD PROMPT — ${tierLabelA}\nSource: ${sourceUrl}\n\n` +
-      assemblePrompt(masterPrompt, blocks, referenceUrl || "", userNotes || "") + brandOverrideBlock + contentModuleBlock;
+      assemblePrompt(masterPrompt, blocks, runtimeValuesA, userNotes || "") + brandOverrideBlock + contentModuleBlock;
 
     const conversionDirective = `--------------------------------------------------
 LAYOUT MODE: PREMIUM CONVERSION LAYOUT
@@ -621,7 +655,7 @@ IMPORTANT: Do NOT add conversion strategy, CRO analysis, sales funnel planning, 
 
     const promptB = `SWIFTLIFT BUILD PROMPT — ${tierLabelB}\nSource: ${sourceUrl}\n\n` +
       conversionDirective +
-      assemblePrompt(masterPrompt, blocks, convUrl, userNotes || "") + brandOverrideBlock + contentModuleBlock;
+      assemblePrompt(masterPrompt, blocks, runtimeValuesB, userNotes || "") + brandOverrideBlock + contentModuleBlock;
 
     console.log("Prompts assembled from database prompts. A length:", promptA.length, "B length:", promptB.length, "Assembly rules length:", assemblyRules?.length || 0);
 
