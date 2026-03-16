@@ -72,7 +72,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const [primaryColor, setPrimaryColor] = useState('');
   const [secondaryColor, setSecondaryColor] = useState('');
   const [primaryFont, setPrimaryFont] = useState('');
-  const [fontWeight, setFontWeight] = useState('700');
+  const [fontWeight, setFontWeight] = useState('');
   const [themeMode, setThemeMode] = useState<'auto' | 'force_light' | 'force_dark'>('auto');
   const [brandDetected, setBrandDetected] = useState(false);
   const [modules, setModules] = useState<string[]>([]);
