@@ -108,9 +108,8 @@ export async function uploadClientAsset(
   if (error) throw error;
 
   // Update count
-  await supabase.rpc// can't use rpc, do manual update
-  const { data: assets } = await supabase.from('client_assets').select('id').eq('client_slug', clientSlug);
-  await supabase.from('client_projects').update({ uploaded_image_count: assets?.length || 0 }).eq('client_slug', clientSlug);
+  const { data: countData } = await supabase.from('client_assets').select('id').eq('client_slug', clientSlug);
+  await supabase.from('client_projects').update({ uploaded_image_count: countData?.length || 0 }).eq('client_slug', clientSlug);
 
   return data as unknown as ClientAsset;
 }
