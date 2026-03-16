@@ -152,6 +152,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           primaryFont,
           fontWeight,
           enabledModules: modules,
+          projectBrand,
         },
       });
 
