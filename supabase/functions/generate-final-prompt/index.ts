@@ -1,4 +1,5 @@
 import Anthropic from "npm:@anthropic-ai/sdk@0.39.0";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,451 +7,52 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// ── Extraction System Prompt ──
-const EXTRACTION_SYSTEM_PROMPT = `You are a deterministic website source extraction engine.
-
-Your task is to extract ALL usable business, structural, design, and asset information from the Source URL so the website can be rebuilt as accurately as possible.
-
-This output will be used as a structured database for rebuilding the website and generating a final website build prompt.
-
-CRITICAL RULES
-
-1. Use the Source URL as the primary source of truth.
-2. Preserve original wording whenever possible.
-3. Do not summarize aggressively.
-4. Do not omit meaningful public-facing copywriting.
-5. Extract and preserve the original public URL structure and slug naming whenever available.
-6. Do not rename page URLs unless the source clearly does not provide a usable public slug.
-7. Extract all meaningful page titles, headings, subheadings, paragraph copy, button labels, navigation labels, form labels, footer text, CTA copy, FAQ content, testimonial content, and offer text.
-8. Extract all meaningful business information including services, service details, locations served, contact information, hours, trust signals, and social links.
-9. Extract design-related information including primary color, secondary color, accent color, additional colors, heading font family, body font family, font size hierarchy, font weight hierarchy, button style, border radius style, and overall visual direction.
-10. Extract all usable public image URLs including logo, favicon, hero images, section images, service images, gallery images, team images, background images, and any other meaningful image assets.
-11. Ignore privacy policy, terms, login, account, cart, checkout, cookie notices, and unrelated blog clutter unless they contain important business facts.
-12. Do not invent facts.
-13. Merge duplicate information cleanly while preserving important wording.
-14. Return valid JSON only.
-15. Do not output markdown.
-16. Do not output explanations.
-17. Leave missing values blank or as empty arrays.
-
-RETURN THIS EXACT JSON STRUCTURE
-
-{
-  "site_meta": {
-    "source_url": "",
-    "site_name": "",
-    "logo_url": "",
-    "favicon_url": "",
-    "primary_domain": ""
-  },
-  "site_structure": [
-    {
-      "page_title": "",
-      "page_type": "",
-      "url": "",
-      "slug": "",
-      "nav_label": "",
-      "meta_title": "",
-      "meta_description": ""
-    }
-  ],
-  "copywriting": {
-    "global_value_proposition": "",
-    "brand_summary": "",
-    "tone_of_voice": "",
-    "all_headings": [],
-    "all_subheadings": [],
-    "all_paragraphs": [],
-    "all_button_texts": [],
-    "all_ctas": [],
-    "all_form_labels": [],
-    "all_nav_labels": [],
-    "all_footer_text": [],
-    "all_faqs": [],
-    "all_testimonials": [],
-    "all_offers": []
-  },
-  "business_info": {
-    "business_name": "",
-    "services": [],
-    "service_details": [],
-    "target_audience": [],
-    "locations_served": [],
-    "contact_info": {
-      "phone": "",
-      "email": "",
-      "address": ""
-    },
-    "hours": [],
-    "social_links": [],
-    "trust_signals": []
-  },
-  "design_system": {
-    "primary_color": "",
-    "secondary_color": "",
-    "accent_color": "",
-    "additional_colors": [],
-    "heading_font_family": "",
-    "body_font_family": "",
-    "font_sizes": {
-      "hero_title": "",
-      "page_title": "",
-      "section_title": "",
-      "body_text": "",
-      "button_text": ""
-    },
-    "font_weights": {
-      "hero_title": "",
-      "page_title": "",
-      "section_title": "",
-      "body_text": "",
-      "button_text": ""
-    },
-    "button_style": "",
-    "border_radius_style": "",
-    "overall_visual_direction": ""
-  },
-  "images": {
-    "hero_images": [],
-    "logo_images": [],
-    "section_images": [],
-    "gallery_images": [],
-    "team_images": [],
-    "service_images": [],
-    "background_images": [],
-    "all_image_urls": []
-  },
-  "extraction_notes": {
-    "missing_information": [],
-    "warnings": []
+// ── Fetch required prompts from database ──
+async function fetchRequiredPrompts(): Promise<{
+  extractionPrompt: string;
+  masterPrompt: string;
+  assemblyRules: string;
+}> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured.");
   }
-}`;
 
-// ── Standard Layout Master Prompt Template ──
-const STANDARD_PROMPT_TEMPLATE = `You are a deterministic website builder operating in PRODUCTION MODE.
-
-Your goal is to generate a COMPLETE, CLIENT-READY WEBSITE in a single build.
-
-The website must appear fully finished, professional, intentional, and well-structured.
-
-No placeholder text.
-No lorem ipsum.
-No unfinished sections.
-No generic filler copy.
-
---------------------------------------------------
-BUILD FORMULA
---------------------------------------------------
-
-New Website =
-Reference Design Direction
-+
-Extracted Source Business Content
-+
-Preserved Source URL Structure
-+
-Preserved Source Copywriting Database
-
---------------------------------------------------
-LAYOUT MODE: STANDARD
---------------------------------------------------
-
-Build a clean, professional business website layout.
-
-Use a conventional, well-organized section order appropriate for this type of business.
-
-Prioritize clarity, readability, and logical content flow.
-
-Sections should follow a natural business website progression:
-- Navigation
-- Hero / main headline
-- Services or offerings overview
-- About / company information
-- Testimonials or trust signals (if available)
-- Contact information / call to action
-- Footer
-
-This is a standard business website, not a landing page.
-
---------------------------------------------------
-CORE BUILD RULES
---------------------------------------------------
-
-1. Use the extracted source business content as the primary source of truth.
-2. Preserve the original public page URL structure and slug naming from the source website whenever available.
-3. Do not rename source page URLs unless explicitly required.
-4. Preserve important business wording, service names, CTA text, and trust signals whenever possible.
-5. Do not invent unsupported claims, certifications, awards, offers, or service details.
-6. Rebuild the website with a modern, polished presentation while keeping the business identity intact.
-7. Use the reference design direction for layout and visual refinement, but do not overwrite source business facts.
-8. Every public-facing page must feel complete and intentional.
-9. All pages must be mobile responsive and visually consistent.
-10. The final site must feel fully designed, not templated.
-11. Use only valid public-facing pages from the extracted source structure.
-12. Preserve page intent from the source site.
-13. Preserve important CTA wording, buttons, testimonials, FAQs, offers, and trust signals when available.
-14. Use the extracted design system as a continuity guide where appropriate.
-15. Do not omit meaningful button labels, navigation labels, form labels, or footer text when they are relevant to the site structure.
-16. If some design assets cannot be extracted, generate visually appropriate equivalents that maintain the same level of polish.
-17. Social media icons must only appear if valid social links exist in the extracted source data.
-18. If no social links are found, do not display social icons anywhere.
-19. Use clean, modern, visually consistent iconography only.
-20. Mobile-first execution is required.
-
---------------------------------------------------
-SOURCE SITE META
---------------------------------------------------
-
-{{SITE_META}}
-
---------------------------------------------------
-SOURCE SITE STRUCTURE
---------------------------------------------------
-
-Use this as the required public page structure and preserve the original page slugs wherever possible:
-
-{{SITE_STRUCTURE}}
-
---------------------------------------------------
-SOURCE COPYWRITING DATABASE
---------------------------------------------------
-
-Use this extracted copywriting database as the main source of business content. Preserve useful original wording whenever possible.
-
-{{COPYWRITING}}
-
---------------------------------------------------
-SOURCE BUSINESS INFORMATION
---------------------------------------------------
-
-{{BUSINESS_INFO}}
-
---------------------------------------------------
-SOURCE DESIGN SYSTEM
---------------------------------------------------
-
-Use the extracted design system as a source reference for maintaining brand continuity where appropriate:
-
-{{DESIGN_SYSTEM}}
-
---------------------------------------------------
-SOURCE IMAGE URL DATABASE
---------------------------------------------------
-
-Use these extracted image URLs where relevant. Preserve meaningful brand and content imagery.
-
-{{IMAGES}}
-
---------------------------------------------------
-EXTRACTION WARNINGS AND MISSING INFORMATION
---------------------------------------------------
-
-Respect these limitations. Do not invent missing facts.
-
-{{EXTRACTION_NOTES}}
-
---------------------------------------------------
-REFERENCE DESIGN DIRECTION
---------------------------------------------------
-
-Reference URL:
-{{REFERENCE_URL}}
-
-Use the reference site only as inspiration for layout quality, section flow, spacing, hierarchy, visual polish, and modern presentation.
-
-Do not copy the source content from the reference site.
-Do not replace the source business identity with the reference site.
-
---------------------------------------------------
-USER NOTES
---------------------------------------------------
-
-{{USER_NOTES}}
-
---------------------------------------------------
-FINAL BUILD INSTRUCTION
---------------------------------------------------
-
-Build the complete website using the extracted source website database above.
-
-Requirements:
-- preserve source page intent
-- preserve source URL structure
-- preserve critical service wording
-- preserve important CTA wording
-- preserve testimonials, FAQs, offers, and trust signals when available
-- use the extracted design system as a continuity guide
-- use the reference design direction to improve presentation quality
-- output a fully built, client-ready website`;
-
-// ── Premium Conversion Layout Master Prompt Template ──
-const PREMIUM_PROMPT_TEMPLATE = `You are a deterministic website builder operating in PRODUCTION MODE.
-
-Your goal is to generate a COMPLETE, CLIENT-READY WEBSITE in a single build.
-
-The website must appear fully finished, professional, intentional, and conversion-focused.
-
-No placeholder text.
-No lorem ipsum.
-No unfinished sections.
-No generic filler copy.
-
---------------------------------------------------
-BUILD FORMULA
---------------------------------------------------
-
-New Website =
-Reference Design Direction
-+
-Extracted Source Business Content
-+
-Preserved Source URL Structure
-+
-Preserved Source Copywriting Database
-+
-Conversion-Oriented Layout Structure
-
---------------------------------------------------
-LAYOUT MODE: PREMIUM CONVERSION LAYOUT
---------------------------------------------------
-
-Build a conversion-oriented layout using the same source business content.
-
-This is NOT a marketing strategy or CRO analysis.
-This is a LAYOUT UPGRADE ONLY.
-
-Apply these layout principles:
-
-1. Lead with the strongest value proposition or hero headline.
-2. Place the primary call-to-action prominently above the fold.
-3. Use a landing-page-inspired section flow:
-   - Hero with clear CTA
-   - Key benefits or services (visual, scannable)
-   - Social proof / testimonials / trust signals early
-   - Detailed service or offering breakdown
-   - Secondary CTA or lead capture
-   - About / credibility section
-   - Final CTA / contact
-   - Footer
-4. Use stronger visual hierarchy: larger headings, bolder CTAs, more whitespace between sections.
-5. Place trust signals (testimonials, certifications, years in business) closer to CTAs.
-6. Use more prominent button styling for primary actions.
-7. Repeat the primary CTA at strategic intervals throughout the page.
-8. Use visual separators, background color alternation, or card layouts to create clear section breaks.
-
-IMPORTANT: Do NOT add conversion strategy, CRO analysis, sales funnel planning, audience targeting, or marketing consulting content. Only restructure the layout for better conversion flow.
-
---------------------------------------------------
-CORE BUILD RULES
---------------------------------------------------
-
-1. Use the extracted source business content as the primary source of truth.
-2. Preserve the original public page URL structure and slug naming from the source website whenever available.
-3. Do not rename source page URLs unless explicitly required.
-4. Preserve important business wording, service names, CTA text, and trust signals whenever possible.
-5. Do not invent unsupported claims, certifications, awards, offers, or service details.
-6. Rebuild the website with a modern, polished, high-conversion presentation while keeping the business identity intact.
-7. Use the reference design direction for layout and visual refinement, but do not overwrite source business facts.
-8. Every public-facing page must feel complete and intentional.
-9. All pages must be mobile responsive and visually consistent.
-10. The final site must feel fully designed, not templated.
-11. Use only valid public-facing pages from the extracted source structure.
-12. Preserve page intent from the source site.
-13. Preserve important CTA wording, buttons, testimonials, FAQs, offers, and trust signals when available.
-14. Use the extracted design system as a continuity guide where appropriate.
-15. Do not omit meaningful button labels, navigation labels, form labels, or footer text when they are relevant to the site structure.
-16. If some design assets cannot be extracted, generate visually appropriate equivalents that maintain the same level of polish.
-17. Social media icons must only appear if valid social links exist in the extracted source data.
-18. If no social links are found, do not display social icons anywhere.
-19. Use clean, modern, visually consistent iconography only.
-20. Mobile-first execution is required.
-
---------------------------------------------------
-SOURCE SITE META
---------------------------------------------------
-
-{{SITE_META}}
-
---------------------------------------------------
-SOURCE SITE STRUCTURE
---------------------------------------------------
-
-Use this as the required public page structure and preserve the original page slugs wherever possible:
-
-{{SITE_STRUCTURE}}
-
---------------------------------------------------
-SOURCE COPYWRITING DATABASE
---------------------------------------------------
-
-Use this extracted copywriting database as the main source of business content. Preserve useful original wording whenever possible.
-
-{{COPYWRITING}}
-
---------------------------------------------------
-SOURCE BUSINESS INFORMATION
---------------------------------------------------
-
-{{BUSINESS_INFO}}
-
---------------------------------------------------
-SOURCE DESIGN SYSTEM
---------------------------------------------------
-
-Use the extracted design system as a source reference for maintaining brand continuity where appropriate:
-
-{{DESIGN_SYSTEM}}
-
---------------------------------------------------
-SOURCE IMAGE URL DATABASE
---------------------------------------------------
-
-Use these extracted image URLs where relevant. Preserve meaningful brand and content imagery.
-
-{{IMAGES}}
-
---------------------------------------------------
-EXTRACTION WARNINGS AND MISSING INFORMATION
---------------------------------------------------
-
-Respect these limitations. Do not invent missing facts.
-
-{{EXTRACTION_NOTES}}
-
---------------------------------------------------
-REFERENCE DESIGN DIRECTION
---------------------------------------------------
-
-Reference URL:
-{{REFERENCE_URL}}
-
-Use the reference site only as inspiration for layout quality, section flow, spacing, hierarchy, visual polish, and modern presentation.
-
-Do not copy the source content from the reference site.
-Do not replace the source business identity with the reference site.
-
---------------------------------------------------
-USER NOTES
---------------------------------------------------
-
-{{USER_NOTES}}
-
---------------------------------------------------
-FINAL BUILD INSTRUCTION
---------------------------------------------------
-
-Build the complete website using the extracted source website database above.
-
-Requirements:
-- preserve source page intent
-- preserve source URL structure
-- preserve critical service wording
-- preserve important CTA wording
-- preserve testimonials, FAQs, offers, and trust signals when available
-- use the extracted design system as a continuity guide
-- use the reference design direction to improve presentation quality
-- apply conversion-oriented layout structure for stronger CTA placement, visual hierarchy, and trust signal positioning
-- output a fully built, client-ready website`;
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  const requiredNames = [
+    "SwiftLift Source Extraction Prompt V1",
+    "SwiftLift Final Build Master Prompt V1",
+    "SwiftLift Prompt Assembly Rules V1",
+  ];
+
+  const { data, error } = await supabase
+    .from("prompts")
+    .select("prompt_name, content")
+    .in("prompt_name", requiredNames);
+
+  if (error) {
+    throw new Error(`Failed to fetch prompts from database: ${error.message}`);
+  }
+
+  const promptMap = new Map<string, string>();
+  for (const row of data || []) {
+    promptMap.set(row.prompt_name, row.content);
+  }
+
+  for (const name of requiredNames) {
+    if (!promptMap.has(name) || !promptMap.get(name)?.trim()) {
+      throw new Error(`Required prompt missing: ${name}`);
+    }
+  }
+
+  return {
+    extractionPrompt: promptMap.get(requiredNames[0])!,
+    masterPrompt: promptMap.get(requiredNames[1])!,
+    assemblyRules: promptMap.get(requiredNames[2])!,
+  };
+}
 
 // ── compileExtractionUserPrompt ──
 function compileExtractionUserPrompt(input: {
@@ -752,7 +354,10 @@ function assemblePrompt(
     .replace("{{IMAGES}}", blocks.images || "")
     .replace("{{EXTRACTION_NOTES}}", blocks.extractionNotes || "")
     .replace("{{REFERENCE_URL}}", referenceUrl || "(none)")
-    .replace("{{USER_NOTES}}", userNotes || "(none)");
+    .replace("{{USER_NOTES}}", userNotes || "(none)")
+    .replace("{{SOURCE_URL}}", blocks.siteMeta || "")
+    .replace("{{REFERENCE_URL}}", referenceUrl || "(none)")
+    .replace("{{SCRAPED_DATA}}", blocks.siteMeta || "");
 }
 
 // ── Main handler ──
@@ -783,9 +388,13 @@ Deno.serve(async (req) => {
     const tierLabelA = tier === "350" ? "$350 Standard Layout" : "$550 Standard Layout";
     const tierLabelB = tier === "350" ? "$450 Premium Conversion Layout" : "$750 Premium Conversion Layout";
 
-    console.log("Starting extraction for:", sourceUrl);
+    // Step 1: Fetch prompts from database
+    console.log("Fetching prompts from database...");
+    const { extractionPrompt, masterPrompt, assemblyRules } = await fetchRequiredPrompts();
+    console.log("Prompts loaded from database successfully.");
 
-    // Step 1: Compile extraction prompt
+    // Step 2: Compile extraction user prompt
+    console.log("Starting extraction for:", sourceUrl);
     const userPrompt = compileExtractionUserPrompt({
       sourceUrl,
       referenceUrl: referenceUrl || "",
@@ -793,14 +402,14 @@ Deno.serve(async (req) => {
       userNotes: userNotes || "",
     });
 
-    // Step 2: Call Claude for extraction
-    const rawText = await callClaudeExtraction(apiKey, EXTRACTION_SYSTEM_PROMPT, userPrompt);
+    // Step 3: Call Claude for extraction using DB extraction prompt
+    const rawText = await callClaudeExtraction(apiKey, extractionPrompt, userPrompt);
     console.log("Claude response received, length:", rawText.length);
 
-    // Step 3: Parse JSON
+    // Step 4: Parse JSON
     const parsedData = parseClaudeTextToJson(rawText);
 
-    // Step 4: Validate
+    // Step 5: Validate
     if (!validateExtractionJson(parsedData)) {
       return new Response(
         JSON.stringify({ success: false, error: "Claude returned invalid extraction data." }),
@@ -808,10 +417,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Step 5: Normalize
+    // Step 6: Normalize
     const normalized = normalizeExtractionData(parsedData);
 
-    // Step 6: Format blocks (shared between both prompts)
+    // Step 7: Format blocks (shared between both prompts)
     const blocks = {
       siteMeta: formatSiteMeta(normalized),
       siteStructure: formatSiteStructure(normalized),
@@ -882,14 +491,54 @@ ${activeContentModules.includes('portfolio') ? `PORTFOLIO MODULE:
     // Use conversion layout URL for prompt B if provided
     const convUrl = conversionLayoutUrl || referenceUrl || "";
 
-    // Step 7: Assemble BOTH prompts from same extracted data
+    // Step 8: Assemble BOTH prompts using the Master Prompt from the database
+    // Prompt A = Standard Layout (uses masterPrompt as-is)
+    // Prompt B = Premium Conversion Layout (uses masterPrompt with conversion layout modifications)
+    
+    // The master prompt template contains placeholders like {{SITE_META}}, {{COPYWRITING}}, etc.
+    // Assembly Rules V1 governs how we fill those placeholders — we use deterministic formatting (already done above).
+    
     const promptA = `SWIFTLIFT BUILD PROMPT — ${tierLabelA}\nSource: ${sourceUrl}\n\n` +
-      assemblePrompt(STANDARD_PROMPT_TEMPLATE, blocks, referenceUrl || "", userNotes || "") + brandOverrideBlock + contentModuleBlock;
+      assemblePrompt(masterPrompt, blocks, referenceUrl || "", userNotes || "") + brandOverrideBlock + contentModuleBlock;
+
+    // For Prompt B, prepend a conversion layout directive before the master prompt
+    const conversionDirective = `--------------------------------------------------
+LAYOUT MODE: PREMIUM CONVERSION LAYOUT
+--------------------------------------------------
+
+Build a conversion-oriented layout using the same source business content.
+
+This is NOT a marketing strategy or CRO analysis.
+This is a LAYOUT UPGRADE ONLY.
+
+Apply these layout principles:
+
+1. Lead with the strongest value proposition or hero headline.
+2. Place the primary call-to-action prominently above the fold.
+3. Use a landing-page-inspired section flow:
+   - Hero with clear CTA
+   - Key benefits or services (visual, scannable)
+   - Social proof / testimonials / trust signals early
+   - Detailed service or offering breakdown
+   - Secondary CTA or lead capture
+   - About / credibility section
+   - Final CTA / contact
+   - Footer
+4. Use stronger visual hierarchy: larger headings, bolder CTAs, more whitespace between sections.
+5. Place trust signals (testimonials, certifications, years in business) closer to CTAs.
+6. Use more prominent button styling for primary actions.
+7. Repeat the primary CTA at strategic intervals throughout the page.
+8. Use visual separators, background color alternation, or card layouts to create clear section breaks.
+
+IMPORTANT: Do NOT add conversion strategy, CRO analysis, sales funnel planning, audience targeting, or marketing consulting content. Only restructure the layout for better conversion flow.
+
+`;
 
     const promptB = `SWIFTLIFT BUILD PROMPT — ${tierLabelB}\nSource: ${sourceUrl}\n\n` +
-      assemblePrompt(PREMIUM_PROMPT_TEMPLATE, blocks, convUrl, userNotes || "") + brandOverrideBlock + contentModuleBlock;
+      conversionDirective +
+      assemblePrompt(masterPrompt, blocks, convUrl, userNotes || "") + brandOverrideBlock + contentModuleBlock;
 
-    console.log("Prompts assembled. A length:", promptA.length, "B length:", promptB.length);
+    console.log("Prompts assembled from database prompts. A length:", promptA.length, "B length:", promptB.length);
 
     return new Response(
       JSON.stringify({ success: true, promptA, promptB }),
