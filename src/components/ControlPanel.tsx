@@ -139,6 +139,18 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     const resolvedConvRef = normalizedConvUrl || convRef?.live_url || '';
 
     try {
+      // DEBUG MODE: Read prompts from local Prompt Library state
+      const localPrompts = getPromptLibrary();
+      const extractionPrompt = localPrompts.find(p => p.name === 'SwiftLift Source Extraction Prompt V1')?.content || '';
+      const masterPrompt = localPrompts.find(p => p.name === 'SwiftLift Final Build Master Prompt V1')?.content || '';
+      const assemblyRules = localPrompts.find(p => p.name === 'SwiftLift Prompt Assembly Rules V1')?.content || '';
+
+      if (!extractionPrompt || !masterPrompt || !assemblyRules) {
+        onGenerateError('Required local prompts missing. Check Prompt Library for all 3 required prompts.');
+        setGenerating(false);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('generate-final-prompt', {
         body: {
           sourceUrl,
@@ -153,6 +165,12 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           primaryFont,
           fontWeight,
           enabledModules: modules,
+          // DEBUG MODE: pass local prompts directly
+          localPrompts: {
+            extractionPrompt,
+            masterPrompt,
+            assemblyRules,
+          },
         },
       });
 
