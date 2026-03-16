@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { googleFonts, contentModules, advancedModules } from '@/lib/mockData';
-import { compilePrompts, getProjectName } from '@/lib/promptCompiler';
 import { saveProject } from '@/lib/store';
 import type { SavedProject } from '@/lib/mockData';
 import ReferenceLibraryModal from './ReferenceLibraryModal';
 import { Library, Sparkles, X } from 'lucide-react';
-import type { ReferenceEntry } from '@/lib/referenceStore';
+import type { DemoSite } from '@/lib/demoSiteStore';
 import { supabase } from '@/integrations/supabase/client';
 
 const projectBrands = ['SwiftLift', 'Bluluma', 'Sonykun', 'SwiftSite'];
@@ -18,6 +17,16 @@ interface Props {
   clearSignal: number;
   saveSignal: number;
   newSignal: number;
+}
+
+function getProjectName(sourceUrl: string): string {
+  try {
+    const hostname = new URL(sourceUrl.startsWith('http') ? sourceUrl : `https://${sourceUrl}`).hostname;
+    return hostname.replace('www.', '').split('.')[0].charAt(0).toUpperCase() +
+      hostname.replace('www.', '').split('.')[0].slice(1);
+  } catch {
+    return 'Untitled Project';
+  }
 }
 
 function simulateBrandDetection(url: string): { primary: string; secondary: string; font: string } {
@@ -33,6 +42,12 @@ function simulateBrandDetection(url: string): { primary: string; secondary: stri
   return { primary: `hsl(${hue}, 65%, 45%)`, secondary: `hsl(${(hue + 120) % 360}, 55%, 40%)`, font: googleFonts[hash % googleFonts.length] };
 }
 
+// Adapter: DemoSite fields used by the modal selection
+interface RefSelection {
+  reference_name: string;
+  live_url: string;
+}
+
 export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGenerateError, onClear, clearSignal, saveSignal, newSignal }: Props) {
   const [projectBrand, setProjectBrand] = useState('SwiftLift');
   const [sourceUrl, setSourceUrl] = useState('');
@@ -40,11 +55,11 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const [clientName, setClientName] = useState('');
 
   // Style Reference
-  const [styleRef, setStyleRef] = useState<ReferenceEntry | null>(null);
+  const [styleRef, setStyleRef] = useState<RefSelection | null>(null);
   const [showStyleLibrary, setShowStyleLibrary] = useState(false);
 
   // Conversion Layout Reference
-  const [convRef, setConvRef] = useState<ReferenceEntry | null>(null);
+  const [convRef, setConvRef] = useState<RefSelection | null>(null);
   const [showConvLibrary, setShowConvLibrary] = useState(false);
 
   // Legacy manual reference URL override
@@ -93,6 +108,10 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           userNotes: specialInstructions || '',
           packageTier,
           themeMode,
+          primaryColor,
+          secondaryColor,
+          primaryFont,
+          fontWeight,
         },
       });
 
@@ -123,16 +142,12 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   };
 
   const doSave = () => {
-    const { promptA, promptB } = compilePrompts({
-      sourceUrl, referenceLayout: styleRef?.reference_name || '', referenceUrl: styleRef?.live_url || referenceUrl, packageTier,
-      modules: [...modules, ...advModules], primaryColor, secondaryColor, primaryFont, specialInstructions,
-    });
     const project: SavedProject = {
       id: crypto.randomUUID(),
       name: projectName || getProjectName(sourceUrl),
       sourceUrl, referenceLayout: styleRef?.reference_name || '', referenceUrl: styleRef?.live_url || referenceUrl, packageTier,
       modules, addons: [], primaryColor, secondaryColor, primaryFont,
-      specialInstructions, promptA, promptB,
+      specialInstructions, promptA: '', promptB: '',
       dateCreated: new Date().toISOString().slice(0, 10),
       producedBy: projectBrand, projectName, clientName,
       fontWeight, advancedModules: advModules,
@@ -416,7 +431,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
       <ReferenceLibraryModal
         open={showStyleLibrary}
         onClose={() => setShowStyleLibrary(false)}
-        onSelect={(ref) => setStyleRef(ref)}
+        onSelect={(ref) => setStyleRef({ reference_name: ref.site_name, live_url: ref.live_url })}
         roleFilter="style"
       />
 
@@ -424,7 +439,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
       <ReferenceLibraryModal
         open={showConvLibrary}
         onClose={() => setShowConvLibrary(false)}
-        onSelect={(ref) => setConvRef(ref)}
+        onSelect={(ref) => setConvRef({ reference_name: ref.site_name, live_url: ref.live_url })}
         roleFilter="conversion_layout"
       />
     </>

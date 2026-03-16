@@ -1,7 +1,3 @@
-// Re-export reference types from the new store for backward compatibility
-export type { ReferenceEntry as ReferenceLayout } from '@/lib/referenceStore';
-export { getReferences as getReferenceLayouts, industries as categories } from '@/lib/referenceStore';
-
 export const sortOptions = ['Recently Added', 'A–Z', 'Industry'];
 
 export const googleFonts = [
@@ -28,18 +24,6 @@ export const advancedModules = [
   { id: 'full_seo', label: 'Full SEO Package' },
 ];
 
-export const premiumAddons = [
-  { id: 'conversion', label: 'Conversion Strategy Layout' },
-  { id: 'hero', label: 'Premium Hero Structure' },
-  { id: 'luxury', label: 'Luxury Visual Direction' },
-];
-
-export const industryOptions = [
-  'Dental', 'Construction', 'Restaurant', 'Real Estate',
-  'Professional Services', 'Luxury Service', 'Ecommerce',
-  'Healthcare', 'Legal', 'Technology', 'Education', 'Other'
-];
-
 export interface SavedProject {
   id: string;
   name: string;
@@ -56,7 +40,7 @@ export interface SavedProject {
   promptA: string;
   promptB: string;
   dateCreated: string;
-  // New fields
+  lastModified?: string;
   producedBy?: string;
   projectName?: string;
   clientName?: string;
@@ -67,38 +51,3 @@ export interface SavedProject {
   fontWeight?: string;
   advancedModules?: string[];
 }
-
-export const exampleProjects: SavedProject[] = [
-  {
-    id: '1', name: 'Ming Pao Canada', sourceUrl: 'https://mingpaocanada.com',
-    referenceLayout: 'Professional Services Layout', referenceUrl: '',
-    packageTier: '550', modules: ['blog_nologin', 'multilanguage'], addons: ['conversion'],
-    primaryColor: '#1a365d', secondaryColor: '#c53030', primaryFont: 'Inter',
-    specialInstructions: 'Focus on bilingual content structure. Ensure Chinese and English sections are clearly separated.',
-    promptA: '', promptB: '', dateCreated: '2026-03-05',
-  },
-  {
-    id: '2', name: 'Friendly Dental', sourceUrl: 'https://friendlydental.ca',
-    referenceLayout: 'Dental Layout A', referenceUrl: '',
-    packageTier: '350', modules: ['portfolio_nologin'], addons: ['hero'],
-    primaryColor: '#2b6cb0', secondaryColor: '#38a169', primaryFont: 'DM Sans',
-    specialInstructions: 'Emphasize family-friendly atmosphere. Highlight new patient specials.',
-    promptA: '', promptB: '', dateCreated: '2026-03-03',
-  },
-  {
-    id: '3', name: 'KChen Construction', sourceUrl: 'https://kchenconstruction.com',
-    referenceLayout: 'Construction Layout A', referenceUrl: '',
-    packageTier: '550', modules: ['portfolio_nologin', 'gallery'], addons: ['hero', 'luxury'],
-    primaryColor: '#dd6b20', secondaryColor: '#1a202c', primaryFont: 'Montserrat',
-    specialInstructions: 'Showcase large commercial projects. Include before/after galleries.',
-    promptA: '', promptB: '', dateCreated: '2026-02-28',
-  },
-  {
-    id: '4', name: 'BTN Real Estate', sourceUrl: 'https://btnrealestate.com',
-    referenceLayout: 'Real Estate Layout', referenceUrl: '',
-    packageTier: '550', modules: ['blog_nologin', 'portfolio_nologin', 'gallery'], addons: ['conversion', 'luxury'],
-    primaryColor: '#2c5282', secondaryColor: '#d69e2e', primaryFont: 'Playfair Display',
-    specialInstructions: 'Focus on luxury listings. Include market report section and virtual tour integration.',
-    promptA: '', promptB: '', dateCreated: '2026-02-25',
-  },
-];

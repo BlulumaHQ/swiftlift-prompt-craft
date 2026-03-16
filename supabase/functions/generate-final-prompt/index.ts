@@ -770,7 +770,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { sourceUrl, referenceUrl, businessType, userNotes, packageTier } = await req.json();
+    const { sourceUrl, referenceUrl, businessType, userNotes, packageTier, themeMode, primaryColor, secondaryColor, primaryFont, fontWeight } = await req.json();
 
     if (!sourceUrl) {
       return new Response(
@@ -822,12 +822,25 @@ Deno.serve(async (req) => {
       extractionNotes: formatExtractionNotes(normalized),
     };
 
+    // Build brand override block
+    const brandOverrideParts: string[] = [];
+    if (primaryColor) brandOverrideParts.push(`Primary Color: ${primaryColor}`);
+    if (secondaryColor) brandOverrideParts.push(`Secondary Color: ${secondaryColor}`);
+    if (primaryFont) brandOverrideParts.push(`Primary Font: ${primaryFont}`);
+    if (fontWeight) brandOverrideParts.push(`Font Weight: ${fontWeight}`);
+    if (themeMode && themeMode !== 'auto') {
+      brandOverrideParts.push(`Theme Mode: ${themeMode === 'force_light' ? 'Force Light — use light backgrounds, light surfaces, dark text' : 'Force Dark — use dark backgrounds, dark surfaces, light text'}`);
+    }
+    const brandOverrideBlock = brandOverrideParts.length > 0
+      ? `\n\n--------------------------------------------------\nBRAND & THEME OVERRIDE\n--------------------------------------------------\n\n${brandOverrideParts.join('\n')}\n\nApply these brand overrides to the final design. Brand colors take priority over extracted design system colors. Theme mode affects page background, section backgrounds, surface/card tones, and text contrast — but does NOT override brand colors.`
+      : '';
+
     // Step 7: Assemble BOTH prompts from same extracted data
     const promptA = `SWIFTLIFT BUILD PROMPT — ${tierLabelA}\nSource: ${sourceUrl}\n\n` +
-      assemblePrompt(STANDARD_PROMPT_TEMPLATE, blocks, referenceUrl || "", userNotes || "");
+      assemblePrompt(STANDARD_PROMPT_TEMPLATE, blocks, referenceUrl || "", userNotes || "") + brandOverrideBlock;
 
     const promptB = `SWIFTLIFT BUILD PROMPT — ${tierLabelB}\nSource: ${sourceUrl}\n\n` +
-      assemblePrompt(PREMIUM_PROMPT_TEMPLATE, blocks, referenceUrl || "", userNotes || "");
+      assemblePrompt(PREMIUM_PROMPT_TEMPLATE, blocks, referenceUrl || "", userNotes || "") + brandOverrideBlock;
 
     console.log("Prompts assembled. A length:", promptA.length, "B length:", promptB.length);
 

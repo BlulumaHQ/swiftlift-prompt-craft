@@ -1,4 +1,4 @@
-import { SavedProject, exampleProjects } from './mockData';
+import { SavedProject } from './mockData';
 
 const STORAGE_KEY = 'swiftlift_projects';
 
@@ -7,8 +7,8 @@ function getStoredProjects(): SavedProject[] {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) return JSON.parse(stored);
   } catch {}
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(exampleProjects));
-  return exampleProjects;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+  return [];
 }
 
 export function getProjects(): SavedProject[] {
@@ -19,7 +19,7 @@ export function saveProject(project: SavedProject): void {
   const projects = getStoredProjects();
   const idx = projects.findIndex(p => p.id === project.id);
   if (idx >= 0) {
-    projects[idx] = project;
+    projects[idx] = { ...project, lastModified: new Date().toISOString().slice(0, 10) };
   } else {
     projects.unshift(project);
   }
