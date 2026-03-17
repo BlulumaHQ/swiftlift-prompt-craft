@@ -40,7 +40,12 @@ function simulateBrandDetection(url: string): { primary: string; secondary: stri
   if (lower.includes('luxury') || lower.includes('premium')) return { primary: '#1A202C', secondary: '#B7791F', font: 'Cormorant Garamond' };
   const hash = url.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   const hue = hash % 360;
-  return { primary: `hsl(${hue}, 65%, 45%)`, secondary: `hsl(${(hue + 120) % 360}, 55%, 40%)`, font: googleFonts[hash % googleFonts.length] };
+  const toHex = (h: number, s: number, l: number) => {
+    const a = s / 100 * Math.min(l, 100 - l) / 100;
+    const f = (n: number) => { const k = (n + h / 30) % 12; const c = l / 100 - a * Math.max(Math.min(k - 3, 9 - k, 1), -1); return Math.round(255 * c).toString(16).padStart(2, '0'); };
+    return `#${f(0)}${f(8)}${f(4)}`;
+  };
+  return { primary: toHex(hue, 65, 45), secondary: toHex((hue + 120) % 360, 55, 40), font: googleFonts[hash % googleFonts.length] };
 }
 
 // Adapter: DemoSite fields used by the modal selection
