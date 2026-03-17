@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { googleFonts, contentModules, advancedModules } from '@/lib/mockData';
 import { saveProject } from '@/lib/store';
 import type { SavedProject } from '@/lib/mockData';
 import ReferenceLibraryModal from './ReferenceLibraryModal';
-import { LayoutGrid, Sparkles, X } from 'lucide-react';
+import { LayoutGrid, Sparkles, X, Loader2 } from 'lucide-react';
 import type { DemoSite } from '@/lib/demoSiteStore';
 import { supabase } from '@/integrations/supabase/client';
 import { getPromptLibrary } from '@/lib/promptLibraryStore';
@@ -30,28 +30,17 @@ function getProjectName(sourceUrl: string): string {
   }
 }
 
-function simulateBrandDetection(url: string): { primary: string; secondary: string; font: string } {
-  if (!url) return { primary: '', secondary: '', font: '' };
-  const lower = url.toLowerCase();
-  if (lower.includes('dental') || lower.includes('clinic')) return { primary: '#2B6CB0', secondary: '#38A169', font: 'DM Sans' };
-  if (lower.includes('construct') || lower.includes('build')) return { primary: '#DD6B20', secondary: '#1A202C', font: 'Montserrat' };
-  if (lower.includes('real') || lower.includes('estate') || lower.includes('property')) return { primary: '#2C5282', secondary: '#D69E2E', font: 'Playfair Display' };
-  if (lower.includes('restaurant') || lower.includes('food') || lower.includes('cafe')) return { primary: '#C53030', secondary: '#2D3748', font: 'Lora' };
-  if (lower.includes('luxury') || lower.includes('premium')) return { primary: '#1A202C', secondary: '#B7791F', font: 'Cormorant Garamond' };
-  const hash = url.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-  const hue = hash % 360;
-  const toHex = (h: number, s: number, l: number) => {
-    const a = s / 100 * Math.min(l, 100 - l) / 100;
-    const f = (n: number) => { const k = (n + h / 30) % 12; const c = l / 100 - a * Math.max(Math.min(k - 3, 9 - k, 1), -1); return Math.round(255 * c).toString(16).padStart(2, '0'); };
-    return `#${f(0)}${f(8)}${f(4)}`;
-  };
-  return { primary: toHex(hue, 65, 45), secondary: toHex((hue + 120) % 360, 55, 40), font: googleFonts[hash % googleFonts.length] };
-}
-
 // Adapter: DemoSite fields used by the modal selection
 interface RefSelection {
   reference_name: string;
   live_url: string;
+}
+
+interface DetectedBrand {
+  primaryColor: { hex: string; source: string } | null;
+  secondaryColor: { hex: string; source: string } | null;
+  primaryFont: { family: string; source: string } | null;
+  fontWeight: { weight: string; source: string } | null;
 }
 
 export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGenerateError, onClear, clearSignal, saveSignal, newSignal }: Props) {
@@ -81,26 +70,91 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const [fontWeight, setFontWeight] = useState('');
   const [themeMode, setThemeMode] = useState<'auto' | 'force_light' | 'force_dark'>('auto');
   const [brandDetected, setBrandDetected] = useState(false);
+  const [brandDetecting, setBrandDetecting] = useState(false);
+  const [detectedSources, setDetectedSources] = useState<{
+    primaryColor?: string; secondaryColor?: string; primaryFont?: string; fontWeight?: string;
+  }>({});
+  // Track manual overrides — once user manually changes a field, auto-detection won't overwrite it
+  const manualOverrides = useRef<Set<string>>(new Set());
   const [modules, setModules] = useState<string[]>([]);
   const [advModules, setAdvModules] = useState<string[]>([]);
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [generating, setGenerating] = useState(false);
   const [showBrandConfirm, setShowBrandConfirm] = useState(false);
   const [confirmBrand, setConfirmBrand] = useState('SwiftLift');
+  const detectAbortRef = useRef<AbortController | null>(null);
 
   const toggleModule = (id: string) => setModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   const toggleAdvModule = (id: string) => setAdvModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
+  // Real brand detection via edge function
+  const runBrandDetection = useCallback(async (url: string) => {
+    if (!url || url.length < 5) return;
+
+    // Abort any in-flight detection
+    if (detectAbortRef.current) detectAbortRef.current.abort();
+    const controller = new AbortController();
+    detectAbortRef.current = controller;
+
+    setBrandDetecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('detect-brand', {
+        body: { url },
+      });
+
+      if (controller.signal.aborted) return;
+
+      if (error || !data?.success) {
+        console.warn('Brand detection failed:', error?.message || data?.error);
+        setBrandDetecting(false);
+        return;
+      }
+
+      const result = data as DetectedBrand & { success: boolean };
+      const newSources: typeof detectedSources = {};
+
+      if (result.primaryColor?.hex && !manualOverrides.current.has('primaryColor')) {
+        setPrimaryColor(result.primaryColor.hex);
+        newSources.primaryColor = result.primaryColor.source;
+      }
+      if (result.secondaryColor?.hex && !manualOverrides.current.has('secondaryColor')) {
+        setSecondaryColor(result.secondaryColor.hex);
+        newSources.secondaryColor = result.secondaryColor.source;
+      }
+      if (result.primaryFont?.family && !manualOverrides.current.has('primaryFont')) {
+        // Match against available Google Fonts list
+        const matched = googleFonts.find(f => f.toLowerCase() === result.primaryFont!.family.toLowerCase());
+        if (matched) {
+          setPrimaryFont(matched);
+          newSources.primaryFont = result.primaryFont.source;
+        }
+      }
+      if (result.fontWeight?.weight && !manualOverrides.current.has('fontWeight')) {
+        setFontWeight(result.fontWeight.weight);
+        newSources.fontWeight = result.fontWeight.source;
+      }
+
+      setDetectedSources(newSources);
+      setBrandDetected(true);
+    } catch (err) {
+      if (!controller.signal.aborted) console.warn('Brand detection error:', err);
+    }
+    if (!controller.signal.aborted) setBrandDetecting(false);
+  }, []);
+
   const handleSourceUrlChange = (url: string) => {
     setSourceUrl(url);
-    if (url.length > 5 && !brandDetected) {
-      const detected = simulateBrandDetection(url);
-      if (detected.primary) setPrimaryColor(detected.primary);
-      if (detected.secondary) setSecondaryColor(detected.secondary);
-      if (detected.font) setPrimaryFont(detected.font);
-      setBrandDetected(true);
+    if (!url) {
+      setBrandDetected(false);
+      setDetectedSources({});
     }
-    if (!url) setBrandDetected(false);
+  };
+
+  // Trigger detection on URL blur (when user finishes typing)
+  const handleSourceUrlBlur = () => {
+    if (sourceUrl && sourceUrl.length > 5) {
+      runBrandDetection(sourceUrl);
+    }
   };
 
   function normalizeUrl(url: string): string {
