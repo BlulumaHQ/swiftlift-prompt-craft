@@ -225,6 +225,8 @@ function extractFontProps(declarations: string): { family?: string; weight?: str
     const w = weightMatch[1].toLowerCase();
     const map: Record<string, string> = { bold: "700", normal: "400", bolder: "800", lighter: "300" };
     weight = map[w] || w;
+    // Only accept valid numeric weights (100-900)
+    if (weight && !/^[1-9]00$/.test(weight)) weight = undefined;
   }
 
   return { family, weight };
