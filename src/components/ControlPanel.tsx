@@ -281,7 +281,9 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     setPackageTier('550'); setModules([]); setAdvModules([]);
     setPrimaryColor(''); setSecondaryColor('');
     setPrimaryFont(''); setFontWeight(''); setThemeMode('auto');
-    setSpecialInstructions(''); setBrandDetected(false);
+    setSpecialInstructions(''); setBrandDetected(false); setBrandDetecting(false);
+    setDetectedSources({});
+    manualOverrides.current = new Set();
     onClear();
   };
 
