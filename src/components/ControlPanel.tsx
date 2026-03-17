@@ -306,8 +306,12 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
             </div>
             <div>
               <label className="control-label">Source URL</label>
-              <input type="text" value={sourceUrl} onChange={e => handleSourceUrlChange(e.target.value)}
-                placeholder="https://example.com" className="control-input" />
+              <div className="flex items-center gap-1.5">
+                <input type="text" value={sourceUrl} onChange={e => handleSourceUrlChange(e.target.value)}
+                  onBlur={handleSourceUrlBlur}
+                  placeholder="https://example.com" className="control-input flex-1" />
+                {brandDetecting && <Loader2 size={16} className="animate-spin text-muted-foreground shrink-0" />}
+              </div>
             </div>
             <div>
               <label className="control-label">Project Name</label>
