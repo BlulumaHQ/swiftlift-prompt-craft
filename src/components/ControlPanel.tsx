@@ -418,7 +418,12 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           <h3 className="panel-section-title">Brand & Theme Override</h3>
           {brandDetected && (
             <div className="mb-3 px-3 py-2 rounded-md bg-accent text-accent-foreground text-xs">
-              ✨ Colors and font auto-detected from source URL
+              ✨ Brand styling auto-detected from live website
+            </div>
+          )}
+          {brandDetecting && (
+            <div className="mb-3 px-3 py-2 rounded-md bg-muted text-muted-foreground text-xs flex items-center gap-2">
+              <Loader2 size={12} className="animate-spin" /> Detecting brand from source URL…
             </div>
           )}
           <div className="space-y-3">
@@ -427,39 +432,56 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
                 <label className="control-label">Primary Color</label>
                 <div className="flex items-center gap-1.5">
                   <label className="relative w-8 h-8 rounded border border-border shrink-0 cursor-pointer overflow-hidden" style={{ background: primaryColor ? primaryColor : 'repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%) 50% / 8px 8px' }}>
-                    <input type="color" value={primaryColor || '#000000'} onChange={e => setPrimaryColor(e.target.value)}
+                    <input type="color" value={primaryColor || '#000000'} onChange={e => {
+                      manualOverrides.current.add('primaryColor');
+                      setPrimaryColor(e.target.value);
+                    }}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                   </label>
                   <input type="text" value={primaryColor ? primaryColor.replace(/^#/, '') : ''} onChange={e => {
+                    manualOverrides.current.add('primaryColor');
                     const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
                     setPrimaryColor(v ? `#${v}` : '');
                   }}
                     placeholder="______" className="control-input flex-1 font-mono text-xs" maxLength={6} />
                 </div>
+                {detectedSources.primaryColor && !manualOverrides.current.has('primaryColor') && (
+                  <p className="text-[10px] text-muted-foreground mt-1 italic">from {detectedSources.primaryColor}</p>
+                )}
               </div>
               <div>
                 <label className="control-label">Secondary Color</label>
                 <div className="flex items-center gap-1.5">
                   <label className="relative w-8 h-8 rounded border border-border shrink-0 cursor-pointer overflow-hidden" style={{ background: secondaryColor ? secondaryColor : 'repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%) 50% / 8px 8px' }}>
-                    <input type="color" value={secondaryColor || '#000000'} onChange={e => setSecondaryColor(e.target.value)}
+                    <input type="color" value={secondaryColor || '#000000'} onChange={e => {
+                      manualOverrides.current.add('secondaryColor');
+                      setSecondaryColor(e.target.value);
+                    }}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                   </label>
                   <input type="text" value={secondaryColor ? secondaryColor.replace(/^#/, '') : ''} onChange={e => {
+                    manualOverrides.current.add('secondaryColor');
                     const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
                     setSecondaryColor(v ? `#${v}` : '');
                   }}
                     placeholder="______" className="control-input flex-1 font-mono text-xs" maxLength={6} />
                 </div>
+                {detectedSources.secondaryColor && !manualOverrides.current.has('secondaryColor') && (
+                  <p className="text-[10px] text-muted-foreground mt-1 italic">from {detectedSources.secondaryColor}</p>
+                )}
               </div>
             </div>
             <div>
               <label className="control-label">Primary Font</label>
-              <select value={primaryFont} onChange={e => setPrimaryFont(e.target.value)} className="control-input">
+              <select value={primaryFont} onChange={e => { manualOverrides.current.add('primaryFont'); setPrimaryFont(e.target.value); }} className="control-input">
                 <option value="">— No override —</option>
                 {googleFonts.map(f => (
                   <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
                 ))}
               </select>
+              {detectedSources.primaryFont && !manualOverrides.current.has('primaryFont') && (
+                <p className="text-[10px] text-muted-foreground mt-1 italic">from {detectedSources.primaryFont}</p>
+              )}
               {primaryFont && (
                 <p className="mt-2 text-lg text-foreground" style={{ fontFamily: `"${primaryFont}", sans-serif` }}>
                   The quick brown fox jumps over the lazy dog
@@ -468,8 +490,10 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
             </div>
             <div>
               <label className="control-label">Font Weight</label>
-              <select value={fontWeight} onChange={e => setFontWeight(e.target.value)} className="control-input">
+              <select value={fontWeight} onChange={e => { manualOverrides.current.add('fontWeight'); setFontWeight(e.target.value); }} className="control-input">
                 <option value="">— No override —</option>
+                <option value="400">400 — Regular</option>
+                <option value="500">500 — Medium</option>
                 <option value="600">600 — Semi Bold</option>
                 <option value="700">700 — Bold</option>
                 <option value="800">800 — Extra Bold</option>
