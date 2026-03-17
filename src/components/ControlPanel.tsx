@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { googleFonts, contentModules, advancedModules } from '@/lib/mockData';
 import { saveProject } from '@/lib/store';
 import type { SavedProject } from '@/lib/mockData';
 import ReferenceLibraryModal from './ReferenceLibraryModal';
-import { LayoutGrid, Sparkles, X } from 'lucide-react';
+import { LayoutGrid, Sparkles, X, Loader2 } from 'lucide-react';
 import type { DemoSite } from '@/lib/demoSiteStore';
 import { supabase } from '@/integrations/supabase/client';
 import { getPromptLibrary } from '@/lib/promptLibraryStore';
@@ -30,28 +30,17 @@ function getProjectName(sourceUrl: string): string {
   }
 }
 
-function simulateBrandDetection(url: string): { primary: string; secondary: string; font: string } {
-  if (!url) return { primary: '', secondary: '', font: '' };
-  const lower = url.toLowerCase();
-  if (lower.includes('dental') || lower.includes('clinic')) return { primary: '#2B6CB0', secondary: '#38A169', font: 'DM Sans' };
-  if (lower.includes('construct') || lower.includes('build')) return { primary: '#DD6B20', secondary: '#1A202C', font: 'Montserrat' };
-  if (lower.includes('real') || lower.includes('estate') || lower.includes('property')) return { primary: '#2C5282', secondary: '#D69E2E', font: 'Playfair Display' };
-  if (lower.includes('restaurant') || lower.includes('food') || lower.includes('cafe')) return { primary: '#C53030', secondary: '#2D3748', font: 'Lora' };
-  if (lower.includes('luxury') || lower.includes('premium')) return { primary: '#1A202C', secondary: '#B7791F', font: 'Cormorant Garamond' };
-  const hash = url.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-  const hue = hash % 360;
-  const toHex = (h: number, s: number, l: number) => {
-    const a = s / 100 * Math.min(l, 100 - l) / 100;
-    const f = (n: number) => { const k = (n + h / 30) % 12; const c = l / 100 - a * Math.max(Math.min(k - 3, 9 - k, 1), -1); return Math.round(255 * c).toString(16).padStart(2, '0'); };
-    return `#${f(0)}${f(8)}${f(4)}`;
-  };
-  return { primary: toHex(hue, 65, 45), secondary: toHex((hue + 120) % 360, 55, 40), font: googleFonts[hash % googleFonts.length] };
-}
-
 // Adapter: DemoSite fields used by the modal selection
 interface RefSelection {
   reference_name: string;
   live_url: string;
+}
+
+interface DetectedBrand {
+  primaryColor: { hex: string; source: string } | null;
+  secondaryColor: { hex: string; source: string } | null;
+  primaryFont: { family: string; source: string } | null;
+  fontWeight: { weight: string; source: string } | null;
 }
 
 export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGenerateError, onClear, clearSignal, saveSignal, newSignal }: Props) {
@@ -81,26 +70,91 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const [fontWeight, setFontWeight] = useState('');
   const [themeMode, setThemeMode] = useState<'auto' | 'force_light' | 'force_dark'>('auto');
   const [brandDetected, setBrandDetected] = useState(false);
+  const [brandDetecting, setBrandDetecting] = useState(false);
+  const [detectedSources, setDetectedSources] = useState<{
+    primaryColor?: string; secondaryColor?: string; primaryFont?: string; fontWeight?: string;
+  }>({});
+  // Track manual overrides — once user manually changes a field, auto-detection won't overwrite it
+  const manualOverrides = useRef<Set<string>>(new Set());
   const [modules, setModules] = useState<string[]>([]);
   const [advModules, setAdvModules] = useState<string[]>([]);
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [generating, setGenerating] = useState(false);
   const [showBrandConfirm, setShowBrandConfirm] = useState(false);
   const [confirmBrand, setConfirmBrand] = useState('SwiftLift');
+  const detectAbortRef = useRef<AbortController | null>(null);
 
   const toggleModule = (id: string) => setModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   const toggleAdvModule = (id: string) => setAdvModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
+  // Real brand detection via edge function
+  const runBrandDetection = useCallback(async (url: string) => {
+    if (!url || url.length < 5) return;
+
+    // Abort any in-flight detection
+    if (detectAbortRef.current) detectAbortRef.current.abort();
+    const controller = new AbortController();
+    detectAbortRef.current = controller;
+
+    setBrandDetecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('detect-brand', {
+        body: { url },
+      });
+
+      if (controller.signal.aborted) return;
+
+      if (error || !data?.success) {
+        console.warn('Brand detection failed:', error?.message || data?.error);
+        setBrandDetecting(false);
+        return;
+      }
+
+      const result = data as DetectedBrand & { success: boolean };
+      const newSources: typeof detectedSources = {};
+
+      if (result.primaryColor?.hex && !manualOverrides.current.has('primaryColor')) {
+        setPrimaryColor(result.primaryColor.hex);
+        newSources.primaryColor = result.primaryColor.source;
+      }
+      if (result.secondaryColor?.hex && !manualOverrides.current.has('secondaryColor')) {
+        setSecondaryColor(result.secondaryColor.hex);
+        newSources.secondaryColor = result.secondaryColor.source;
+      }
+      if (result.primaryFont?.family && !manualOverrides.current.has('primaryFont')) {
+        // Match against available Google Fonts list
+        const matched = googleFonts.find(f => f.toLowerCase() === result.primaryFont!.family.toLowerCase());
+        if (matched) {
+          setPrimaryFont(matched);
+          newSources.primaryFont = result.primaryFont.source;
+        }
+      }
+      if (result.fontWeight?.weight && !manualOverrides.current.has('fontWeight')) {
+        setFontWeight(result.fontWeight.weight);
+        newSources.fontWeight = result.fontWeight.source;
+      }
+
+      setDetectedSources(newSources);
+      setBrandDetected(true);
+    } catch (err) {
+      if (!controller.signal.aborted) console.warn('Brand detection error:', err);
+    }
+    if (!controller.signal.aborted) setBrandDetecting(false);
+  }, []);
+
   const handleSourceUrlChange = (url: string) => {
     setSourceUrl(url);
-    if (url.length > 5 && !brandDetected) {
-      const detected = simulateBrandDetection(url);
-      if (detected.primary) setPrimaryColor(detected.primary);
-      if (detected.secondary) setSecondaryColor(detected.secondary);
-      if (detected.font) setPrimaryFont(detected.font);
-      setBrandDetected(true);
+    if (!url) {
+      setBrandDetected(false);
+      setDetectedSources({});
     }
-    if (!url) setBrandDetected(false);
+  };
+
+  // Trigger detection on URL blur (when user finishes typing)
+  const handleSourceUrlBlur = () => {
+    if (sourceUrl && sourceUrl.length > 5) {
+      runBrandDetection(sourceUrl);
+    }
   };
 
   function normalizeUrl(url: string): string {
@@ -227,7 +281,9 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     setPackageTier('550'); setModules([]); setAdvModules([]);
     setPrimaryColor(''); setSecondaryColor('');
     setPrimaryFont(''); setFontWeight(''); setThemeMode('auto');
-    setSpecialInstructions(''); setBrandDetected(false);
+    setSpecialInstructions(''); setBrandDetected(false); setBrandDetecting(false);
+    setDetectedSources({});
+    manualOverrides.current = new Set();
     onClear();
   };
 
@@ -250,8 +306,12 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
             </div>
             <div>
               <label className="control-label">Source URL</label>
-              <input type="text" value={sourceUrl} onChange={e => handleSourceUrlChange(e.target.value)}
-                placeholder="https://example.com" className="control-input" />
+              <div className="flex items-center gap-1.5">
+                <input type="text" value={sourceUrl} onChange={e => handleSourceUrlChange(e.target.value)}
+                  onBlur={handleSourceUrlBlur}
+                  placeholder="https://example.com" className="control-input flex-1" />
+                {brandDetecting && <Loader2 size={16} className="animate-spin text-muted-foreground shrink-0" />}
+              </div>
             </div>
             <div>
               <label className="control-label">Project Name</label>
@@ -358,7 +418,12 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           <h3 className="panel-section-title">Brand & Theme Override</h3>
           {brandDetected && (
             <div className="mb-3 px-3 py-2 rounded-md bg-accent text-accent-foreground text-xs">
-              ✨ Colors and font auto-detected from source URL
+              ✨ Brand styling auto-detected from live website
+            </div>
+          )}
+          {brandDetecting && (
+            <div className="mb-3 px-3 py-2 rounded-md bg-muted text-muted-foreground text-xs flex items-center gap-2">
+              <Loader2 size={12} className="animate-spin" /> Detecting brand from source URL…
             </div>
           )}
           <div className="space-y-3">
@@ -367,39 +432,56 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
                 <label className="control-label">Primary Color</label>
                 <div className="flex items-center gap-1.5">
                   <label className="relative w-8 h-8 rounded border border-border shrink-0 cursor-pointer overflow-hidden" style={{ background: primaryColor ? primaryColor : 'repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%) 50% / 8px 8px' }}>
-                    <input type="color" value={primaryColor || '#000000'} onChange={e => setPrimaryColor(e.target.value)}
+                    <input type="color" value={primaryColor || '#000000'} onChange={e => {
+                      manualOverrides.current.add('primaryColor');
+                      setPrimaryColor(e.target.value);
+                    }}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                   </label>
                   <input type="text" value={primaryColor ? primaryColor.replace(/^#/, '') : ''} onChange={e => {
+                    manualOverrides.current.add('primaryColor');
                     const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
                     setPrimaryColor(v ? `#${v}` : '');
                   }}
                     placeholder="______" className="control-input flex-1 font-mono text-xs" maxLength={6} />
                 </div>
+                {detectedSources.primaryColor && !manualOverrides.current.has('primaryColor') && (
+                  <p className="text-[10px] text-muted-foreground mt-1 italic">from {detectedSources.primaryColor}</p>
+                )}
               </div>
               <div>
                 <label className="control-label">Secondary Color</label>
                 <div className="flex items-center gap-1.5">
                   <label className="relative w-8 h-8 rounded border border-border shrink-0 cursor-pointer overflow-hidden" style={{ background: secondaryColor ? secondaryColor : 'repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%) 50% / 8px 8px' }}>
-                    <input type="color" value={secondaryColor || '#000000'} onChange={e => setSecondaryColor(e.target.value)}
+                    <input type="color" value={secondaryColor || '#000000'} onChange={e => {
+                      manualOverrides.current.add('secondaryColor');
+                      setSecondaryColor(e.target.value);
+                    }}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                   </label>
                   <input type="text" value={secondaryColor ? secondaryColor.replace(/^#/, '') : ''} onChange={e => {
+                    manualOverrides.current.add('secondaryColor');
                     const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
                     setSecondaryColor(v ? `#${v}` : '');
                   }}
                     placeholder="______" className="control-input flex-1 font-mono text-xs" maxLength={6} />
                 </div>
+                {detectedSources.secondaryColor && !manualOverrides.current.has('secondaryColor') && (
+                  <p className="text-[10px] text-muted-foreground mt-1 italic">from {detectedSources.secondaryColor}</p>
+                )}
               </div>
             </div>
             <div>
               <label className="control-label">Primary Font</label>
-              <select value={primaryFont} onChange={e => setPrimaryFont(e.target.value)} className="control-input">
+              <select value={primaryFont} onChange={e => { manualOverrides.current.add('primaryFont'); setPrimaryFont(e.target.value); }} className="control-input">
                 <option value="">— No override —</option>
                 {googleFonts.map(f => (
                   <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
                 ))}
               </select>
+              {detectedSources.primaryFont && !manualOverrides.current.has('primaryFont') && (
+                <p className="text-[10px] text-muted-foreground mt-1 italic">from {detectedSources.primaryFont}</p>
+              )}
               {primaryFont && (
                 <p className="mt-2 text-lg text-foreground" style={{ fontFamily: `"${primaryFont}", sans-serif` }}>
                   The quick brown fox jumps over the lazy dog
@@ -408,13 +490,18 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
             </div>
             <div>
               <label className="control-label">Font Weight</label>
-              <select value={fontWeight} onChange={e => setFontWeight(e.target.value)} className="control-input">
+              <select value={fontWeight} onChange={e => { manualOverrides.current.add('fontWeight'); setFontWeight(e.target.value); }} className="control-input">
                 <option value="">— No override —</option>
+                <option value="400">400 — Regular</option>
+                <option value="500">500 — Medium</option>
                 <option value="600">600 — Semi Bold</option>
                 <option value="700">700 — Bold</option>
                 <option value="800">800 — Extra Bold</option>
                 <option value="900">900 — Black</option>
               </select>
+              {detectedSources.fontWeight && !manualOverrides.current.has('fontWeight') && (
+                <p className="text-[10px] text-muted-foreground mt-1 italic">from {detectedSources.fontWeight}</p>
+              )}
             </div>
             <div>
               <label className="control-label">Theme Mode</label>
