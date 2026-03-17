@@ -499,6 +499,9 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
                 <option value="800">800 — Extra Bold</option>
                 <option value="900">900 — Black</option>
               </select>
+              {detectedSources.fontWeight && !manualOverrides.current.has('fontWeight') && (
+                <p className="text-[10px] text-muted-foreground mt-1 italic">from {detectedSources.fontWeight}</p>
+              )}
             </div>
             <div>
               <label className="control-label">Theme Mode</label>
