@@ -953,6 +953,32 @@ Build a conversion-oriented layout using the same source business content.
 This is NOT a marketing strategy or CRO analysis.
 This is a LAYOUT UPGRADE ONLY.
 
+Prompt B MUST be structurally different from Prompt A.
+If both layouts feel similar → FAILURE.
+
+MANDATORY CONVERSION ELEMENTS:
+
+1. Sticky CTA
+   - Desktop: fixed right-side button, always visible while scrolling
+   - Mobile: sticky bottom bar
+
+2. Hero Conversion Focus
+   - Strong value proposition
+   - Clear CTA
+   - May include: contact form OR call / booking button
+
+3. Conversion Flow
+   - Problem → Solution → Trust → Action
+
+4. CTA Repetition
+   - Minimum 3 CTA placements: top / middle / bottom
+
+5. Trust Section
+   - Testimonials OR badges OR proof
+
+6. Early Contact Trigger
+   - Contact / booking must appear early
+
 Apply these layout principles:
 
 1. Lead with the strongest value proposition or hero headline.
@@ -971,6 +997,10 @@ Apply these layout principles:
 6. Use more prominent button styling for primary actions.
 7. Repeat the primary CTA at strategic intervals throughout the page.
 8. Use visual separators, background color alternation, or card layouts to create clear section breaks.
+
+REFERENCE USAGE: Use Style Reference PLUS apply conversion structure. Conversion rules OVERRIDE visual reference when conflict occurs.
+
+DATA CONSISTENCY (CRITICAL): ALL extracted business data used in Prompt A MUST also appear in Prompt B — business name, services, address, Google Map embed, phone, email, description. No exceptions.
 
 IMPORTANT: Do NOT add conversion strategy, CRO analysis, sales funnel planning, audience targeting, or marketing consulting content. Only restructure the layout for better conversion flow.
 

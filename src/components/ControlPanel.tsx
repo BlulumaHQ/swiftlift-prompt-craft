@@ -361,7 +361,10 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
               <div>
                 <label className="control-label">Primary Color</label>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-8 h-8 rounded border border-border shrink-0" style={{ background: primaryColor ? primaryColor : 'repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%) 50% / 8px 8px' }} />
+                  <label className="relative w-8 h-8 rounded border border-border shrink-0 cursor-pointer overflow-hidden" style={{ background: primaryColor ? primaryColor : 'repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%) 50% / 8px 8px' }}>
+                    <input type="color" value={primaryColor || '#000000'} onChange={e => setPrimaryColor(e.target.value)}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                  </label>
                   <input type="text" value={primaryColor ? primaryColor.replace(/^#/, '') : ''} onChange={e => {
                     const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
                     setPrimaryColor(v ? `#${v}` : '');
@@ -372,7 +375,10 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
               <div>
                 <label className="control-label">Secondary Color</label>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-8 h-8 rounded border border-border shrink-0" style={{ background: secondaryColor ? secondaryColor : 'repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%) 50% / 8px 8px' }} />
+                  <label className="relative w-8 h-8 rounded border border-border shrink-0 cursor-pointer overflow-hidden" style={{ background: secondaryColor ? secondaryColor : 'repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%) 50% / 8px 8px' }}>
+                    <input type="color" value={secondaryColor || '#000000'} onChange={e => setSecondaryColor(e.target.value)}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                  </label>
                   <input type="text" value={secondaryColor ? secondaryColor.replace(/^#/, '') : ''} onChange={e => {
                     const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
                     setSecondaryColor(v ? `#${v}` : '');
