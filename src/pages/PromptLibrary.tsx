@@ -19,8 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 // System prompt IDs that should be hidden from the operational library
 const SYSTEM_PROMPT_IDS = ['generator_app_build_v1'];
 
-// Owner passphrase — in production this would be auth-based
-const OWNER_KEY = 'swiftlift_prompt_owner';
+// System prompt IDs that should be hidden from the operational library
 
 interface PromptItem {
   id: string;
