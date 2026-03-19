@@ -376,17 +376,19 @@ export default function PromptLibrary() {
                   {isOwner && (
                     <>
                       {!editMode ? (
-                         <button onClick={() => setUnlockConfirmOpen(true)}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 border border-amber-500/30 transition-colors">
-                          <Unlock size={14} /> Unlock Editing
-                        </button>
-                        {hasPreviousVersion && (
-                          <button onClick={handleRevertRequest}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 transition-colors">
-                            <RotateCcw size={14} /> Revert
+                        <>
+                          <button onClick={() => setUnlockConfirmOpen(true)}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 border border-amber-500/30 transition-colors">
+                            <Unlock size={14} /> Unlock Editing
                           </button>
-                        )}
-                      </>) : (
+                          {hasPreviousVersion && (
+                            <button onClick={handleRevertRequest}
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 transition-colors">
+                              <RotateCcw size={14} /> Revert
+                            </button>
+                          )}
+                        </>
+                      ) : (
                         <>
                           <button onClick={() => { setEditMode(false); setEditContent(selectedItem.content); setEditName(selectedItem.name); }}
                             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted/60 transition-colors">
