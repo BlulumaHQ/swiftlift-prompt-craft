@@ -455,7 +455,7 @@ export default function PromptLibrary() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => { setUnlockConfirmOpen(false); setEditMode(true); }}>
-              Confirm Unlock
+              Unlock
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
