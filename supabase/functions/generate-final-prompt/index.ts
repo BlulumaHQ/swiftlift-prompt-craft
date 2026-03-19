@@ -710,20 +710,22 @@ function assemblePrompt(
     referenceScreenshot: string;
     scrapedData: string;
     scrapedUrls: string;
+    brandName: string;
+    layoutMode: string;
   },
   userNotes: string,
 ): string {
   let result = template;
 
-  // Replace all placeholder variants (both {SINGLE} and {{DOUBLE}} braces)
   const replacements: [string, string][] = [
-    // Core runtime placeholders
     ["SOURCE_URL", runtimeValues.sourceUrl],
     ["REFERENCE_URL", runtimeValues.referenceUrl || "(none)"],
     ["REFERENCE_SCREENSHOT", runtimeValues.referenceScreenshot || "(none)"],
     ["SCRAPED_DATA", runtimeValues.scrapedData],
     ["SCRAPED_URLS", runtimeValues.scrapedUrls],
-    // Formatted block placeholders
+    ["BRAND_NAME", runtimeValues.brandName],
+    ["LAYOUT_MODE", runtimeValues.layoutMode],
+    ["COMPANY_NAME", runtimeValues.brandName],
     ["SITE_META", blocks.siteMeta || ""],
     ["SITE_STRUCTURE", blocks.siteStructure || ""],
     ["COPYWRITING", blocks.copywriting || ""],
@@ -732,12 +734,14 @@ function assemblePrompt(
     ["IMAGES", blocks.images || ""],
     ["EXTRACTION_NOTES", blocks.extractionNotes || ""],
     ["USER_NOTES", userNotes || "(none)"],
+    ["DEMO_SITE_URLS", "(none)"],
+    ["DEMO_SITE_SCREENSHOTS", "(none)"],
+    ["CONVERSION_REFERENCE_URLS", "(none)"],
+    ["CONVERSION_REFERENCE_SCREENSHOTS", "(none)"],
   ];
 
   for (const [key, value] of replacements) {
-    // Replace {{KEY}} variant
     result = safeReplaceAll(result, `{{${key}}}`, value);
-    // Replace {KEY} variant
     result = safeReplaceAll(result, `{${key}}`, value);
   }
 
