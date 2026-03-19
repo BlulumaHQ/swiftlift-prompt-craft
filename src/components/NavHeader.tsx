@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import logo from '@/assets/swiftlift-logo.svg';
-import { ChevronDown, Hammer, PenLine, Layout, ShoppingCart, Home, Paintbrush, User, BookOpen, FolderOpen, Settings, LogOut, CircleCheck, Lock, ImageIcon } from 'lucide-react';
+import { ChevronDown, Hammer, PenLine, Layout, ShoppingCart, Home, Paintbrush, User, BookOpen, FolderOpen, Settings, LogOut, CircleCheck, Lock, ImageIcon, Menu, X } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface NavHeaderProps {
   title?: string;
@@ -22,11 +23,21 @@ const profileMenuItems = [
   { label: 'Settings', path: '/settings', icon: Settings, active: true },
 ];
 
+const navLinks = [
+  { label: 'Revision', path: '/revision', icon: PenLine },
+  { label: 'Demo Sites', path: '/references', icon: Layout },
+  { label: 'Quality Control', path: '/quality-control', icon: CircleCheck },
+  { label: 'Lock Preview', path: '/lock-preview', icon: Lock },
+  { label: 'Client Assets', path: '/client-assets', icon: ImageIcon },
+];
+
 export default function NavHeader({ title, rightContent }: NavHeaderProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [builderOpen, setBuilderOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const builderRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -39,8 +50,78 @@ export default function NavHeader({ title, rightContent }: NavHeaderProps) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // Close mobile menu on route change
+  useEffect(() => { setMobileMenuOpen(false); }, [location.pathname]);
+
   const isActive = (path: string) => location.pathname === path;
   const isBuilderActive = location.pathname === '/';
+
+  if (isMobile) {
+    return (
+      <>
+        <header className="console-header flex items-center justify-between px-4 py-3 shrink-0">
+          <button onClick={() => navigate('/')} className="flex items-center shrink-0 hover:opacity-80 transition-opacity">
+            <img src={logo} alt="SwiftLift" className="h-7" />
+          </button>
+          <div className="flex items-center gap-2">
+            {rightContent}
+            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="nav-link p-2">
+              {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+          </div>
+        </header>
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 top-[52px] z-50 bg-card border-t border-border overflow-y-auto">
+            <div className="p-4 space-y-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-3 py-2">Builder</p>
+              {builderItems.map(item => (
+                <Link key={item.label} to={item.active ? item.path : '#'}
+                  onClick={() => item.active && setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm transition-colors ${
+                    item.active
+                      ? isActive(item.path) ? 'bg-accent text-primary font-medium' : 'text-foreground hover:bg-muted'
+                      : 'text-muted-foreground/50'
+                  }`}>
+                  <item.icon size={16} />
+                  <span>{item.label}</span>
+                  {!item.active && <span className="ml-auto text-[10px] text-muted-foreground/40 uppercase">Soon</span>}
+                </Link>
+              ))}
+
+              <div className="border-t border-border my-3" />
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-3 py-2">Tools</p>
+              {navLinks.map(link => (
+                <Link key={link.path} to={link.path}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm transition-colors ${
+                    isActive(link.path) ? 'bg-accent text-primary font-medium' : 'text-foreground hover:bg-muted'
+                  }`}>
+                  <link.icon size={16} />
+                  <span>{link.label}</span>
+                </Link>
+              ))}
+
+              <div className="border-t border-border my-3" />
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-3 py-2">Account</p>
+              {profileMenuItems.map(item => (
+                <Link key={item.label} to={item.active ? item.path : '#'}
+                  onClick={() => item.active && setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm transition-colors ${
+                    item.active
+                      ? isActive(item.path) ? 'bg-accent text-primary font-medium' : 'text-foreground hover:bg-muted'
+                      : 'text-muted-foreground/50'
+                  }`}>
+                  <item.icon size={16} />
+                  <span>{item.label}</span>
+                  {!item.active && <span className="ml-auto text-[10px] text-muted-foreground/40 uppercase">Soon</span>}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
 
   return (
     <header className="console-header flex items-center px-6 py-3 shrink-0">
@@ -86,21 +167,11 @@ export default function NavHeader({ title, rightContent }: NavHeaderProps) {
           )}
         </div>
 
-        <Link to="/revision" className={`nav-link ${isActive('/revision') ? 'active' : ''}`}>
-          <PenLine size={14} /> Revision
-        </Link>
-        <Link to="/references" className={`nav-link ${isActive('/references') ? 'active' : ''}`}>
-          <Layout size={14} /> Demo Sites
-        </Link>
-        <Link to="/quality-control" className={`nav-link ${isActive('/quality-control') ? 'active' : ''}`}>
-          <CircleCheck size={14} /> Quality Control
-        </Link>
-        <Link to="/lock-preview" className={`nav-link ${isActive('/lock-preview') ? 'active' : ''}`}>
-          <Lock size={14} /> Lock Preview
-        </Link>
-        <Link to="/client-assets" className={`nav-link ${isActive('/client-assets') ? 'active' : ''}`}>
-          <ImageIcon size={14} /> Client Assets
-        </Link>
+        {navLinks.map(link => (
+          <Link key={link.path} to={link.path} className={`nav-link ${isActive(link.path) ? 'active' : ''}`}>
+            <link.icon size={14} /> {link.label}
+          </Link>
+        ))}
       </nav>
 
       <div className="h-5 w-px bg-foreground/20 mr-2" />

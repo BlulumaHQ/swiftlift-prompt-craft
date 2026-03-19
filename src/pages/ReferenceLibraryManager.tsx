@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import NavHeader from '@/components/NavHeader';
 import {
   getDemoSites, addDemoSite, deleteDemoSite, type DemoSite
@@ -45,14 +45,12 @@ export default function ReferenceLibraryManager() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  // Single add state
   const [newRef, setNewRef] = useState({
     name: '', industry: 'Professional Services', liveUrl: '', role: 'style' as ReferenceRole, notes: ''
   });
   const [desktopFile, setDesktopFile] = useState<File | undefined>();
   const [mobileFile, setMobileFile] = useState<File | undefined>();
 
-  // Bulk import state
   const [bulkJsonFile, setBulkJsonFile] = useState<File | null>(null);
   const [bulkStatus, setBulkStatus] = useState('');
 
@@ -91,21 +89,14 @@ export default function ReferenceLibraryManager() {
     setUploading(true);
     try {
       await addDemoSite({
-        site_name: newRef.name,
-        live_url: newRef.liveUrl,
-        reference_role: newRef.role,
-        industry: newRef.industry,
-        desktop_screenshot_url: '',
-        mobile_screenshot_url: '',
-        preview_image: '',
-        notes: newRef.notes,
+        site_name: newRef.name, live_url: newRef.liveUrl, reference_role: newRef.role,
+        industry: newRef.industry, desktop_screenshot_url: '', mobile_screenshot_url: '',
+        preview_image: '', notes: newRef.notes,
       }, desktopFile, mobileFile);
-
       toast({ title: 'Reference added to cloud' });
       setShowAddModal(false);
       setNewRef({ name: '', industry: 'Professional Services', liveUrl: '', role: 'style', notes: '' });
-      setDesktopFile(undefined);
-      setMobileFile(undefined);
+      setDesktopFile(undefined); setMobileFile(undefined);
       await loadAll();
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
@@ -120,29 +111,20 @@ export default function ReferenceLibraryManager() {
     try {
       const jsonText = await bulkJsonFile.text();
       const entries: any[] = JSON.parse(jsonText);
-
       for (let i = 0; i < entries.length; i++) {
         const entry = entries[i];
         setBulkStatus(`Importing ${i + 1} of ${entries.length}: ${entry.site_name || entry.reference_name || 'Untitled'}...`);
         await addDemoSite({
           site_name: entry.site_name || entry.reference_name || `Import ${i + 1}`,
-          live_url: entry.live_url || '',
-          reference_role: entry.reference_role || 'style',
-          industry: entry.industry || 'Other',
-          desktop_screenshot_url: entry.desktop_screenshot_url || '',
-          mobile_screenshot_url: entry.mobile_screenshot_url || '',
-          preview_image: entry.preview_image || '',
+          live_url: entry.live_url || '', reference_role: entry.reference_role || 'style',
+          industry: entry.industry || 'Other', desktop_screenshot_url: entry.desktop_screenshot_url || '',
+          mobile_screenshot_url: entry.mobile_screenshot_url || '', preview_image: entry.preview_image || '',
           notes: entry.notes || '',
         });
       }
-
       setBulkStatus(`✅ Imported ${entries.length} references`);
       await loadAll();
-      setTimeout(() => {
-        setShowBulkModal(false);
-        setBulkStatus('');
-        setBulkJsonFile(null);
-      }, 1500);
+      setTimeout(() => { setShowBulkModal(false); setBulkStatus(''); setBulkJsonFile(null); }, 1500);
     } catch (err: any) {
       setBulkStatus(`❌ Error: ${err.message}`);
     }
@@ -172,17 +154,17 @@ export default function ReferenceLibraryManager() {
     <div className="flex flex-col h-screen">
       <NavHeader title="References Demo Sites" />
 
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-foreground">Reference Demo Sites</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-foreground">Reference Demo Sites</h2>
             <div className="flex items-center gap-2">
               <button onClick={() => setShowBulkModal(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
-                <Upload size={16} /> Bulk Import
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
+                <Upload size={16} /> <span className="hidden sm:inline">Bulk Import</span><span className="sm:hidden">Bulk</span>
               </button>
               <button onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
                 <Plus size={16} /> Add Reference
               </button>
             </div>
@@ -190,30 +172,30 @@ export default function ReferenceLibraryManager() {
 
           {/* Search, Filter, Sort */}
           <div className="space-y-3 mb-6">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <div className="relative flex-1">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                   placeholder="Search references..." className="control-input pl-9" />
               </div>
               <select value={sortBy} onChange={e => setSortBy(e.target.value as SortOption)}
-                className="control-input w-auto text-xs">
+                className="control-input w-full sm:w-auto text-xs">
                 <option value="recent">Recently Added</option>
                 <option value="az">A–Z</option>
                 <option value="industry">Industry</option>
               </select>
             </div>
-            <div className="flex gap-1.5 flex-wrap">
+            <div className="flex gap-1 sm:gap-1.5 flex-wrap">
               {roleFilters.map(r => (
                 <button key={r.value} onClick={() => setFilterRole(r.value)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  className={`px-2 sm:px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-medium transition-colors ${
                     filterRole === r.value ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-secondary'
                   }`}>{r.label}</button>
               ))}
-              <span className="w-px bg-border mx-1" />
+              <span className="w-px bg-border mx-0.5 sm:mx-1" />
               {categoryFilters.map(c => (
                 <button key={c} onClick={() => setFilterCategory(c)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  className={`px-2 sm:px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-medium transition-colors ${
                     filterCategory === c ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-secondary'
                   }`}>{c}</button>
               ))}
@@ -225,7 +207,7 @@ export default function ReferenceLibraryManager() {
               <Loader2 size={16} className="animate-spin" /> Loading...
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered.map(ref => (
                 <div key={ref.id} className="rounded-lg border border-border bg-card overflow-hidden group relative">
                   <div className="aspect-[4/3] bg-muted overflow-hidden">
@@ -236,9 +218,7 @@ export default function ReferenceLibraryManager() {
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-foreground truncate">{ref.site_name}</h3>
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                          <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-secondary text-secondary-foreground">
-                            {ref.industry}
-                          </span>
+                          <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-secondary text-secondary-foreground">{ref.industry}</span>
                           {roleBadge(ref.reference_role)}
                         </div>
                       </div>
@@ -252,13 +232,9 @@ export default function ReferenceLibraryManager() {
                       {deleteConfirm === ref.id ? (
                         <div className="flex items-center gap-1">
                           <button onClick={() => handleDelete(ref)}
-                            className="px-2 py-1 rounded text-xs font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors">
-                            Confirm
-                          </button>
+                            className="px-2 py-1 rounded text-xs font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors">Confirm</button>
                           <button onClick={() => setDeleteConfirm(null)}
-                            className="px-2 py-1 rounded text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
-                            Cancel
-                          </button>
+                            className="px-2 py-1 rounded text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">Cancel</button>
                         </div>
                       ) : (
                         <button onClick={() => setDeleteConfirm(ref.id)}
@@ -284,78 +260,54 @@ export default function ReferenceLibraryManager() {
 
       {/* Add Reference Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-sm">
-          <div className="bg-card rounded-xl shadow-2xl border border-border w-[540px] max-w-[95vw] max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-foreground">Add Reference</h2>
-              <button onClick={() => setShowAddModal(false)} className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground">
-                <X size={18} />
-              </button>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-foreground/40 backdrop-blur-sm">
+          <div className="bg-card rounded-t-xl sm:rounded-xl shadow-2xl border border-border w-full sm:w-[540px] sm:max-w-[95vw] max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border">
+              <h2 className="text-base sm:text-lg font-semibold text-foreground">Add Reference</h2>
+              <button onClick={() => setShowAddModal(false)} className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground"><X size={18} /></button>
             </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="control-label">Reference Name</label>
+            <div className="p-4 sm:p-6 space-y-4">
+              <div><label className="control-label">Reference Name</label>
                 <input type="text" value={newRef.name} onChange={e => setNewRef({ ...newRef, name: e.target.value })}
-                  placeholder="e.g., Modern Dental Layout" className="control-input" />
-              </div>
-              <div>
-                <label className="control-label">Live URL</label>
+                  placeholder="e.g., Modern Dental Layout" className="control-input" /></div>
+              <div><label className="control-label">Live URL</label>
                 <input type="url" value={newRef.liveUrl} onChange={e => setNewRef({ ...newRef, liveUrl: e.target.value })}
-                  placeholder="https://example-reference.com" className="control-input" />
-              </div>
-              <div>
-                <label className="control-label">Industry</label>
-                <select value={newRef.industry} onChange={e => setNewRef({ ...newRef, industry: e.target.value })}
-                  className="control-input">
+                  placeholder="https://example-reference.com" className="control-input" /></div>
+              <div><label className="control-label">Industry</label>
+                <select value={newRef.industry} onChange={e => setNewRef({ ...newRef, industry: e.target.value })} className="control-input">
                   {industries.map(i => <option key={i} value={i}>{i}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="control-label">Reference Role</label>
-                <select value={newRef.role} onChange={e => setNewRef({ ...newRef, role: e.target.value as ReferenceRole })}
-                  className="control-input">
+                </select></div>
+              <div><label className="control-label">Reference Role</label>
+                <select value={newRef.role} onChange={e => setNewRef({ ...newRef, role: e.target.value as ReferenceRole })} className="control-input">
                   <option value="style">Style</option>
                   <option value="conversion_layout">Conversion Layout</option>
                 </select>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {newRef.role === 'style'
-                    ? 'Controls visual style: colors, fonts, component look & feel'
+                  {newRef.role === 'style' ? 'Controls visual style: colors, fonts, component look & feel'
                     : 'Controls layout structure: section order, CTA placement, trust/proof positioning'}
-                </p>
-              </div>
-
-              {/* Screenshot Uploads */}
+                </p></div>
               <div>
                 <label className="control-label">Screenshots (optional)</label>
                 <p className="text-xs text-muted-foreground mb-2">Upload screenshots to cloud storage.</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Desktop</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div><label className="text-xs text-muted-foreground mb-1 block">Desktop</label>
                     <input type="file" accept="image/*" onChange={e => setDesktopFile(e.target.files?.[0])}
                       className="text-xs w-full file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-secondary file:text-secondary-foreground" />
-                    {desktopFile && <p className="text-xs text-primary mt-0.5 truncate">✓ {desktopFile.name}</p>}
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Mobile</label>
+                    {desktopFile && <p className="text-xs text-primary mt-0.5 truncate">✓ {desktopFile.name}</p>}</div>
+                  <div><label className="text-xs text-muted-foreground mb-1 block">Mobile</label>
                     <input type="file" accept="image/*" onChange={e => setMobileFile(e.target.files?.[0])}
                       className="text-xs w-full file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-secondary file:text-secondary-foreground" />
-                    {mobileFile && <p className="text-xs text-primary mt-0.5 truncate">✓ {mobileFile.name}</p>}
-                  </div>
+                    {mobileFile && <p className="text-xs text-primary mt-0.5 truncate">✓ {mobileFile.name}</p>}</div>
                 </div>
               </div>
-
-              <div>
-                <label className="control-label">Notes (optional)</label>
+              <div><label className="control-label">Notes (optional)</label>
                 <textarea value={newRef.notes} onChange={e => setNewRef({ ...newRef, notes: e.target.value })}
-                  placeholder="Any additional notes..." rows={3} className="control-input resize-none" />
-              </div>
+                  placeholder="Any additional notes..." rows={3} className="control-input resize-none" /></div>
               <div className="flex gap-2 pt-2">
                 <button onClick={() => setShowAddModal(false)}
-                  className="flex-1 px-4 py-2 rounded-lg text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
-                  Cancel
-                </button>
+                  className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">Cancel</button>
                 <button onClick={handleAdd} disabled={!newRef.name || !newRef.liveUrl || uploading}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors">
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors">
                   {uploading && <Loader2 size={14} className="animate-spin" />}
                   {uploading ? 'Uploading...' : 'Add Reference'}
                 </button>
@@ -367,37 +319,28 @@ export default function ReferenceLibraryManager() {
 
       {/* Bulk Import Modal */}
       {showBulkModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-sm">
-          <div className="bg-card rounded-xl shadow-2xl border border-border w-[540px] max-w-[95vw]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-foreground">Bulk Import References</h2>
-              <button onClick={() => { setShowBulkModal(false); setBulkStatus(''); }} className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground">
-                <X size={18} />
-              </button>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-foreground/40 backdrop-blur-sm">
+          <div className="bg-card rounded-t-xl sm:rounded-xl shadow-2xl border border-border w-full sm:w-[480px] sm:max-w-[95vw] max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border">
+              <h2 className="text-base sm:text-lg font-semibold text-foreground">Bulk Import References</h2>
+              <button onClick={() => { setShowBulkModal(false); setBulkStatus(''); setBulkJsonFile(null); }}
+                className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground"><X size={18} /></button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-6 space-y-4">
               <div>
-                <label className="control-label">Metadata JSON File</label>
-                <p className="text-xs text-muted-foreground mb-2">Upload a JSON array of reference entries.</p>
+                <label className="control-label">JSON Metadata File</label>
                 <input type="file" accept=".json" onChange={e => setBulkJsonFile(e.target.files?.[0] || null)}
-                  className="text-sm w-full file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:bg-secondary file:text-secondary-foreground" />
-                {bulkJsonFile && <p className="text-xs text-primary mt-1">✓ {bulkJsonFile.name}</p>}
+                  className="text-xs w-full file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-secondary file:text-secondary-foreground" />
+                <p className="text-xs text-muted-foreground mt-1">Array of objects with site_name, live_url, industry, reference_role.</p>
               </div>
-              {bulkStatus && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted text-sm">
-                  {uploading && <Loader2 size={14} className="animate-spin text-primary" />}
-                  <span>{bulkStatus}</span>
-                </div>
-              )}
+              {bulkStatus && <p className="text-xs text-muted-foreground">{bulkStatus}</p>}
               <div className="flex gap-2 pt-2">
-                <button onClick={() => { setShowBulkModal(false); setBulkStatus(''); }}
-                  className="flex-1 px-4 py-2 rounded-lg text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
-                  Cancel
-                </button>
+                <button onClick={() => { setShowBulkModal(false); setBulkStatus(''); setBulkJsonFile(null); }}
+                  className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">Cancel</button>
                 <button onClick={handleBulkImport} disabled={!bulkJsonFile || uploading}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors">
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors">
                   {uploading && <Loader2 size={14} className="animate-spin" />}
-                  {uploading ? 'Importing...' : 'Import References'}
+                  {uploading ? 'Importing...' : 'Import'}
                 </button>
               </div>
             </div>

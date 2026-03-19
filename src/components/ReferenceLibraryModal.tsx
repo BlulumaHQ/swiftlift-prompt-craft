@@ -65,33 +65,33 @@ export default function ReferenceLibraryModal({ open, onClose, onSelect, roleFil
       : 'Reference Library');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-sm">
-      <div className="bg-card rounded-xl shadow-2xl border border-border w-[900px] max-w-[95vw] max-h-[85vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="text-lg font-semibold text-foreground">{modalTitle}</h2>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-foreground/40 backdrop-blur-sm">
+      <div className="bg-card rounded-t-xl sm:rounded-xl shadow-2xl border border-border w-full sm:w-[900px] sm:max-w-[95vw] max-h-[90vh] sm:max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border">
+          <h2 className="text-base sm:text-lg font-semibold text-foreground">{modalTitle}</h2>
           <button onClick={onClose} className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground">
             <X size={18} />
           </button>
         </div>
 
-        <div className="px-6 py-4 border-b border-border space-y-3">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border space-y-3">
           <div className="relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Search references..." className="control-input pl-9" />
           </div>
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex gap-1.5 flex-wrap">
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            <div className="flex gap-1 sm:gap-1.5 flex-wrap flex-1">
               {categoryFilters.map(c => (
                 <button key={c} onClick={() => setCategory(c)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-medium transition-colors ${
                     category === c ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-secondary'
                   }`}>
                   {c}
                 </button>
               ))}
             </div>
-            <select value={sort} onChange={e => setSort(e.target.value)} className="control-input w-auto text-xs">
+            <select value={sort} onChange={e => setSort(e.target.value)} className="control-input w-auto text-xs shrink-0">
               <option>Recently Added</option>
               <option>A–Z</option>
               <option>Industry</option>
@@ -99,8 +99,8 @@ export default function ReferenceLibraryModal({ open, onClose, onSelect, roleFil
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="grid grid-cols-3 gap-4">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {filtered.map(ref => (
               <div key={ref.id} className="group rounded-lg border border-border overflow-hidden bg-card hover:shadow-md transition-shadow">
                 <div className="aspect-[4/3] overflow-hidden bg-muted">
@@ -120,7 +120,7 @@ export default function ReferenceLibraryModal({ open, onClose, onSelect, roleFil
                     </div>
                   </div>
                   <button onClick={() => { onSelect(ref); onClose(); }}
-                    className="w-full px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                    className="w-full px-3 py-2 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
                     Select
                   </button>
                 </div>
