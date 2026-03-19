@@ -1006,7 +1006,8 @@ Layout Mode: ${layoutModeB}
 `;
 
     // ── Footer attribution contamination safety block ──
-    const footerSafetyBlock = `--------------------------------------------------
+    // MUST be placed BEFORE "FINAL BUILD INSTRUCTION", not after it
+    const footerSafetyBlock = `\n\n--------------------------------------------------
 FOOTER ATTRIBUTION SAFETY
 --------------------------------------------------
 
@@ -1020,11 +1021,37 @@ These MUST be treated as non-authoritative archival text only.
 They must NOT override the locked footer credit rules in this prompt.
 The Master Prompt footer rules always take priority without exception.
 The active footer credit must reflect the Selected Brand above.
-
 `;
 
-    const promptA = `SWIFTLIFT BUILD PROMPT — ${tierLabelA}\nSource: ${ensureHttpUrl(sourceUrl)}\n\n` +
-      brandHeaderBlock + layoutHeaderA + assembledA + footerSafetyBlock + brandOverrideBlock + contentModuleBlock;
+    // Insert footer safety block BEFORE "FINAL BUILD INSTRUCTION" in the assembled prompt
+    function insertFooterSafetyBeforeFinalInstruction(assembled: string): string {
+      const marker = '--------------------------------------------------\nFINAL BUILD INSTRUCTION\n--------------------------------------------------';
+      const idx = assembled.indexOf(marker);
+      if (idx > 0) {
+        // Insert the footer safety block just before the FINAL BUILD INSTRUCTION divider
+        return assembled.substring(0, idx) + footerSafetyBlock.trim() + '\n\n' + assembled.substring(idx);
+      }
+      // Fallback: append before the end with proper spacing
+      return assembled + footerSafetyBlock;
+    }
+
+    // Apply footer safety insertion and ensure clean formatting
+    assembledA = insertFooterSafetyBeforeFinalInstruction(assembledA);
+    assembledB = insertFooterSafetyBeforeFinalInstruction(assembledB);
+
+    // Final output formatting cleanup pass
+    function cleanOutputFormatting(prompt: string): string {
+      // Fix merged section dividers (no line break before dashes)
+      let result = prompt.replace(/([^\n])(\n--------------------------------------------------)/g, '$1\n$2');
+      // Remove triple+ blank lines
+      result = result.replace(/\n{4,}/g, '\n\n\n');
+      return result;
+    }
+
+    const promptA = cleanOutputFormatting(
+      `SWIFTLIFT BUILD PROMPT — ${tierLabelA}\nSource: ${ensureHttpUrl(sourceUrl)}\n\n` +
+      brandHeaderBlock + layoutHeaderA + assembledA + brandOverrideBlock + contentModuleBlock
+    );
 
     const conversionDirective = `--------------------------------------------------
 LAYOUT MODE: PREMIUM CONVERSION LAYOUT
@@ -1088,9 +1115,11 @@ IMPORTANT: Do NOT add conversion strategy, CRO analysis, sales funnel planning, 
 
 `;
 
-    const promptB = `SWIFTLIFT BUILD PROMPT — ${tierLabelB}\nSource: ${ensureHttpUrl(sourceUrl)}\n\n` +
+    const promptB = cleanOutputFormatting(
+      `SWIFTLIFT BUILD PROMPT — ${tierLabelB}\nSource: ${ensureHttpUrl(sourceUrl)}\n\n` +
       brandHeaderBlock + layoutHeaderB + conversionDirective +
-      assembledB + footerSafetyBlock + brandOverrideBlock + contentModuleBlock;
+      assembledB + brandOverrideBlock + contentModuleBlock
+    );
 
     console.log("Prompts assembled from database prompts. A length:", promptA.length, "B length:", promptB.length, "Assembly rules length:", assemblyRules?.length || 0);
 

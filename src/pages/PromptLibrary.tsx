@@ -117,29 +117,42 @@ export default function PromptLibrary() {
     });
 
     try {
-      if (selectedItem.source === 'cloud') {
-        await saveCloudPrompt({
-          id: selectedItem.cloudId,
-          prompt_name: editName,
-          file_path: selectedItem.filePath || '',
-          version: selectedItem.version || 1,
-          content: editContent,
-          category: selectedItem.category,
-        });
-        toast({ title: 'Saved to cloud' });
+      // ALWAYS save to local
+      const localBlock: PromptBlock = {
+        id: selectedItem.source === 'cloud' ? selectedItem.name.toLowerCase().replace(/[^a-z0-9]+/g, '_') : selectedItem.id,
+        name: editName,
+        content: editContent,
+        category: selectedItem.category as any,
+        mode: 'prompts',
+        type: (selectedItem.type || 'Output Prompt') as any,
+        status: (selectedItem.status || 'CONFIRMED') as any,
+      };
+      savePromptBlock(localBlock);
+
+      // ALWAYS save to cloud
+      const existingCloud = await getCloudPrompts();
+      const cloudMatch = existingCloud.find(c => c.prompt_name === editName || c.id === selectedItem.cloudId);
+      await saveCloudPrompt({
+        id: cloudMatch?.id || selectedItem.cloudId,
+        prompt_name: editName,
+        file_path: cloudMatch?.file_path || selectedItem.filePath || '',
+        version: cloudMatch ? cloudMatch.version : (selectedItem.version || 1),
+        content: editContent,
+        category: selectedItem.category,
+      });
+
+      // Verify sync
+      const verifyCloud = await getCloudPrompts();
+      const savedCloud = verifyCloud.find(c => c.prompt_name === editName);
+      const localPrompts = getPromptLibrary();
+      const savedLocal = localPrompts.find(p => p.name === editName);
+
+      if (savedCloud && savedLocal && savedCloud.content === savedLocal.content) {
+        toast({ title: 'Saved & synced (local + cloud)' });
       } else {
-        const updated: PromptBlock = {
-          id: selectedItem.id,
-          name: editName,
-          content: editContent,
-          category: selectedItem.category as any,
-          mode: 'prompts',
-          type: (selectedItem.type || 'Output Prompt') as any,
-          status: (selectedItem.status || 'CONFIRMED') as any,
-        };
-        savePromptBlock(updated);
-        toast({ title: 'Saved locally' });
+        toast({ title: 'Saved', description: 'Warning: sync verification could not confirm match.', variant: 'destructive' });
       }
+
       setSaved(true);
       setEditMode(false);
       setTimeout(() => setSaved(false), 2000);
@@ -165,31 +178,35 @@ export default function PromptLibrary() {
     setEditName(prev.name);
     setEditContent(prev.content);
 
-    // Auto-save the reverted content
+    // Auto-save reverted content to BOTH local and cloud
     const item = items.find(i => i.id === selectedId);
     if (!item) return;
 
     try {
-      if (item.source === 'cloud') {
-        await saveCloudPrompt({
-          id: item.cloudId,
-          prompt_name: prev.name,
-          file_path: item.filePath || '',
-          version: item.version || 1,
-          content: prev.content,
-          category: item.category,
-        });
-      } else {
-        savePromptBlock({
-          id: item.id, name: prev.name, content: prev.content,
-          category: item.category as any, mode: 'prompts',
-          type: (item.type || 'Output Prompt') as any,
-          status: (item.status || 'CONFIRMED') as any,
-        });
-      }
+      // Save to local
+      savePromptBlock({
+        id: item.source === 'cloud' ? prev.name.toLowerCase().replace(/[^a-z0-9]+/g, '_') : item.id,
+        name: prev.name, content: prev.content,
+        category: item.category as any, mode: 'prompts',
+        type: (item.type || 'Output Prompt') as any,
+        status: (item.status || 'CONFIRMED') as any,
+      });
+
+      // Save to cloud
+      const existingCloud = await getCloudPrompts();
+      const cloudMatch = existingCloud.find(c => c.prompt_name === prev.name || c.id === item.cloudId);
+      await saveCloudPrompt({
+        id: cloudMatch?.id || item.cloudId,
+        prompt_name: prev.name,
+        file_path: cloudMatch?.file_path || item.filePath || '',
+        version: cloudMatch ? cloudMatch.version : (item.version || 1),
+        content: prev.content,
+        category: item.category,
+      });
+
       previousVersions.current.delete(selectedId);
       setEditMode(false);
-      toast({ title: 'Reverted to previous version' });
+      toast({ title: 'Reverted & synced (local + cloud)' });
       await loadAll();
     } catch (err: any) {
       toast({ title: 'Revert failed', description: err.message, variant: 'destructive' });
