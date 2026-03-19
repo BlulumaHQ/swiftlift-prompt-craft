@@ -760,13 +760,16 @@ Deno.serve(async (req) => {
     }
 
     currentStep = "parse_request";
-    const { sourceUrl, referenceUrl, conversionLayoutUrl, businessType, userNotes, packageTier, themeMode, primaryColor, secondaryColor, primaryFont, fontWeight, enabledModules, localPrompts } = await req.json();
+    const { sourceUrl, referenceUrl, conversionLayoutUrl, businessType, userNotes, packageTier, projectBrand, themeMode, primaryColor, secondaryColor, primaryFont, fontWeight, enabledModules, localPrompts } = await req.json();
 
     if (!sourceUrl) {
       throw new StepError("parse_request", "Source URL is required.", 400);
     }
 
+    const resolvedBrand = projectBrand || "SwiftLift";
     const tier = packageTier === "350" ? "350" : "550";
+    const layoutModeA = "STANDARD";
+    const layoutModeB = "CONVERSION";
     const tierLabelA = tier === "350" ? "$350 Standard Layout" : "$550 Standard Layout";
     const tierLabelB = tier === "350" ? "$450 Premium Conversion Layout" : "$750 Premium Conversion Layout";
 
