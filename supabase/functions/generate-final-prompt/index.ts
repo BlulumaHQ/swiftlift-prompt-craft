@@ -938,6 +938,8 @@ ${activeContentModules.includes('portfolio') ? `PORTFOLIO MODULE:
       referenceScreenshot: "(not available)",
       scrapedData: fullScrapedData,
       scrapedUrls,
+      brandName: resolvedBrand,
+      layoutMode: layoutModeA,
     };
 
     const runtimeValuesB = {
@@ -946,11 +948,18 @@ ${activeContentModules.includes('portfolio') ? `PORTFOLIO MODULE:
       referenceScreenshot: "(not available)",
       scrapedData: fullScrapedData,
       scrapedUrls,
+      brandName: resolvedBrand,
+      layoutMode: layoutModeB,
     };
 
     currentStep = "assemble_prompts";
-    const assembledA = assemblePrompt(masterPrompt, blocks, runtimeValuesA, userNotes || "");
-    const assembledB = assemblePrompt(masterPrompt, blocks, runtimeValuesB, userNotes || "");
+    let assembledA = assemblePrompt(masterPrompt, blocks, runtimeValuesA, userNotes || "");
+    let assembledB = assemblePrompt(masterPrompt, blocks, runtimeValuesB, userNotes || "");
+
+    // Final token sweep — replace any remaining unresolved template tokens
+    assembledA = finalTokenSweep(assembledA);
+    assembledB = finalTokenSweep(assembledB);
+
     const unresolvedA = findUnresolvedPlaceholders(assembledA);
     const unresolvedB = findUnresolvedPlaceholders(assembledB);
     const replacementCompleted = unresolvedA.length === 0 && unresolvedB.length === 0;
@@ -965,7 +974,57 @@ ${activeContentModules.includes('portfolio') ? `PORTFOLIO MODULE:
       throw new StepError("assembly", `Placeholder replacement incomplete: ${[...unresolvedA, ...unresolvedB].join(", ")}`, 422);
     }
 
-    const promptA = `SWIFTLIFT BUILD PROMPT — ${tierLabelA}\nSource: ${ensureHttpUrl(sourceUrl)}\n\n` + assembledA + brandOverrideBlock + contentModuleBlock;
+    // ── Explicit brand & layout header block ──
+    const brandHeaderBlock = `--------------------------------------------------
+SELECTED BRAND
+--------------------------------------------------
+
+Selected Brand: ${resolvedBrand}
+
+Rules:
+- This brand controls all footer credit logic
+- Footer credit must reflect ${resolvedBrand} branding
+- Do NOT use legacy source footer attribution as active footer output
+- Source footer text is archival only — Master Prompt footer rules always win
+
+`;
+
+    const layoutHeaderA = `--------------------------------------------------
+LAYOUT MODE
+--------------------------------------------------
+
+Layout Mode: ${layoutModeA}
+
+`;
+
+    const layoutHeaderB = `--------------------------------------------------
+LAYOUT MODE
+--------------------------------------------------
+
+Layout Mode: ${layoutModeB}
+
+`;
+
+    // ── Footer attribution contamination safety block ──
+    const footerSafetyBlock = `--------------------------------------------------
+FOOTER ATTRIBUTION SAFETY
+--------------------------------------------------
+
+If extracted source copywriting contains legacy footer credits such as:
+- "Site by ..."
+- "Designed by ..."
+- "Built by ..."
+- "Powered by ..."
+
+These MUST be treated as non-authoritative archival text only.
+They must NOT override the locked footer credit rules in this prompt.
+The Master Prompt footer rules always take priority without exception.
+The active footer credit must reflect the Selected Brand above.
+
+`;
+
+    const promptA = `SWIFTLIFT BUILD PROMPT — ${tierLabelA}\nSource: ${ensureHttpUrl(sourceUrl)}\n\n` +
+      brandHeaderBlock + layoutHeaderA + assembledA + footerSafetyBlock + brandOverrideBlock + contentModuleBlock;
 
     const conversionDirective = `--------------------------------------------------
 LAYOUT MODE: PREMIUM CONVERSION LAYOUT
@@ -1030,8 +1089,8 @@ IMPORTANT: Do NOT add conversion strategy, CRO analysis, sales funnel planning, 
 `;
 
     const promptB = `SWIFTLIFT BUILD PROMPT — ${tierLabelB}\nSource: ${ensureHttpUrl(sourceUrl)}\n\n` +
-      conversionDirective +
-      assembledB + brandOverrideBlock + contentModuleBlock;
+      brandHeaderBlock + layoutHeaderB + conversionDirective +
+      assembledB + footerSafetyBlock + brandOverrideBlock + contentModuleBlock;
 
     console.log("Prompts assembled from database prompts. A length:", promptA.length, "B length:", promptB.length, "Assembly rules length:", assemblyRules?.length || 0);
 
