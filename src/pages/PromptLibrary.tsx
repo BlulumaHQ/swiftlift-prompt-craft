@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import NavHeader from '@/components/NavHeader';
 import {
   getCloudPrompts, saveCloudPrompt, deleteCloudPrompt, type CloudPrompt
@@ -7,7 +7,7 @@ import {
   getPromptLibrary, savePromptBlock, deletePromptBlock,
   categoryLabels, categoryOrder, type PromptBlock,
 } from '@/lib/promptLibraryStore';
-import { Save, Check, Trash2, ChevronRight, ChevronDown, FileText, Cloud, Loader2 } from 'lucide-react';
+import { Save, Check, Trash2, ChevronRight, ChevronDown, FileText, Cloud, Loader2, Lock, Unlock, RotateCcw, ShieldAlert } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -19,7 +19,9 @@ import { useToast } from '@/hooks/use-toast';
 // System prompt IDs that should be hidden from the operational library
 const SYSTEM_PROMPT_IDS = ['generator_app_build_v1'];
 
-// Unified prompt item that can come from local or cloud
+// Owner passphrase — in production this would be auth-based
+const OWNER_KEY = 'swiftlift_prompt_owner';
+
 interface PromptItem {
   id: string;
   name: string;
@@ -45,17 +47,31 @@ export default function PromptLibrary() {
   const [allExpanded, setAllExpanded] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
+  // --- NEW: Prompt Protection State ---
+  const [isOwner, setIsOwner] = useState(() => {
+    return sessionStorage.getItem(OWNER_KEY) === 'true';
+  });
+  const [editMode, setEditMode] = useState(false);
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+  const [revertConfirmOpen, setRevertConfirmOpen] = useState(false);
+  const [ownerDialogOpen, setOwnerDialogOpen] = useState(false);
+  const [ownerInput, setOwnerInput] = useState('');
+
+  // Previous version backup: { id -> { name, content } }
+  const previousVersions = useRef<Map<string, { name: string; content: string }>>(new Map());
+
   useEffect(() => { loadAll(); }, []);
 
+  // Exit edit mode when switching prompts
+  useEffect(() => { setEditMode(false); }, [selectedId]);
+
   async function loadAll() {
-    // Load local prompts — filter out system prompts
     const localPrompts = getPromptLibrary().filter(p => !SYSTEM_PROMPT_IDS.includes(p.id));
     const localItems: PromptItem[] = localPrompts.map(p => ({
       id: p.id, name: p.name, content: p.content, category: p.category,
       source: 'local' as const, type: p.type, status: p.status,
     }));
 
-    // Load cloud prompts
     let cloudItems: PromptItem[] = [];
     try {
       const cloudPrompts = await getCloudPrompts();
@@ -83,11 +99,41 @@ export default function PromptLibrary() {
     setEditContent(item.content);
     setEditName(item.name);
     setSaved(false);
+    setEditMode(false);
   };
 
-  const handleSave = async () => {
+  const hasPreviousVersion = selectedId ? previousVersions.current.has(selectedId) : false;
+
+  // --- Owner verification ---
+  const handleOwnerVerify = () => {
+    if (ownerInput.trim().toLowerCase() === 'bluluma') {
+      sessionStorage.setItem(OWNER_KEY, 'true');
+      setIsOwner(true);
+      setOwnerDialogOpen(false);
+      setOwnerInput('');
+      toast({ title: 'Owner access granted' });
+    } else {
+      toast({ title: 'Incorrect passphrase', variant: 'destructive' });
+    }
+  };
+
+  // --- Save with confirmation ---
+  const handleSaveRequest = () => {
+    if (!selectedItem || !editMode) return;
+    setSaveConfirmOpen(true);
+  };
+
+  const handleConfirmedSave = async () => {
     if (!selectedItem) return;
+    setSaveConfirmOpen(false);
     setSaving(true);
+
+    // Store previous version before saving
+    previousVersions.current.set(selectedItem.id, {
+      name: selectedItem.name,
+      content: selectedItem.content,
+    });
+
     try {
       if (selectedItem.source === 'cloud') {
         await saveCloudPrompt({
@@ -113,12 +159,59 @@ export default function PromptLibrary() {
         toast({ title: 'Saved locally' });
       }
       setSaved(true);
+      setEditMode(false);
       setTimeout(() => setSaved(false), 2000);
       await loadAll();
     } catch (err: any) {
       toast({ title: 'Save failed', description: err.message, variant: 'destructive' });
     }
     setSaving(false);
+  };
+
+  // --- Revert ---
+  const handleRevertRequest = () => {
+    if (!selectedId || !hasPreviousVersion) return;
+    setRevertConfirmOpen(true);
+  };
+
+  const handleConfirmedRevert = async () => {
+    if (!selectedId) return;
+    setRevertConfirmOpen(false);
+    const prev = previousVersions.current.get(selectedId);
+    if (!prev) return;
+
+    setEditName(prev.name);
+    setEditContent(prev.content);
+
+    // Auto-save the reverted content
+    const item = items.find(i => i.id === selectedId);
+    if (!item) return;
+
+    try {
+      if (item.source === 'cloud') {
+        await saveCloudPrompt({
+          id: item.cloudId,
+          prompt_name: prev.name,
+          file_path: item.filePath || '',
+          version: item.version || 1,
+          content: prev.content,
+          category: item.category,
+        });
+      } else {
+        savePromptBlock({
+          id: item.id, name: prev.name, content: prev.content,
+          category: item.category as any, mode: 'prompts',
+          type: (item.type || 'Output Prompt') as any,
+          status: (item.status || 'CONFIRMED') as any,
+        });
+      }
+      previousVersions.current.delete(selectedId);
+      setEditMode(false);
+      toast({ title: 'Reverted to previous version' });
+      await loadAll();
+    } catch (err: any) {
+      toast({ title: 'Revert failed', description: err.message, variant: 'destructive' });
+    }
   };
 
   const handleDelete = async () => {
@@ -149,18 +242,15 @@ export default function PromptLibrary() {
   const handleSyncToCloud = async () => {
     setSyncing(true);
     try {
-      // Load existing cloud prompts to match by name
       const existingCloud = await getCloudPrompts();
       const cloudByName = new Map(existingCloud.map(c => [c.prompt_name, c]));
-
-      // Only sync operational prompts, not system ones
       const localPrompts = getPromptLibrary().filter(p => !SYSTEM_PROMPT_IDS.includes(p.id));
       for (const p of localPrompts) {
         const existing = cloudByName.get(p.name);
         await saveCloudPrompt({
-          id: existing?.id,                       // pass existing id → UPDATE, not INSERT
+          id: existing?.id,
           prompt_name: p.name,
-          file_path: existing?.file_path || '',    // preserve existing file path
+          file_path: existing?.file_path || '',
           version: existing ? existing.version : 1,
           content: p.content,
           category: p.category,
@@ -174,7 +264,6 @@ export default function PromptLibrary() {
     setSyncing(false);
   };
 
-  // Group by source then category
   const groups = [
     { key: 'cloud', label: 'Cloud Prompts', items: items.filter(i => i.source === 'cloud') },
     { key: 'local', label: 'Local Prompts', items: items.filter(i => i.source === 'local') },
@@ -194,11 +283,25 @@ export default function PromptLibrary() {
                 {allExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                 {allExpanded ? 'Collapse' : 'Expand'}
               </button>
-              <button onClick={handleSyncToCloud} disabled={syncing}
-                className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors">
-                {syncing ? <Loader2 size={12} className="animate-spin" /> : <Cloud size={12} />}
-                Sync to Cloud
-              </button>
+              <div className="flex items-center gap-1">
+                {!isOwner && (
+                  <button onClick={() => setOwnerDialogOpen(true)}
+                    className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    <Lock size={12} /> Authenticate
+                  </button>
+                )}
+                {isOwner && (
+                  <button onClick={() => { sessionStorage.removeItem(OWNER_KEY); setIsOwner(false); setEditMode(false); }}
+                    className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-emerald-600 hover:text-emerald-700 transition-colors">
+                    <ShieldAlert size={12} /> Owner ✓
+                  </button>
+                )}
+                <button onClick={handleSyncToCloud} disabled={syncing}
+                  className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors">
+                  {syncing ? <Loader2 size={12} className="animate-spin" /> : <Cloud size={12} />}
+                  Sync
+                </button>
+              </div>
             </div>
 
             {groups.map(group => (
@@ -233,33 +336,83 @@ export default function PromptLibrary() {
         <main className="flex-1 flex flex-col p-6 overflow-hidden">
           {selectedItem ? (
             <>
+              {/* Edit mode warning banner */}
+              {editMode && (
+                <div className="flex items-center gap-2 px-4 py-2 mb-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-medium">
+                  <ShieldAlert size={16} />
+                  You are editing a locked system prompt
+                </div>
+              )}
+
               <div className="flex items-start justify-between mb-4 gap-4">
                 <div className="flex-1 min-w-0">
-                  <input value={editName} onChange={e => setEditName(e.target.value)}
-                    className="text-lg font-bold text-foreground bg-transparent border-none outline-none w-full focus:ring-0" />
+                  <input value={editName} onChange={e => editMode && setEditName(e.target.value)}
+                    readOnly={!editMode}
+                    className={`text-lg font-bold bg-transparent border-none outline-none w-full focus:ring-0 ${
+                      editMode ? 'text-foreground' : 'text-foreground/70 cursor-default'
+                    }`} />
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <Badge variant="outline" className="text-[10px] font-mono">
                       {selectedItem.source === 'cloud' ? 'Cloud' : 'Local'}
                     </Badge>
+                    {!editMode && (
+                      <Badge variant="secondary" className="text-[10px] gap-1">
+                        <Lock size={8} /> Locked
+                      </Badge>
+                    )}
+                    {editMode && (
+                      <Badge className="text-[10px] gap-1 bg-amber-500/20 text-amber-700 border-amber-500/30">
+                        <Unlock size={8} /> Editing Mode Active
+                      </Badge>
+                    )}
                     {selectedItem.filePath && (
                       <span className="text-[10px] text-muted-foreground font-mono">{selectedItem.filePath}</span>
                     )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <button onClick={() => setDeleteTarget(selectedItem.id)}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors">
-                    <Trash2 size={14} /> Delete
-                  </button>
-                  <button onClick={handleSave} disabled={saving}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors">
-                    {saving ? <Loader2 size={14} className="animate-spin" /> : saved ? <Check size={14} /> : <Save size={14} />}
-                    {saving ? 'Saving...' : saved ? 'Saved' : 'Save'}
-                  </button>
+                  {/* Only show controls if owner */}
+                  {isOwner && (
+                    <>
+                      {!editMode ? (
+                        <button onClick={() => setEditMode(true)}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 border border-amber-500/30 transition-colors">
+                          <Unlock size={14} /> Unlock Editing
+                        </button>
+                      ) : (
+                        <>
+                          {hasPreviousVersion && (
+                            <button onClick={handleRevertRequest}
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 transition-colors">
+                              <RotateCcw size={14} /> Revert
+                            </button>
+                          )}
+                          <button onClick={() => { setEditMode(false); setEditContent(selectedItem.content); setEditName(selectedItem.name); }}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted/60 transition-colors">
+                            Cancel
+                          </button>
+                          <button onClick={() => setDeleteTarget(selectedItem.id)}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors">
+                            <Trash2 size={14} />
+                          </button>
+                          <button onClick={handleSaveRequest} disabled={saving}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-md">
+                            {saving ? <Loader2 size={14} className="animate-spin" /> : saved ? <Check size={14} /> : <Save size={14} />}
+                            {saving ? 'Saving...' : saved ? 'Saved' : 'Confirm Save'}
+                          </button>
+                        </>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
-              <textarea value={editContent} onChange={e => setEditContent(e.target.value)}
-                className="flex-1 w-full p-4 rounded-lg border border-border bg-background font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+              <textarea value={editContent} onChange={e => editMode && setEditContent(e.target.value)}
+                readOnly={!editMode}
+                className={`flex-1 w-full p-4 rounded-lg border font-mono text-sm resize-none focus:outline-none transition-colors ${
+                  editMode
+                    ? 'border-amber-500/40 bg-amber-500/5 focus:ring-2 focus:ring-amber-500/30'
+                    : 'border-border bg-muted/30 cursor-default text-foreground/80'
+                }`}
                 placeholder="Enter prompt content..." />
             </>
           ) : (
@@ -270,6 +423,7 @@ export default function PromptLibrary() {
         </main>
       </div>
 
+      {/* Delete confirmation */}
       <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -279,6 +433,66 @@ export default function PromptLibrary() {
           <AlertDialogFooter>
             <AlertDialogCancel>No</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete}>Yes</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Save confirmation */}
+      <AlertDialog open={saveConfirmOpen} onOpenChange={setSaveConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Save</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to overwrite this prompt?{'\n'}
+              This action will replace the current version.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmedSave}>Confirm Save</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Revert confirmation */}
+      <AlertDialog open={revertConfirmOpen} onOpenChange={setRevertConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revert Prompt</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to revert to the previous version?{'\n'}
+              This will overwrite the current version.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmedRevert} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Confirm Revert
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Owner authentication dialog */}
+      <AlertDialog open={ownerDialogOpen} onOpenChange={setOwnerDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Owner Authentication</AlertDialogTitle>
+            <AlertDialogDescription>
+              Enter the owner passphrase to unlock editing capabilities.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <input
+            type="password"
+            value={ownerInput}
+            onChange={e => setOwnerInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleOwnerVerify()}
+            placeholder="Passphrase"
+            className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setOwnerInput('')}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleOwnerVerify}>Verify</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
