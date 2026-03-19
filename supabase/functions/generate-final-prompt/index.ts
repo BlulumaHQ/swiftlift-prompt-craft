@@ -522,8 +522,24 @@ function findUnresolvedPlaceholders(value: string): string[] {
     "{IMAGES}", "{{IMAGES}}",
     "{EXTRACTION_NOTES}", "{{EXTRACTION_NOTES}}",
     "{USER_NOTES}", "{{USER_NOTES}}",
+    "{BRAND_NAME}", "{{BRAND_NAME}}",
+    "{LAYOUT_MODE}", "{{LAYOUT_MODE}}",
+    "{DEMO_SITE_URLS}", "{{DEMO_SITE_URLS}}",
+    "{DEMO_SITE_SCREENSHOTS}", "{{DEMO_SITE_SCREENSHOTS}}",
+    "{CONVERSION_REFERENCE_URLS}", "{{CONVERSION_REFERENCE_URLS}}",
+    "{CONVERSION_REFERENCE_SCREENSHOTS}", "{{CONVERSION_REFERENCE_SCREENSHOTS}}",
+    "{COMPANY_NAME}", "{{COMPANY_NAME}}",
   ];
   return requiredTokens.filter((token) => value.includes(token));
+}
+
+// ── Final sweep: resolve ANY remaining template tokens ──
+function finalTokenSweep(prompt: string): string {
+  // Replace any remaining {{...}} tokens with (none)
+  let result = prompt.replace(/\{\{[A-Z_]+\}\}/g, "(none)");
+  // Replace any remaining {SINGLE_BRACE_TOKENS} (uppercase + underscores only to avoid real content)
+  result = result.replace(/\{([A-Z][A-Z_]{2,})\}/g, "(none)");
+  return result;
 }
 
 // ── Formatting functions ──
