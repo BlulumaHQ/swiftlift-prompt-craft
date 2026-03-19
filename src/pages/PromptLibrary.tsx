@@ -310,7 +310,7 @@ export default function PromptLibrary() {
               {editMode && (
                 <div className="flex items-center gap-2 px-4 py-2 mb-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-medium">
                   <ShieldAlert size={16} />
-                  Editing system prompt — changes will affect all builds
+                  Editing system prompt — changes will affect future builds
                 </div>
               )}
 
