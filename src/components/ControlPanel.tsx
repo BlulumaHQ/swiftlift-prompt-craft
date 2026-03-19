@@ -247,7 +247,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           primaryFont,
           fontWeight,
           enabledModules: modules,
-          // DEBUG MODE: pass local prompts directly
+          // Pass local prompts for generation
           localPrompts: {
             extractionPrompt,
             masterPrompt,
