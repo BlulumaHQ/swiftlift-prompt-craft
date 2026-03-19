@@ -474,6 +474,26 @@ export default function PromptLibrary() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Unlock confirmation */}
+      <AlertDialog open={unlockConfirmOpen} onOpenChange={setUnlockConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unlock System Prompt</AlertDialogTitle>
+            <AlertDialogDescription>
+              You're about to edit a locked system prompt.
+              This may affect all generated websites.
+              Are you sure you want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setUnlockConfirmOpen(false); setEditMode(true); }}>
+              Confirm Unlock
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Owner authentication dialog */}
       <AlertDialog open={ownerDialogOpen} onOpenChange={setOwnerDialogOpen}>
         <AlertDialogContent>
