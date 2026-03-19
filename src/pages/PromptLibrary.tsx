@@ -7,7 +7,7 @@ import {
   getPromptLibrary, savePromptBlock, deletePromptBlock,
   categoryLabels, categoryOrder, type PromptBlock,
 } from '@/lib/promptLibraryStore';
-import { Save, Check, Trash2, ChevronRight, ChevronDown, FileText, Cloud, Loader2, Lock, Unlock, RotateCcw, ShieldAlert } from 'lucide-react';
+import { Save, Check, Trash2, ChevronRight, ChevronDown, FileText, Cloud, Loader2, Lock, Unlock, RotateCcw, ShieldAlert, ArrowLeft } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -15,11 +15,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 
-// System prompt IDs that should be hidden from the operational library
 const SYSTEM_PROMPT_IDS = ['generator_app_build_v1'];
-
-// System prompt IDs that should be hidden from the operational library
 
 interface PromptItem {
   id: string;
@@ -36,6 +34,7 @@ interface PromptItem {
 
 export default function PromptLibrary() {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [items, setItems] = useState<PromptItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
@@ -46,18 +45,14 @@ export default function PromptLibrary() {
   const [allExpanded, setAllExpanded] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
-  // --- Prompt Protection State ---
   const [editMode, setEditMode] = useState(false);
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
   const [revertConfirmOpen, setRevertConfirmOpen] = useState(false);
   const [unlockConfirmOpen, setUnlockConfirmOpen] = useState(false);
 
-  // Previous version backup: { id -> { name, content } }
   const previousVersions = useRef<Map<string, { name: string; content: string }>>(new Map());
 
   useEffect(() => { loadAll(); }, []);
-
-  // Exit edit mode when switching prompts
   useEffect(() => { setEditMode(false); }, [selectedId]);
 
   async function loadAll() {
@@ -99,7 +94,6 @@ export default function PromptLibrary() {
 
   const hasPreviousVersion = selectedId ? previousVersions.current.has(selectedId) : false;
 
-  // --- Save with confirmation ---
   const handleSaveRequest = () => {
     if (!selectedItem || !editMode) return;
     setSaveConfirmOpen(true);
@@ -110,26 +104,21 @@ export default function PromptLibrary() {
     setSaveConfirmOpen(false);
     setSaving(true);
 
-    // Store previous version before saving
     previousVersions.current.set(selectedItem.id, {
       name: selectedItem.name,
       content: selectedItem.content,
     });
 
     try {
-      // ALWAYS save to local
       const localBlock: PromptBlock = {
         id: selectedItem.source === 'cloud' ? selectedItem.name.toLowerCase().replace(/[^a-z0-9]+/g, '_') : selectedItem.id,
-        name: editName,
-        content: editContent,
-        category: selectedItem.category as any,
-        mode: 'prompts',
+        name: editName, content: editContent,
+        category: selectedItem.category as any, mode: 'prompts',
         type: (selectedItem.type || 'Output Prompt') as any,
         status: (selectedItem.status || 'CONFIRMED') as any,
       };
       savePromptBlock(localBlock);
 
-      // ALWAYS save to cloud
       const existingCloud = await getCloudPrompts();
       const cloudMatch = existingCloud.find(c => c.prompt_name === editName || c.id === selectedItem.cloudId);
       await saveCloudPrompt({
@@ -141,7 +130,6 @@ export default function PromptLibrary() {
         category: selectedItem.category,
       });
 
-      // Verify sync
       const verifyCloud = await getCloudPrompts();
       const savedCloud = verifyCloud.find(c => c.prompt_name === editName);
       const localPrompts = getPromptLibrary();
@@ -163,7 +151,6 @@ export default function PromptLibrary() {
     setSaving(false);
   };
 
-  // --- Revert ---
   const handleRevertRequest = () => {
     if (!selectedId || !hasPreviousVersion) return;
     setRevertConfirmOpen(true);
@@ -178,12 +165,10 @@ export default function PromptLibrary() {
     setEditName(prev.name);
     setEditContent(prev.content);
 
-    // Auto-save reverted content to BOTH local and cloud
     const item = items.find(i => i.id === selectedId);
     if (!item) return;
 
     try {
-      // Save to local
       savePromptBlock({
         id: item.source === 'cloud' ? prev.name.toLowerCase().replace(/[^a-z0-9]+/g, '_') : item.id,
         name: prev.name, content: prev.content,
@@ -192,7 +177,6 @@ export default function PromptLibrary() {
         status: (item.status || 'CONFIRMED') as any,
       });
 
-      // Save to cloud
       const existingCloud = await getCloudPrompts();
       const cloudMatch = existingCloud.find(c => c.prompt_name === prev.name || c.id === item.cloudId);
       await saveCloudPrompt({
@@ -268,146 +252,230 @@ export default function PromptLibrary() {
     { key: 'local', label: 'Local Prompts', items: items.filter(i => i.source === 'local') },
   ].filter(g => g.items.length > 0);
 
+  const sidebar = (
+    <div className="p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <button onClick={() => setAllExpanded(!allExpanded)}
+          className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors">
+          {allExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          {allExpanded ? 'Collapse' : 'Expand'}
+        </button>
+        <div className="flex items-center gap-1">
+          <button onClick={handleSyncToCloud} disabled={syncing}
+            className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors">
+            {syncing ? <Loader2 size={12} className="animate-spin" /> : <Cloud size={12} />}
+            Sync
+          </button>
+        </div>
+      </div>
+
+      {groups.map(group => (
+        <div key={group.key} className="mb-1">
+          <div className="flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+            {allExpanded ? <ChevronDown size={12} className="text-muted-foreground/60" /> : <ChevronRight size={12} className="text-muted-foreground/60" />}
+            {group.key === 'cloud' && <Cloud size={10} />}
+            {group.label}
+            <span className="ml-auto text-[10px] font-normal opacity-60">{group.items.length}</span>
+          </div>
+          {allExpanded && (
+            <div className="ml-3 border-l border-border/50">
+              {group.items.map(item => (
+                <button key={item.id} onClick={() => handleSelect(item)}
+                  className={`w-full text-left flex items-center gap-2 pl-3 pr-2 py-2 text-[12px] transition-colors rounded-r-md ${
+                    selectedId === item.id
+                      ? 'bg-primary/10 text-primary font-medium border-l-2 border-primary -ml-px'
+                      : 'text-foreground hover:bg-muted/60'
+                  }`}>
+                  <FileText size={11} className="shrink-0 opacity-40" />
+                  <span className="truncate">{item.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
+  const editor = selectedItem ? (
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* Mobile back button */}
+      {isMobile && (
+        <button onClick={() => setSelectedId(null)}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-3 transition-colors">
+          <ArrowLeft size={14} /> Back to list
+        </button>
+      )}
+
+      {editMode && (
+        <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs sm:text-sm font-medium">
+          <ShieldAlert size={16} className="shrink-0" />
+          <span>Editing system prompt — changes will affect future builds</span>
+        </div>
+      )}
+
+      <div className={`flex ${isMobile ? 'flex-col gap-3' : 'items-start justify-between gap-4'} mb-4`}>
+        <div className="flex-1 min-w-0">
+          <input value={editName} onChange={e => editMode && setEditName(e.target.value)}
+            readOnly={!editMode}
+            className={`text-base sm:text-lg font-bold bg-transparent border-none outline-none w-full focus:ring-0 ${
+              editMode ? 'text-foreground' : 'text-foreground/70 cursor-default'
+            }`} />
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <Badge variant="outline" className="text-[10px] font-mono">
+              {selectedItem.source === 'cloud' ? 'Cloud' : 'Local'}
+            </Badge>
+            {!editMode && (
+              <Badge variant="secondary" className="text-[10px] gap-1">
+                <Lock size={8} /> Locked
+              </Badge>
+            )}
+            {editMode && (
+              <Badge className="text-[10px] gap-1 bg-amber-500/20 text-amber-700 border-amber-500/30">
+                <Unlock size={8} /> Editing Mode Active
+              </Badge>
+            )}
+            {selectedItem.filePath && !isMobile && (
+              <span className="text-[10px] text-muted-foreground font-mono">{selectedItem.filePath}</span>
+            )}
+          </div>
+        </div>
+        <div className={`flex items-center gap-2 ${isMobile ? 'flex-wrap' : 'shrink-0'}`}>
+          {!editMode ? (
+            <>
+              <button onClick={() => setUnlockConfirmOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 border border-amber-500/30 transition-colors">
+                <Unlock size={14} /> Unlock Editing
+              </button>
+              {hasPreviousVersion && (
+                <button onClick={handleRevertRequest}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 transition-colors">
+                  <RotateCcw size={14} /> <span className="hidden sm:inline">Revert to Previous Version</span><span className="sm:hidden">Revert</span>
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <button onClick={() => { setEditMode(false); setEditContent(selectedItem.content); setEditName(selectedItem.name); }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium text-muted-foreground hover:bg-muted/60 transition-colors">
+                Cancel
+              </button>
+              <button onClick={() => setDeleteTarget(selectedItem.id)}
+                className="flex items-center gap-1.5 px-2 py-2 rounded-lg text-xs sm:text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors">
+                <Trash2 size={14} />
+              </button>
+              <button onClick={handleSaveRequest} disabled={saving}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-md">
+                {saving ? <Loader2 size={14} className="animate-spin" /> : saved ? <Check size={14} /> : <Save size={14} />}
+                {saving ? 'Saving...' : saved ? 'Saved' : 'Save'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+      <textarea value={editContent} onChange={e => editMode && setEditContent(e.target.value)}
+        readOnly={!editMode}
+        className={`flex-1 w-full p-3 sm:p-4 rounded-lg border font-mono text-xs sm:text-sm resize-none focus:outline-none transition-colors min-h-[300px] ${
+          editMode
+            ? 'border-amber-500/40 bg-amber-500/5 focus:ring-2 focus:ring-amber-500/30'
+            : 'border-border bg-muted/30 cursor-default text-foreground/80'
+        }`}
+        placeholder="Enter prompt content..." />
+    </div>
+  ) : (
+    <div className="flex-1 flex items-center justify-center text-muted-foreground">
+      <p>Select a prompt to edit</p>
+    </div>
+  );
+
+  if (isMobile) {
+    // On mobile: show list or editor
+    return (
+      <div className="flex flex-col h-screen">
+        <NavHeader title="Prompt Library" />
+        <div className="flex-1 overflow-y-auto">
+          {selectedId ? (
+            <div className="p-4 flex flex-col h-full">{editor}</div>
+          ) : (
+            <div className="border-b border-border bg-card">{sidebar}</div>
+          )}
+        </div>
+
+        {/* Dialogs */}
+        <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure you want to delete this prompt?</AlertDialogTitle>
+              <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={unlockConfirmOpen} onOpenChange={setUnlockConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Unlock Editing</AlertDialogTitle>
+              <AlertDialogDescription>
+                You are about to edit a locked system prompt. Changes may affect all future builds. Do you want to continue?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => { setUnlockConfirmOpen(false); setEditMode(true); }}>Unlock</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={saveConfirmOpen} onOpenChange={setSaveConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm Save</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to overwrite this prompt? The current version will be replaced. A single previous version backup will be kept.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmedSave}>Confirm Save</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={revertConfirmOpen} onOpenChange={setRevertConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Revert Prompt</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to revert to the previous version? This will overwrite the current version.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmedRevert}>Confirm Revert</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen">
       <NavHeader title="Prompt Library" />
-
       <div className="flex flex-1 min-h-0">
-        {/* Tree sidebar */}
         <aside className="w-[320px] shrink-0 border-r border-border bg-card overflow-y-auto">
-          <div className="p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <button onClick={() => setAllExpanded(!allExpanded)}
-                className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors">
-                {allExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                {allExpanded ? 'Collapse' : 'Expand'}
-              </button>
-              <div className="flex items-center gap-1">
-                <button onClick={handleSyncToCloud} disabled={syncing}
-                  className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors">
-                  {syncing ? <Loader2 size={12} className="animate-spin" /> : <Cloud size={12} />}
-                  Sync
-                </button>
-              </div>
-            </div>
-
-            {groups.map(group => (
-              <div key={group.key} className="mb-1">
-                <div className="flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                  {allExpanded ? <ChevronDown size={12} className="text-muted-foreground/60" /> : <ChevronRight size={12} className="text-muted-foreground/60" />}
-                  {group.key === 'cloud' && <Cloud size={10} />}
-                  {group.label}
-                  <span className="ml-auto text-[10px] font-normal opacity-60">{group.items.length}</span>
-                </div>
-                {allExpanded && (
-                  <div className="ml-3 border-l border-border/50">
-                    {group.items.map(item => (
-                      <button key={item.id} onClick={() => handleSelect(item)}
-                        className={`w-full text-left flex items-center gap-2 pl-3 pr-2 py-1.5 text-[12px] transition-colors rounded-r-md ${
-                          selectedId === item.id
-                            ? 'bg-primary/10 text-primary font-medium border-l-2 border-primary -ml-px'
-                            : 'text-foreground hover:bg-muted/60'
-                        }`}>
-                        <FileText size={11} className="shrink-0 opacity-40" />
-                        <span className="truncate">{item.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+          {sidebar}
         </aside>
-
-        {/* Editor */}
         <main className="flex-1 flex flex-col p-6 overflow-hidden">
-          {selectedItem ? (
-            <>
-              {/* Edit mode warning banner */}
-              {editMode && (
-                <div className="flex items-center gap-2 px-4 py-2 mb-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-medium">
-                  <ShieldAlert size={16} />
-                  Editing system prompt — changes will affect future builds
-                </div>
-              )}
-
-              <div className="flex items-start justify-between mb-4 gap-4">
-                <div className="flex-1 min-w-0">
-                  <input value={editName} onChange={e => editMode && setEditName(e.target.value)}
-                    readOnly={!editMode}
-                    className={`text-lg font-bold bg-transparent border-none outline-none w-full focus:ring-0 ${
-                      editMode ? 'text-foreground' : 'text-foreground/70 cursor-default'
-                    }`} />
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <Badge variant="outline" className="text-[10px] font-mono">
-                      {selectedItem.source === 'cloud' ? 'Cloud' : 'Local'}
-                    </Badge>
-                    {!editMode && (
-                      <Badge variant="secondary" className="text-[10px] gap-1">
-                        <Lock size={8} /> Locked
-                      </Badge>
-                    )}
-                    {editMode && (
-                      <Badge className="text-[10px] gap-1 bg-amber-500/20 text-amber-700 border-amber-500/30">
-                        <Unlock size={8} /> Editing Mode Active
-                      </Badge>
-                    )}
-                    {selectedItem.filePath && (
-                      <span className="text-[10px] text-muted-foreground font-mono">{selectedItem.filePath}</span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {!editMode ? (
-                    <>
-                      <button onClick={() => setUnlockConfirmOpen(true)}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 border border-amber-500/30 transition-colors">
-                        <Unlock size={14} /> Unlock Editing
-                      </button>
-                      {hasPreviousVersion && (
-                        <button onClick={handleRevertRequest}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 transition-colors">
-                          <RotateCcw size={14} /> Revert to Previous Version
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <button onClick={() => { setEditMode(false); setEditContent(selectedItem.content); setEditName(selectedItem.name); }}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted/60 transition-colors">
-                        Cancel Editing
-                      </button>
-                      <button onClick={() => setDeleteTarget(selectedItem.id)}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors">
-                        <Trash2 size={14} />
-                      </button>
-                      <button onClick={handleSaveRequest} disabled={saving}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-md">
-                        {saving ? <Loader2 size={14} className="animate-spin" /> : saved ? <Check size={14} /> : <Save size={14} />}
-                        {saving ? 'Saving...' : saved ? 'Saved' : 'Save'}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-              <textarea value={editContent} onChange={e => editMode && setEditContent(e.target.value)}
-                readOnly={!editMode}
-                className={`flex-1 w-full p-4 rounded-lg border font-mono text-sm resize-none focus:outline-none transition-colors ${
-                  editMode
-                    ? 'border-amber-500/40 bg-amber-500/5 focus:ring-2 focus:ring-amber-500/30'
-                    : 'border-border bg-muted/30 cursor-default text-foreground/80'
-                }`}
-                placeholder="Enter prompt content..." />
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground">
-              <p>Select a prompt to edit</p>
-            </div>
-          )}
+          {editor}
         </main>
       </div>
 
-      {/* Delete confirmation */}
+      {/* Dialogs */}
       <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -415,21 +483,33 @@ export default function PromptLibrary() {
             <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>No</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Yes</AlertDialogAction>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Save confirmation */}
+      <AlertDialog open={unlockConfirmOpen} onOpenChange={setUnlockConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unlock Editing</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to edit a locked system prompt. Changes may affect all future builds. Do you want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setUnlockConfirmOpen(false); setEditMode(true); }}>Unlock</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={saveConfirmOpen} onOpenChange={setSaveConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Save</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to overwrite this prompt?
-              The current version will be replaced.
-              A single previous version backup will be kept.
+              Are you sure you want to overwrite this prompt? The current version will be replaced. A single previous version backup will be kept.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -439,41 +519,17 @@ export default function PromptLibrary() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Revert confirmation */}
       <AlertDialog open={revertConfirmOpen} onOpenChange={setRevertConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Revert Prompt</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to revert to the previous version?{'\n'}
-              This will overwrite the current version.
+              Are you sure you want to revert to the previous version? This will overwrite the current version.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmedRevert} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Confirm Revert
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Unlock confirmation */}
-      <AlertDialog open={unlockConfirmOpen} onOpenChange={setUnlockConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Unlock Editing</AlertDialogTitle>
-            <AlertDialogDescription>
-              You are about to edit a locked system prompt.
-              Changes may affect all future builds.
-              Do you want to continue?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setUnlockConfirmOpen(false); setEditMode(true); }}>
-              Unlock
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleConfirmedRevert}>Confirm Revert</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
