@@ -54,6 +54,7 @@ export default function PromptLibrary() {
   const [editMode, setEditMode] = useState(false);
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
   const [revertConfirmOpen, setRevertConfirmOpen] = useState(false);
+  const [unlockConfirmOpen, setUnlockConfirmOpen] = useState(false);
   const [ownerDialogOpen, setOwnerDialogOpen] = useState(false);
   const [ownerInput, setOwnerInput] = useState('');
 
@@ -340,7 +341,7 @@ export default function PromptLibrary() {
               {editMode && (
                 <div className="flex items-center gap-2 px-4 py-2 mb-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-medium">
                   <ShieldAlert size={16} />
-                  You are editing a locked system prompt
+                  Editing system prompt — changes will affect all builds
                 </div>
               )}
 
@@ -375,18 +376,20 @@ export default function PromptLibrary() {
                   {isOwner && (
                     <>
                       {!editMode ? (
-                        <button onClick={() => setEditMode(true)}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 border border-amber-500/30 transition-colors">
-                          <Unlock size={14} /> Unlock Editing
-                        </button>
-                      ) : (
                         <>
+                          <button onClick={() => setUnlockConfirmOpen(true)}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 border border-amber-500/30 transition-colors">
+                            <Unlock size={14} /> Unlock Editing
+                          </button>
                           {hasPreviousVersion && (
                             <button onClick={handleRevertRequest}
                               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 transition-colors">
                               <RotateCcw size={14} /> Revert
                             </button>
                           )}
+                        </>
+                      ) : (
+                        <>
                           <button onClick={() => { setEditMode(false); setEditContent(selectedItem.content); setEditName(selectedItem.name); }}
                             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted/60 transition-colors">
                             Cancel
@@ -398,7 +401,7 @@ export default function PromptLibrary() {
                           <button onClick={handleSaveRequest} disabled={saving}
                             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-md">
                             {saving ? <Loader2 size={14} className="animate-spin" /> : saved ? <Check size={14} /> : <Save size={14} />}
-                            {saving ? 'Saving...' : saved ? 'Saved' : 'Confirm Save'}
+                            {saving ? 'Saving...' : saved ? 'Saved' : 'Save'}
                           </button>
                         </>
                       )}
@@ -468,6 +471,26 @@ export default function PromptLibrary() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmedRevert} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Confirm Revert
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unlock confirmation */}
+      <AlertDialog open={unlockConfirmOpen} onOpenChange={setUnlockConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unlock System Prompt</AlertDialogTitle>
+            <AlertDialogDescription>
+              You're about to edit a locked system prompt.
+              This may affect all generated websites.
+              Are you sure you want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setUnlockConfirmOpen(false); setEditMode(true); }}>
+              Confirm Unlock
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
