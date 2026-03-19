@@ -6,13 +6,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 /* ------------------------------------------------------------------ */
+/*  Brand options                                                     */
+/* ------------------------------------------------------------------ */
+
+const BRAND_OPTIONS = ['SwiftLift', 'Bluluma', 'Sonykun', 'SwiftSite'] as const;
+
+/* ------------------------------------------------------------------ */
 /*  Override module definitions                                       */
 /* ------------------------------------------------------------------ */
 
 const OVERRIDE_MODULES: Record<string, { label: string; prompt: string }> = {
   forceImageReplacement: {
     label: 'Force Image Replacement',
-    prompt: `\n--------------------------------------------------\nOVERRIDE: FORCE IMAGE REPLACEMENT\n--------------------------------------------------\n- Replace ALL non-source images with source business images\n- Prioritize real photos over stock\n- Ignore conditional logic\n- Every hero, section, and card image must use actual business photography\n`,
+    prompt: `\n--------------------------------------------------\nOVERRIDE: FORCE IMAGE REPLACEMENT\n--------------------------------------------------\n- Replace ALL non-source images with source business images\n- Prioritize real photos over stock\n- Ignore conditional logic\n- Every hero, section, and card image must use actual business photography\n- Use {{DOMAIN}} as fallback image source if source images are insufficient\n`,
   },
   forceHeaderSimplification: {
     label: 'Force Header Simplification',
@@ -28,11 +34,32 @@ const OVERRIDE_MODULES: Record<string, { label: string; prompt: string }> = {
   },
   removeWebDesignCredit: {
     label: 'Remove Web Design Credit',
-    prompt: `\n--------------------------------------------------\nOVERRIDE: REMOVE WEB DESIGN CREDIT\n--------------------------------------------------\n- Remove "by Bluluma" line completely from footer\n- Keep only:\n  © 2026 {{COMPANY_NAME}}. All rights reserved.\n- Do not add any builder credit\n- This overrides the COPYRIGHT RULE in the base prompt\n`,
+    prompt: `\n--------------------------------------------------\nOVERRIDE: REMOVE WEB DESIGN CREDIT\n--------------------------------------------------\n- Remove "by Bluluma" line completely from footer\n- Keep only:\n  © 2026 {{BRAND_NAME}}. All rights reserved.\n- Do not add any builder credit\n- This overrides the COPYRIGHT RULE in the base prompt\n`,
   },
 };
 
 const OVERRIDE_KEYS = Object.keys(OVERRIDE_MODULES);
+
+/* ------------------------------------------------------------------ */
+/*  Image QA & Data Authority blocks                                  */
+/* ------------------------------------------------------------------ */
+
+const IMAGE_QA_BLOCK = `\n--------------------------------------------------\nIMAGE QA SYSTEM\n--------------------------------------------------\nEvaluate all images across the website.\n\nIF:\n- images are missing\n- images are generic\n- images are irrelevant\n\nTHEN:\n- attempt to reuse extracted source images first\n- DO NOT replace valid, relevant existing images\n- if insufficient, fetch relevant images from {{DOMAIN}}\n- prioritize real business images from the domain\n- avoid generic stock images unless no alternative exists\n\nELSE:\n- preserve existing images\n`;
+
+const DATA_AUTHORITY_BLOCK = `\n--------------------------------------------------\nDATA AUTHORITY RULE\n--------------------------------------------------\nStrict data priority order:\n1. Extracted Source Data (highest priority)\n2. DOMAIN fallback ({{DOMAIN}})\n3. Generated content (last resort)\n\nSTRICT RULES:\n- AI must NOT generate or infer missing data before checking DOMAIN\n- AI must NOT hallucinate business details, services, or visuals\n- DOMAIN must be used as secondary truth source before any generation\n`;
+
+const DOMAIN_VALIDATION_BLOCK = `\n--------------------------------------------------\nDOMAIN VALIDATION SAFETY\n--------------------------------------------------\nIF DOMAIN is unreachable, invalid, or empty:\n- Skip DOMAIN fallback entirely\n- Proceed using only extracted source data\n- Allow generation ONLY as final fallback\n- Do NOT halt the revision process\n`;
+
+/* ------------------------------------------------------------------ */
+/*  Domain normalization                                              */
+/* ------------------------------------------------------------------ */
+
+function normalizeDomain(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Collapsible UI                                                    */
@@ -69,8 +96,7 @@ const QA_PROMPT_ID = '58bd2c0f-305d-4432-b13c-43e31e60e75f';
 
 export default function Revision() {
   // Required inputs
-  const [companyName, setCompanyName] = useState('');
-  const [brandName, setBrandName] = useState('');
+  const [brandName, setBrandName] = useState<string>('SwiftLift');
   const [domain, setDomain] = useState('');
 
   // Overrides
@@ -91,8 +117,8 @@ export default function Revision() {
 
   /* ---- Generate ---- */
   const handleGenerate = useCallback(async () => {
-    if (!companyName.trim()) {
-      toast.error('Company Name is required');
+    if (!domain.trim()) {
+      toast.error('Website Domain is required');
       return;
     }
 
@@ -110,27 +136,37 @@ export default function Revision() {
         throw new Error('Could not load QA Master Prompt from library');
       }
 
-      const effectiveBrand = brandName.trim() || companyName.trim();
-      const effectiveDomain = domain.trim() || '';
+      const effectiveBrand = brandName;
+      const normalizedDomain = normalizeDomain(domain);
 
-      // 2. Inject company context into master prompt
+      // 2. Inject context into master prompt — remove any leftover {{COMPANY_NAME}} refs
       let compiled = promptRow.content
-        .replace(/\{\{COMPANY_NAME\}\}/g, companyName.trim())
+        .replace(/\{\{COMPANY_NAME\}\}/g, effectiveBrand)
         .replace(/\{\{BRAND_NAME\}\}/g, effectiveBrand)
-        .replace(/\{\{DOMAIN\}\}/g, effectiveDomain || '(not provided)');
+        .replace(/\{\{DOMAIN\}\}/g, normalizedDomain || '(not provided)');
 
-      // 3. Append selected override modules
+      // 3. Append Image QA System block
+      compiled += IMAGE_QA_BLOCK.replace(/\{\{DOMAIN\}\}/g, normalizedDomain || '(not provided)');
+
+      // 4. Append Data Authority block
+      compiled += DATA_AUTHORITY_BLOCK.replace(/\{\{DOMAIN\}\}/g, normalizedDomain || '(not provided)');
+
+      // 5. Append Domain Validation Safety
+      compiled += DOMAIN_VALIDATION_BLOCK;
+
+      // 6. Append selected override modules
       for (const key of OVERRIDE_KEYS) {
         if (overrides.has(key)) {
           let moduleText = OVERRIDE_MODULES[key].prompt;
           moduleText = moduleText
-            .replace(/\{\{COMPANY_NAME\}\}/g, companyName.trim())
-            .replace(/\{\{BRAND_NAME\}\}/g, effectiveBrand);
+            .replace(/\{\{BRAND_NAME\}\}/g, effectiveBrand)
+            .replace(/\{\{COMPANY_NAME\}\}/g, effectiveBrand)
+            .replace(/\{\{DOMAIN\}\}/g, normalizedDomain || '(not provided)');
           compiled += moduleText;
         }
       }
 
-      // 4. Append custom instruction
+      // 7. Append custom instruction
       if (customInstructions.trim()) {
         compiled += `\n--------------------------------------------------\nCUSTOM REVISION INSTRUCTION (HIGHEST PRIORITY)\n--------------------------------------------------\n${customInstructions.trim()}\n\nThis instruction takes precedence over all other rules when a conflict exists.\n`;
       }
@@ -142,7 +178,7 @@ export default function Revision() {
     } finally {
       setGenerating(false);
     }
-  }, [companyName, brandName, domain, overrides, customInstructions]);
+  }, [brandName, domain, overrides, customInstructions]);
 
   return (
     <div className="flex flex-col h-screen">
@@ -152,40 +188,40 @@ export default function Revision() {
         {/* Left Panel */}
         <aside className="w-[340px] shrink-0 border-r border-border bg-card overflow-y-auto p-5 space-y-4">
 
-          {/* --- Company Context --- */}
-          <CollapsibleSection title="Company Context">
+          {/* --- Brand & Data Source --- */}
+          <CollapsibleSection title="Brand & Data Source">
             <div className="space-y-3">
               <div>
                 <label className="control-label">
-                  Company Name <span className="text-destructive">*</span>
+                  Brand Name <span className="text-destructive">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="Acme Corp"
-                  className="control-input"
-                />
-              </div>
-              <div>
-                <label className="control-label">Brand Name (optional)</label>
-                <input
-                  type="text"
+                <select
                   value={brandName}
                   onChange={(e) => setBrandName(e.target.value)}
-                  placeholder="Defaults to Company Name"
                   className="control-input"
-                />
+                >
+                  {BRAND_OPTIONS.map((b) => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="control-label">Domain (optional)</label>
+                <label className="control-label">
+                  Website Domain <span className="text-destructive">*</span>
+                </label>
                 <input
                   type="text"
                   value={domain}
                   onChange={(e) => setDomain(e.target.value)}
-                  placeholder="https://acmecorp.com"
+                  onBlur={() => {
+                    if (domain.trim()) setDomain(normalizeDomain(domain));
+                  }}
+                  placeholder="https://example.com"
                   className="control-input"
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Used for image fallback and content reference if needed
+                </p>
               </div>
             </div>
           </CollapsibleSection>
