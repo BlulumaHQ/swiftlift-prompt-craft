@@ -117,29 +117,42 @@ export default function PromptLibrary() {
     });
 
     try {
-      if (selectedItem.source === 'cloud') {
-        await saveCloudPrompt({
-          id: selectedItem.cloudId,
-          prompt_name: editName,
-          file_path: selectedItem.filePath || '',
-          version: selectedItem.version || 1,
-          content: editContent,
-          category: selectedItem.category,
-        });
-        toast({ title: 'Saved to cloud' });
+      // ALWAYS save to local
+      const localBlock: PromptBlock = {
+        id: selectedItem.source === 'cloud' ? selectedItem.name.toLowerCase().replace(/[^a-z0-9]+/g, '_') : selectedItem.id,
+        name: editName,
+        content: editContent,
+        category: selectedItem.category as any,
+        mode: 'prompts',
+        type: (selectedItem.type || 'Output Prompt') as any,
+        status: (selectedItem.status || 'CONFIRMED') as any,
+      };
+      savePromptBlock(localBlock);
+
+      // ALWAYS save to cloud
+      const existingCloud = await getCloudPrompts();
+      const cloudMatch = existingCloud.find(c => c.prompt_name === editName || c.id === selectedItem.cloudId);
+      await saveCloudPrompt({
+        id: cloudMatch?.id || selectedItem.cloudId,
+        prompt_name: editName,
+        file_path: cloudMatch?.file_path || selectedItem.filePath || '',
+        version: cloudMatch ? cloudMatch.version : (selectedItem.version || 1),
+        content: editContent,
+        category: selectedItem.category,
+      });
+
+      // Verify sync
+      const verifyCloud = await getCloudPrompts();
+      const savedCloud = verifyCloud.find(c => c.prompt_name === editName);
+      const localPrompts = getPromptLibrary();
+      const savedLocal = localPrompts.find(p => p.name === editName);
+
+      if (savedCloud && savedLocal && savedCloud.content === savedLocal.content) {
+        toast({ title: 'Saved & synced (local + cloud)' });
       } else {
-        const updated: PromptBlock = {
-          id: selectedItem.id,
-          name: editName,
-          content: editContent,
-          category: selectedItem.category as any,
-          mode: 'prompts',
-          type: (selectedItem.type || 'Output Prompt') as any,
-          status: (selectedItem.status || 'CONFIRMED') as any,
-        };
-        savePromptBlock(updated);
-        toast({ title: 'Saved locally' });
+        toast({ title: 'Saved', description: 'Warning: sync verification could not confirm match.', variant: 'destructive' });
       }
+
       setSaved(true);
       setEditMode(false);
       setTimeout(() => setSaved(false), 2000);
