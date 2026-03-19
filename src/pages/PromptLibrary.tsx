@@ -46,16 +46,11 @@ export default function PromptLibrary() {
   const [allExpanded, setAllExpanded] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
-  // --- NEW: Prompt Protection State ---
-  const [isOwner, setIsOwner] = useState(() => {
-    return sessionStorage.getItem(OWNER_KEY) === 'true';
-  });
+  // --- Prompt Protection State ---
   const [editMode, setEditMode] = useState(false);
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
   const [revertConfirmOpen, setRevertConfirmOpen] = useState(false);
   const [unlockConfirmOpen, setUnlockConfirmOpen] = useState(false);
-  const [ownerDialogOpen, setOwnerDialogOpen] = useState(false);
-  const [ownerInput, setOwnerInput] = useState('');
 
   // Previous version backup: { id -> { name, content } }
   const previousVersions = useRef<Map<string, { name: string; content: string }>>(new Map());
