@@ -19,8 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 // System prompt IDs that should be hidden from the operational library
 const SYSTEM_PROMPT_IDS = ['generator_app_build_v1'];
 
-// Owner passphrase — in production this would be auth-based
-const OWNER_KEY = 'swiftlift_prompt_owner';
+// System prompt IDs that should be hidden from the operational library
 
 interface PromptItem {
   id: string;
@@ -47,16 +46,11 @@ export default function PromptLibrary() {
   const [allExpanded, setAllExpanded] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
-  // --- NEW: Prompt Protection State ---
-  const [isOwner, setIsOwner] = useState(() => {
-    return sessionStorage.getItem(OWNER_KEY) === 'true';
-  });
+  // --- Prompt Protection State ---
   const [editMode, setEditMode] = useState(false);
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
   const [revertConfirmOpen, setRevertConfirmOpen] = useState(false);
   const [unlockConfirmOpen, setUnlockConfirmOpen] = useState(false);
-  const [ownerDialogOpen, setOwnerDialogOpen] = useState(false);
-  const [ownerInput, setOwnerInput] = useState('');
 
   // Previous version backup: { id -> { name, content } }
   const previousVersions = useRef<Map<string, { name: string; content: string }>>(new Map());
@@ -104,19 +98,6 @@ export default function PromptLibrary() {
   };
 
   const hasPreviousVersion = selectedId ? previousVersions.current.has(selectedId) : false;
-
-  // --- Owner verification ---
-  const handleOwnerVerify = () => {
-    if (ownerInput.trim().toLowerCase() === 'bluluma') {
-      sessionStorage.setItem(OWNER_KEY, 'true');
-      setIsOwner(true);
-      setOwnerDialogOpen(false);
-      setOwnerInput('');
-      toast({ title: 'Owner access granted' });
-    } else {
-      toast({ title: 'Incorrect passphrase', variant: 'destructive' });
-    }
-  };
 
   // --- Save with confirmation ---
   const handleSaveRequest = () => {
@@ -285,18 +266,6 @@ export default function PromptLibrary() {
                 {allExpanded ? 'Collapse' : 'Expand'}
               </button>
               <div className="flex items-center gap-1">
-                {!isOwner && (
-                  <button onClick={() => setOwnerDialogOpen(true)}
-                    className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors">
-                    <Lock size={12} /> Authenticate
-                  </button>
-                )}
-                {isOwner && (
-                  <button onClick={() => { sessionStorage.removeItem(OWNER_KEY); setIsOwner(false); setEditMode(false); }}
-                    className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-emerald-600 hover:text-emerald-700 transition-colors">
-                    <ShieldAlert size={12} /> Owner ✓
-                  </button>
-                )}
                 <button onClick={handleSyncToCloud} disabled={syncing}
                   className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors">
                   {syncing ? <Loader2 size={12} className="animate-spin" /> : <Cloud size={12} />}
@@ -341,7 +310,7 @@ export default function PromptLibrary() {
               {editMode && (
                 <div className="flex items-center gap-2 px-4 py-2 mb-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-medium">
                   <ShieldAlert size={16} />
-                  Editing system prompt — changes will affect all builds
+                  Editing system prompt — changes will affect future builds
                 </div>
               )}
 
@@ -372,39 +341,34 @@ export default function PromptLibrary() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {/* Only show controls if owner */}
-                  {isOwner && (
+                  {!editMode ? (
                     <>
-                      {!editMode ? (
-                        <>
-                          <button onClick={() => setUnlockConfirmOpen(true)}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 border border-amber-500/30 transition-colors">
-                            <Unlock size={14} /> Unlock Editing
-                          </button>
-                          {hasPreviousVersion && (
-                            <button onClick={handleRevertRequest}
-                              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 transition-colors">
-                              <RotateCcw size={14} /> Revert
-                            </button>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <button onClick={() => { setEditMode(false); setEditContent(selectedItem.content); setEditName(selectedItem.name); }}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted/60 transition-colors">
-                            Cancel
-                          </button>
-                          <button onClick={() => setDeleteTarget(selectedItem.id)}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors">
-                            <Trash2 size={14} />
-                          </button>
-                          <button onClick={handleSaveRequest} disabled={saving}
-                            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-md">
-                            {saving ? <Loader2 size={14} className="animate-spin" /> : saved ? <Check size={14} /> : <Save size={14} />}
-                            {saving ? 'Saving...' : saved ? 'Saved' : 'Save'}
-                          </button>
-                        </>
+                      <button onClick={() => setUnlockConfirmOpen(true)}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 border border-amber-500/30 transition-colors">
+                        <Unlock size={14} /> Unlock Editing
+                      </button>
+                      {hasPreviousVersion && (
+                        <button onClick={handleRevertRequest}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 transition-colors">
+                          <RotateCcw size={14} /> Revert to Previous Version
+                        </button>
                       )}
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => { setEditMode(false); setEditContent(selectedItem.content); setEditName(selectedItem.name); }}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted/60 transition-colors">
+                        Cancel Editing
+                      </button>
+                      <button onClick={() => setDeleteTarget(selectedItem.id)}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors">
+                        <Trash2 size={14} />
+                      </button>
+                      <button onClick={handleSaveRequest} disabled={saving}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-md">
+                        {saving ? <Loader2 size={14} className="animate-spin" /> : saved ? <Check size={14} /> : <Save size={14} />}
+                        {saving ? 'Saving...' : saved ? 'Saved' : 'Save'}
+                      </button>
                     </>
                   )}
                 </div>
@@ -446,8 +410,9 @@ export default function PromptLibrary() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Save</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to overwrite this prompt?{'\n'}
-              This action will replace the current version.
+              Are you sure you want to overwrite this prompt?
+              The current version will be replaced.
+              A single previous version backup will be kept.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -480,42 +445,18 @@ export default function PromptLibrary() {
       <AlertDialog open={unlockConfirmOpen} onOpenChange={setUnlockConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Unlock System Prompt</AlertDialogTitle>
+            <AlertDialogTitle>Unlock Editing</AlertDialogTitle>
             <AlertDialogDescription>
-              You're about to edit a locked system prompt.
-              This may affect all generated websites.
-              Are you sure you want to continue?
+              You are about to edit a locked system prompt.
+              Changes may affect all future builds.
+              Do you want to continue?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => { setUnlockConfirmOpen(false); setEditMode(true); }}>
-              Confirm Unlock
+              Unlock
             </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Owner authentication dialog */}
-      <AlertDialog open={ownerDialogOpen} onOpenChange={setOwnerDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Owner Authentication</AlertDialogTitle>
-            <AlertDialogDescription>
-              Enter the owner passphrase to unlock editing capabilities.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <input
-            type="password"
-            value={ownerInput}
-            onChange={e => setOwnerInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleOwnerVerify()}
-            placeholder="Passphrase"
-            className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setOwnerInput('')}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleOwnerVerify}>Verify</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
