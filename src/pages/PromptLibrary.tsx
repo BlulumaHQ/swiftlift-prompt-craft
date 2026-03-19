@@ -99,19 +99,6 @@ export default function PromptLibrary() {
 
   const hasPreviousVersion = selectedId ? previousVersions.current.has(selectedId) : false;
 
-  // --- Owner verification ---
-  const handleOwnerVerify = () => {
-    if (ownerInput.trim().toLowerCase() === 'bluluma') {
-      sessionStorage.setItem(OWNER_KEY, 'true');
-      setIsOwner(true);
-      setOwnerDialogOpen(false);
-      setOwnerInput('');
-      toast({ title: 'Owner access granted' });
-    } else {
-      toast({ title: 'Incorrect passphrase', variant: 'destructive' });
-    }
-  };
-
   // --- Save with confirmation ---
   const handleSaveRequest = () => {
     if (!selectedItem || !editMode) return;
