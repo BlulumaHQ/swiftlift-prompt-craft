@@ -459,30 +459,6 @@ export default function PromptLibrary() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Owner authentication dialog */}
-      <AlertDialog open={ownerDialogOpen} onOpenChange={setOwnerDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Owner Authentication</AlertDialogTitle>
-            <AlertDialogDescription>
-              Enter the owner passphrase to unlock editing capabilities.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <input
-            type="password"
-            value={ownerInput}
-            onChange={e => setOwnerInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleOwnerVerify()}
-            placeholder="Passphrase"
-            className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setOwnerInput('')}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleOwnerVerify}>Verify</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
