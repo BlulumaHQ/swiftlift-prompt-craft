@@ -218,6 +218,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           businessType: '',
           userNotes: specialInstructions || '',
           packageTier,
+          projectBrand: projectBrand || 'SwiftLift',
           themeMode,
           primaryColor,
           secondaryColor,
