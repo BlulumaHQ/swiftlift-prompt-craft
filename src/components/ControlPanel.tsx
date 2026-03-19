@@ -198,16 +198,38 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     const resolvedConvRef = normalizedConvUrl || convRef?.live_url || '';
 
     try {
-      // DEBUG MODE: Read prompts from local Prompt Library state
+      // Read prompts from local Prompt Library state
       const localPrompts = getPromptLibrary();
       const extractionPrompt = localPrompts.find(p => p.name === 'SwiftLift Source Extraction Prompt V1')?.content || '';
       const masterPrompt = localPrompts.find(p => p.name === 'SwiftLift Final Build Master Prompt V1')?.content || '';
       const assemblyRules = localPrompts.find(p => p.name === 'SwiftLift Prompt Assembly Rules V1')?.content || '';
 
       if (!extractionPrompt || !masterPrompt || !assemblyRules) {
-        onGenerateError('Required local prompts missing. Check Prompt Library for all 3 required prompts.');
+        onGenerateError('Required prompts missing. Check Prompt Library for all 3 required prompts.');
         setGenerating(false);
         return;
+      }
+
+      // Sync verification: compare local vs cloud
+      try {
+        const { getCloudPrompts } = await import('@/lib/promptCloudStore');
+        const cloudPrompts = await getCloudPrompts();
+        const requiredNames = [
+          'SwiftLift Source Extraction Prompt V1',
+          'SwiftLift Final Build Master Prompt V1',
+          'SwiftLift Prompt Assembly Rules V1',
+        ];
+        for (const name of requiredNames) {
+          const local = localPrompts.find(p => p.name === name);
+          const cloud = cloudPrompts.find(p => p.prompt_name === name);
+          if (local && cloud && local.content !== cloud.content) {
+            onGenerateError(`Prompt sync mismatch detected for "${name}". Please save or sync prompts before generating.`);
+            setGenerating(false);
+            return;
+          }
+        }
+      } catch (syncErr) {
+        console.warn('Sync verification skipped:', syncErr);
       }
 
       const { data, error } = await supabase.functions.invoke('generate-final-prompt', {
