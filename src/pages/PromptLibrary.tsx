@@ -54,6 +54,7 @@ export default function PromptLibrary() {
   const [editMode, setEditMode] = useState(false);
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
   const [revertConfirmOpen, setRevertConfirmOpen] = useState(false);
+  const [unlockConfirmOpen, setUnlockConfirmOpen] = useState(false);
   const [ownerDialogOpen, setOwnerDialogOpen] = useState(false);
   const [ownerInput, setOwnerInput] = useState('');
 
