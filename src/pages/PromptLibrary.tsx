@@ -376,18 +376,18 @@ export default function PromptLibrary() {
                   {isOwner && (
                     <>
                       {!editMode ? (
-                        <button onClick={() => setEditMode(true)}
+                         <button onClick={() => setUnlockConfirmOpen(true)}
                           className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 border border-amber-500/30 transition-colors">
                           <Unlock size={14} /> Unlock Editing
                         </button>
-                      ) : (
+                        {hasPreviousVersion && (
+                          <button onClick={handleRevertRequest}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 transition-colors">
+                            <RotateCcw size={14} /> Revert
+                          </button>
+                        )}
+                      </>) : (
                         <>
-                          {hasPreviousVersion && (
-                            <button onClick={handleRevertRequest}
-                              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 border border-destructive/30 transition-colors">
-                              <RotateCcw size={14} /> Revert
-                            </button>
-                          )}
                           <button onClick={() => { setEditMode(false); setEditContent(selectedItem.content); setEditName(selectedItem.name); }}
                             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted/60 transition-colors">
                             Cancel
@@ -399,7 +399,7 @@ export default function PromptLibrary() {
                           <button onClick={handleSaveRequest} disabled={saving}
                             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-md">
                             {saving ? <Loader2 size={14} className="animate-spin" /> : saved ? <Check size={14} /> : <Save size={14} />}
-                            {saving ? 'Saving...' : saved ? 'Saved' : 'Confirm Save'}
+                            {saving ? 'Saving...' : saved ? 'Saved' : 'Save'}
                           </button>
                         </>
                       )}
