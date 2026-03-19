@@ -266,18 +266,6 @@ export default function PromptLibrary() {
                 {allExpanded ? 'Collapse' : 'Expand'}
               </button>
               <div className="flex items-center gap-1">
-                {!isOwner && (
-                  <button onClick={() => setOwnerDialogOpen(true)}
-                    className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors">
-                    <Lock size={12} /> Authenticate
-                  </button>
-                )}
-                {isOwner && (
-                  <button onClick={() => { sessionStorage.removeItem(OWNER_KEY); setIsOwner(false); setEditMode(false); }}
-                    className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-emerald-600 hover:text-emerald-700 transition-colors">
-                    <ShieldAlert size={12} /> Owner ✓
-                  </button>
-                )}
                 <button onClick={handleSyncToCloud} disabled={syncing}
                   className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors">
                   {syncing ? <Loader2 size={12} className="animate-spin" /> : <Cloud size={12} />}
