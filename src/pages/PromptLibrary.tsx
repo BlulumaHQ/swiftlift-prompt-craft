@@ -410,8 +410,9 @@ export default function PromptLibrary() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Save</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to overwrite this prompt?{'\n'}
-              This action will replace the current version.
+              Are you sure you want to overwrite this prompt?
+              The current version will be replaced.
+              A single previous version backup will be kept.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
