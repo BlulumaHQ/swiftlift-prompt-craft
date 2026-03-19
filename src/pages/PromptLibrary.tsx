@@ -178,31 +178,35 @@ export default function PromptLibrary() {
     setEditName(prev.name);
     setEditContent(prev.content);
 
-    // Auto-save the reverted content
+    // Auto-save reverted content to BOTH local and cloud
     const item = items.find(i => i.id === selectedId);
     if (!item) return;
 
     try {
-      if (item.source === 'cloud') {
-        await saveCloudPrompt({
-          id: item.cloudId,
-          prompt_name: prev.name,
-          file_path: item.filePath || '',
-          version: item.version || 1,
-          content: prev.content,
-          category: item.category,
-        });
-      } else {
-        savePromptBlock({
-          id: item.id, name: prev.name, content: prev.content,
-          category: item.category as any, mode: 'prompts',
-          type: (item.type || 'Output Prompt') as any,
-          status: (item.status || 'CONFIRMED') as any,
-        });
-      }
+      // Save to local
+      savePromptBlock({
+        id: item.source === 'cloud' ? prev.name.toLowerCase().replace(/[^a-z0-9]+/g, '_') : item.id,
+        name: prev.name, content: prev.content,
+        category: item.category as any, mode: 'prompts',
+        type: (item.type || 'Output Prompt') as any,
+        status: (item.status || 'CONFIRMED') as any,
+      });
+
+      // Save to cloud
+      const existingCloud = await getCloudPrompts();
+      const cloudMatch = existingCloud.find(c => c.prompt_name === prev.name || c.id === item.cloudId);
+      await saveCloudPrompt({
+        id: cloudMatch?.id || item.cloudId,
+        prompt_name: prev.name,
+        file_path: cloudMatch?.file_path || item.filePath || '',
+        version: cloudMatch ? cloudMatch.version : (item.version || 1),
+        content: prev.content,
+        category: item.category,
+      });
+
       previousVersions.current.delete(selectedId);
       setEditMode(false);
-      toast({ title: 'Reverted to previous version' });
+      toast({ title: 'Reverted & synced (local + cloud)' });
       await loadAll();
     } catch (err: any) {
       toast({ title: 'Revert failed', description: err.message, variant: 'destructive' });
