@@ -445,11 +445,11 @@ export default function PromptLibrary() {
       <AlertDialog open={unlockConfirmOpen} onOpenChange={setUnlockConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Unlock System Prompt</AlertDialogTitle>
+            <AlertDialogTitle>Unlock Editing</AlertDialogTitle>
             <AlertDialogDescription>
-              You're about to edit a locked system prompt.
-              This may affect all generated websites.
-              Are you sure you want to continue?
+              You are about to edit a locked system prompt.
+              Changes may affect all future builds.
+              Do you want to continue?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
