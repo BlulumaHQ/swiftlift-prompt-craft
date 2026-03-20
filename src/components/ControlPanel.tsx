@@ -98,6 +98,8 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const [advModules, setAdvModules] = useState<string[]>([]);
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'unknown' | 'synced' | 'unsynced' | 'checking'>('unknown');
+  const [unsyncedPrompt, setUnsyncedPrompt] = useState<string | null>(null);
   const [showBrandConfirm, setShowBrandConfirm] = useState(false);
   const [confirmBrand, setConfirmBrand] = useState('SwiftLift');
   const detectAbortRef = useRef<AbortController | null>(null);
