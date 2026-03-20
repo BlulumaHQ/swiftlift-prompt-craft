@@ -200,9 +200,9 @@ export default function ReferenceLibraryModal({ open, onClose, onSelect, roleFil
                     </div>
                   </div>
 
-                  <div className="p-2.5 space-y-1.5">
+                  <div className="p-2.5 flex flex-col flex-1">
                     <p className="text-sm font-medium text-foreground truncate">{ref.site_name}</p>
-                    <div className="flex items-center gap-1 flex-wrap">
+                    <div className="flex items-center gap-1 flex-wrap mt-1.5">
                       <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary text-secondary-foreground">{ref.industry}</span>
                       {category && (
                         <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium capitalize ${categoryColors[category] || 'bg-muted text-muted-foreground'}`}>
