@@ -56,7 +56,7 @@ interface DetectedBrand {
   fontWeight: { weight: string; source: string } | null;
 }
 
-export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGenerateError, onClear, clearSignal, saveSignal, newSignal }: Props) {
+export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGenerateError, onClear, onSaveResult, clearSignal, saveSignal, newSignal, currentPromptA, currentPromptB }: Props) {
   const [projectBrand, setProjectBrand] = useState('SwiftLift');
   const [sourceUrl, setSourceUrl] = useState('');
   const [projectName, setProjectName] = useState('');
