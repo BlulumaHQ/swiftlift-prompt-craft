@@ -107,7 +107,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const toggleModule = (id: string) => setModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   const toggleAdvModule = (id: string) => setAdvModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
-  // Check prompt sync status — verify all 3 cloud prompts exist and have content
+  // Check prompt sync status — verify all 3 cloud prompts exist and have valid metadata
   const checkSyncStatus = useCallback(async () => {
     setSyncStatus('checking');
     try {
@@ -116,11 +116,19 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
 
       for (const name of requiredNames) {
         const cloudId = CLOUD_PROMPT_IDS[name];
-        const cloud = cloudPrompts.find(p => p.id === cloudId);
-        if (!cloud || !normalizePromptContent(cloud.content)) {
+        const cloud = cloudPrompts.find(p => p.id === cloudId) as any;
+        if (!cloud || !cloud.content) {
           setSyncStatus('unsynced');
           const shortName = name.replace('SwiftLift ', '').replace(' V1', '');
           setUnsyncedPrompt(shortName + ' missing from cloud');
+          return;
+        }
+        // Verify content_hash is present and matches actual content
+        const actualHash = computeContentHash(cloud.content);
+        if (cloud.content_hash && cloud.content_hash !== actualHash) {
+          setSyncStatus('unsynced');
+          const shortName = name.replace('SwiftLift ', '').replace(' V1', '');
+          setUnsyncedPrompt(shortName + ' content integrity mismatch');
           return;
         }
       }

@@ -134,13 +134,13 @@ export default function PromptLibrary() {
         category: selectedItem.category,
       });
 
+      // Verify save via metadata — check content_hash matches
       const verifyCloud = await getCloudPrompts();
       const savedCloud = verifyCloud.find(c => c.prompt_name === editName);
-      const localPrompts = getPromptLibrary();
-      const savedLocal = localPrompts.find(p => p.name === editName);
+      const newHash = (await import('@/lib/promptCloudStore')).computeContentHash(editContent);
 
-      if (savedCloud && savedLocal && savedCloud.content === savedLocal.content) {
-        toast({ title: 'Saved & synced (local + cloud)' });
+      if (savedCloud && savedCloud.content_hash === newHash) {
+        toast({ title: `Saved & synced — revision #${savedCloud.revision_number}` });
       } else {
         toast({ title: 'Saved', description: 'Warning: sync verification could not confirm match.', variant: 'destructive' });
       }
