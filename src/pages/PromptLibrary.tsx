@@ -71,6 +71,7 @@ export default function PromptLibrary() {
       cloudItems = cloudPrompts.map(p => ({
         id: `cloud-${p.id}`, name: p.prompt_name, content: p.content, category: p.category,
         source: 'cloud' as const, cloudId: p.id, filePath: p.file_path, version: p.version,
+        revisionNumber: p.revision_number, contentHash: p.content_hash, syncOrigin: p.sync_origin,
       }));
     } catch (err) {
       console.warn('Could not load cloud prompts:', err);
