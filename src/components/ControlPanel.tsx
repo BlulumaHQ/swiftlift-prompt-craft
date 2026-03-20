@@ -16,8 +16,6 @@ const CLOUD_PROMPT_IDS: Record<string, string> = {
   'SwiftLift Prompt Assembly Rules V1': 'cd77a34e-9cb0-44f1-8d31-e1764c531f8e',
 };
 
-// Content hash-based sync — no longer uses text content normalization for comparison
-
 const projectBrands = ['SwiftLift', 'Bluluma', 'Sonykun', 'SwiftSite'];
 
 interface Props {
@@ -43,7 +41,6 @@ function getProjectName(sourceUrl: string): string {
   }
 }
 
-// Adapter: DemoSite fields used by the modal selection
 interface RefSelection {
   reference_name: string;
   live_url: string;
@@ -54,6 +51,66 @@ interface DetectedBrand {
   secondaryColor: { hex: string; source: string } | null;
   primaryFont: { family: string; source: string } | null;
   fontWeight: { weight: string; source: string } | null;
+}
+
+// Auto-differentiation: derive Prompt B palette from Prompt A's detected values
+function differentiateColorForB(hex: string): string {
+  if (!hex) return '';
+  // Parse hex
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  // Convert to HSL
+  const rN = r / 255, gN = g / 255, bN = b / 255;
+  const max = Math.max(rN, gN, bN), min = Math.min(rN, gN, bN);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === rN) h = ((gN - bN) / d + (gN < bN ? 6 : 0)) / 6;
+    else if (max === gN) h = ((bN - rN) / d + 2) / 6;
+    else h = ((rN - gN) / d + 4) / 6;
+  }
+  // Shift: darken by 12%, increase saturation by 8%, shift hue by 8°
+  h = (h + 8 / 360) % 1;
+  s = Math.min(1, s + 0.08);
+  l = Math.max(0.08, l - 0.12);
+  // HSL to hex
+  const hue2rgb = (p: number, q: number, t: number) => {
+    if (t < 0) t += 1; if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+  const q2 = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p2 = 2 * l - q2;
+  const rOut = Math.round(hue2rgb(p2, q2, h + 1 / 3) * 255);
+  const gOut = Math.round(hue2rgb(p2, q2, h) * 255);
+  const bOut = Math.round(hue2rgb(p2, q2, h - 1 / 3) * 255);
+  return `#${rOut.toString(16).padStart(2, '0')}${gOut.toString(16).padStart(2, '0')}${bOut.toString(16).padStart(2, '0')}`;
+}
+
+function differentiateFontForB(fontA: string): string {
+  if (!fontA) return '';
+  // Pick a complementary font from the list
+  const sansSerif = ['Inter', 'Montserrat', 'Poppins', 'Plus Jakarta Sans', 'Sora', 'Space Grotesk', 'Syne', 'General Sans'];
+  const serif = ['Playfair Display', 'Lora', 'Cormorant Garamond', 'Merriweather', 'Libre Baskerville'];
+  const display = ['Archivo Black', 'Clash Display'];
+  // If A is sans-serif, B gets a premium sans or display
+  if (sansSerif.includes(fontA)) {
+    const alternatives = [...display, ...sansSerif.filter(f => f !== fontA)];
+    return alternatives[0] || fontA;
+  }
+  // If A is serif, B gets a modern sans
+  if (serif.includes(fontA)) {
+    return 'Space Grotesk';
+  }
+  // If A is display, B gets a clean sans
+  if (display.includes(fontA)) {
+    return 'Plus Jakarta Sans';
+  }
+  return fontA;
 }
 
 export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGenerateError, onClear, onSaveResult, clearSignal, saveSignal, newSignal, currentPromptA, currentPromptB }: Props) {
@@ -77,17 +134,27 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const [convUrlError, setConvUrlError] = useState('');
 
   const [packageTier, setPackageTier] = useState<'350' | '550'>('550');
-  const [primaryColor, setPrimaryColor] = useState('');
-  const [secondaryColor, setSecondaryColor] = useState('');
-  const [primaryFont, setPrimaryFont] = useState('');
-  const [fontWeight, setFontWeight] = useState('');
-  const [themeMode, setThemeMode] = useState<'auto' | 'force_light' | 'force_dark'>('auto');
+
+  // Prompt A theme overrides
+  const [aPrimaryColor, setAPrimaryColor] = useState('');
+  const [aSecondaryColor, setASecondaryColor] = useState('');
+  const [aPrimaryFont, setAPrimaryFont] = useState('');
+  const [aFontWeight, setAFontWeight] = useState('');
+  const [aThemeMode, setAThemeMode] = useState<'auto' | 'force_light' | 'force_dark'>('auto');
+
+  // Prompt B theme overrides
+  const [bPrimaryColor, setBPrimaryColor] = useState('');
+  const [bSecondaryColor, setBSecondaryColor] = useState('');
+  const [bPrimaryFont, setBPrimaryFont] = useState('');
+  const [bFontWeight, setBFontWeight] = useState('');
+  const [bThemeMode, setBThemeMode] = useState<'auto' | 'force_light' | 'force_dark'>('auto');
+
   const [brandDetected, setBrandDetected] = useState(false);
   const [brandDetecting, setBrandDetecting] = useState(false);
   const [detectedSources, setDetectedSources] = useState<{
     primaryColor?: string; secondaryColor?: string; primaryFont?: string; fontWeight?: string;
   }>({});
-  // Track manual overrides — once user manually changes a field, auto-detection won't overwrite it
+  // Track manual overrides per prompt — a_ and b_ prefixed
   const manualOverrides = useRef<Set<string>>(new Set());
   const [modules, setModules] = useState<string[]>([]);
   const [advModules, setAdvModules] = useState<string[]>([]);
@@ -102,7 +169,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const toggleModule = (id: string) => setModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   const toggleAdvModule = (id: string) => setAdvModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
-  // Check prompt sync status — verify all 3 cloud prompts exist and have valid metadata
+  // Check prompt sync status
   const checkSyncStatus = useCallback(async () => {
     setSyncStatus('checking');
     try {
@@ -118,7 +185,6 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           setUnsyncedPrompt(shortName + ' missing from cloud');
           return;
         }
-        // Verify content_hash is present and matches actual content
         const actualHash = computeContentHash(cloud.content);
         if (cloud.content_hash && cloud.content_hash !== actualHash) {
           setSyncStatus('unsynced');
@@ -130,22 +196,19 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
       setSyncStatus('synced');
       setUnsyncedPrompt(null);
     } catch {
-      // If cloud fetch fails, assume synced to avoid blocking
       setSyncStatus('synced');
       setUnsyncedPrompt(null);
     }
   }, []);
 
-  // Check sync on mount
   useEffect(() => {
     checkSyncStatus();
   }, [checkSyncStatus]);
 
-  // Real brand detection via edge function
+  // Real brand detection — populates both A and B with differentiation
   const runBrandDetection = useCallback(async (url: string) => {
     if (!url || url.length < 5) return;
 
-    // Abort any in-flight detection
     if (detectAbortRef.current) detectAbortRef.current.abort();
     const controller = new AbortController();
     detectAbortRef.current = controller;
@@ -167,25 +230,44 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
       const result = data as DetectedBrand & { success: boolean };
       const newSources: typeof detectedSources = {};
 
-      if (result.primaryColor?.hex && !manualOverrides.current.has('primaryColor')) {
-        setPrimaryColor(result.primaryColor.hex);
+      // Prompt A gets source-faithful values
+      if (result.primaryColor?.hex && !manualOverrides.current.has('a_primaryColor')) {
+        setAPrimaryColor(result.primaryColor.hex);
         newSources.primaryColor = result.primaryColor.source;
       }
-      if (result.secondaryColor?.hex && !manualOverrides.current.has('secondaryColor')) {
-        setSecondaryColor(result.secondaryColor.hex);
+      if (result.secondaryColor?.hex && !manualOverrides.current.has('a_secondaryColor')) {
+        setASecondaryColor(result.secondaryColor.hex);
         newSources.secondaryColor = result.secondaryColor.source;
       }
-      if (result.primaryFont?.family && !manualOverrides.current.has('primaryFont')) {
-        // Match against available Google Fonts list
+      if (result.primaryFont?.family && !manualOverrides.current.has('a_primaryFont')) {
         const matched = googleFonts.find(f => f.toLowerCase() === result.primaryFont!.family.toLowerCase());
         if (matched) {
-          setPrimaryFont(matched);
+          setAPrimaryFont(matched);
           newSources.primaryFont = result.primaryFont.source;
         }
       }
-      if (result.fontWeight?.weight && !manualOverrides.current.has('fontWeight')) {
-        setFontWeight(result.fontWeight.weight);
+      if (result.fontWeight?.weight && !manualOverrides.current.has('a_fontWeight')) {
+        setAFontWeight(result.fontWeight.weight);
         newSources.fontWeight = result.fontWeight.source;
+      }
+
+      // Prompt B gets differentiated values (premium/elevated direction)
+      if (result.primaryColor?.hex && !manualOverrides.current.has('b_primaryColor')) {
+        setBPrimaryColor(differentiateColorForB(result.primaryColor.hex));
+      }
+      if (result.secondaryColor?.hex && !manualOverrides.current.has('b_secondaryColor')) {
+        setBSecondaryColor(differentiateColorForB(result.secondaryColor.hex));
+      }
+      if (result.primaryFont?.family && !manualOverrides.current.has('b_primaryFont')) {
+        const matched = googleFonts.find(f => f.toLowerCase() === result.primaryFont!.family.toLowerCase());
+        if (matched) {
+          setBPrimaryFont(differentiateFontForB(matched));
+        }
+      }
+      if (result.fontWeight?.weight && !manualOverrides.current.has('b_fontWeight')) {
+        // B gets a slightly bolder weight
+        const w = parseInt(result.fontWeight.weight);
+        setBFontWeight(String(Math.min(900, w + 100)));
       }
 
       setDetectedSources(newSources);
@@ -204,7 +286,6 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     }
   };
 
-  // Trigger detection on URL blur (when user finishes typing)
   const handleSourceUrlBlur = () => {
     if (sourceUrl && sourceUrl.length > 5) {
       runBrandDetection(sourceUrl);
@@ -221,44 +302,28 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   }
 
   const executeGenerate = async () => {
-    // Validate manual URLs if provided
     const normalizedStyleUrl = normalizeUrl(styleRefUrl);
     const normalizedConvUrl = normalizeUrl(convRefUrl);
 
     if (styleRefUrl && normalizedStyleUrl) {
-      try {
-        new URL(normalizedStyleUrl);
-        setStyleUrlError('');
-      } catch {
-        setStyleUrlError('Unable to access the reference URL. Please check the address.');
-        return;
-      }
+      try { new URL(normalizedStyleUrl); setStyleUrlError(''); }
+      catch { setStyleUrlError('Unable to access the reference URL. Please check the address.'); return; }
     }
     if (convRefUrl && normalizedConvUrl) {
-      try {
-        new URL(normalizedConvUrl);
-        setConvUrlError('');
-      } catch {
-        setConvUrlError('Unable to access the reference URL. Please check the address.');
-        return;
-      }
+      try { new URL(normalizedConvUrl); setConvUrlError(''); }
+      catch { setConvUrlError('Unable to access the reference URL. Please check the address.'); return; }
     }
 
     setGenerating(true);
     onGenerateStart(packageTier);
 
-    // Priority: Manual URL > Demo Site selection > empty
     const resolvedStyleRef = normalizedStyleUrl || styleRef?.live_url || '';
     const resolvedConvRef = normalizedConvUrl || convRef?.live_url || '';
 
     try {
-      // Fetch latest cloud prompts as the single source of truth
       let cloudPrompts: Awaited<ReturnType<typeof getCloudPrompts>> = [];
-      try {
-        cloudPrompts = await getCloudPrompts();
-      } catch (fetchErr) {
-        console.warn('Cloud prompt fetch failed:', fetchErr);
-      }
+      try { cloudPrompts = await getCloudPrompts(); }
+      catch (fetchErr) { console.warn('Cloud prompt fetch failed:', fetchErr); }
 
       const requiredNames = Object.keys(CLOUD_PROMPT_IDS);
       const resolvedPrompts: Record<string, string> = {};
@@ -266,9 +331,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
       for (const name of requiredNames) {
         const cloudId = CLOUD_PROMPT_IDS[name];
         const cloud = cloudPrompts.find(p => p.id === cloudId);
-
         if (!cloud?.content) {
-          // Fallback to local if cloud is missing
           const localPrompts = getPromptLibrary();
           const local = localPrompts.find(p => p.name === name);
           if (!local?.content) {
@@ -286,7 +349,6 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
       const masterPrompt = resolvedPrompts['SwiftLift Final Build Master Prompt V1'];
       const assemblyRules = resolvedPrompts['SwiftLift Prompt Assembly Rules V1'];
 
-      // Mark as synced since we passed the check
       setSyncStatus('synced');
       setUnsyncedPrompt(null);
 
@@ -299,13 +361,19 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           userNotes: specialInstructions || '',
           packageTier,
           projectBrand: projectBrand || 'SwiftLift',
-          themeMode,
-          primaryColor,
-          secondaryColor,
-          primaryFont,
-          fontWeight,
+          // Prompt A theme
+          themeMode: aThemeMode,
+          primaryColor: aPrimaryColor,
+          secondaryColor: aSecondaryColor,
+          primaryFont: aPrimaryFont,
+          fontWeight: aFontWeight,
+          // Prompt B theme (separate)
+          promptBThemeMode: bThemeMode,
+          promptBPrimaryColor: bPrimaryColor,
+          promptBSecondaryColor: bSecondaryColor,
+          promptBPrimaryFont: bPrimaryFont,
+          promptBFontWeight: bFontWeight,
           enabledModules: modules,
-          // Pass local prompts for generation
           localPrompts: {
             extractionPrompt,
             masterPrompt,
@@ -340,22 +408,22 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     executeGenerate();
   };
 
-  // Stable project ID — reused across saves to prevent duplicates
+  // Stable project ID
   const currentProjectIdRef = useRef<string>(crypto.randomUUID());
   const lastSavedHashRef = useRef<string>('');
 
   const getProjectHash = useCallback(() => {
     return JSON.stringify({
       sourceUrl, projectName, clientName, packageTier,
-      modules, advModules, primaryColor, secondaryColor, primaryFont,
-      fontWeight, specialInstructions, promptA: currentPromptA, promptB: currentPromptB,
+      modules, advModules, aPrimaryColor, aSecondaryColor, aPrimaryFont,
+      aFontWeight, bPrimaryColor, bSecondaryColor, bPrimaryFont, bFontWeight,
+      specialInstructions, promptA: currentPromptA, promptB: currentPromptB,
     });
-  }, [sourceUrl, projectName, clientName, packageTier, modules, advModules, primaryColor, secondaryColor, primaryFont, fontWeight, specialInstructions, currentPromptA, currentPromptB]);
+  }, [sourceUrl, projectName, clientName, packageTier, modules, advModules, aPrimaryColor, aSecondaryColor, aPrimaryFont, aFontWeight, bPrimaryColor, bSecondaryColor, bPrimaryFont, bFontWeight, specialInstructions, currentPromptA, currentPromptB]);
 
   const doSave = useCallback(() => {
     try {
       const currentHash = getProjectHash();
-      // Skip if nothing changed since last save
       if (currentHash === lastSavedHashRef.current) {
         onSaveResult(true, 'No new changes to save');
         return;
@@ -366,11 +434,16 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
         id: currentProjectIdRef.current,
         name: projectName || getProjectName(sourceUrl),
         sourceUrl, referenceLayout: styleRef?.reference_name || '', referenceUrl: resolvedStyleRef, packageTier,
-        modules, addons: [], primaryColor, secondaryColor, primaryFont,
+        modules, addons: [], primaryColor: aPrimaryColor, secondaryColor: aSecondaryColor, primaryFont: aPrimaryFont,
         specialInstructions, promptA: currentPromptA, promptB: currentPromptB,
         dateCreated: new Date().toISOString().slice(0, 10),
         producedBy: projectBrand, projectName, clientName,
-        fontWeight, advancedModules: advModules,
+        fontWeight: aFontWeight, advancedModules: advModules,
+        // A/B theme overrides
+        promptAPrimaryColor: aPrimaryColor, promptASecondaryColor: aSecondaryColor,
+        promptAPrimaryFont: aPrimaryFont, promptAFontWeight: aFontWeight, promptAThemeMode: aThemeMode,
+        promptBPrimaryColor: bPrimaryColor, promptBSecondaryColor: bSecondaryColor,
+        promptBPrimaryFont: bPrimaryFont, promptBFontWeight: bFontWeight, promptBThemeMode: bThemeMode,
       };
       saveProject(project);
       lastSavedHashRef.current = currentHash;
@@ -378,19 +451,20 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     } catch (err: any) {
       onSaveResult(false, err.message || 'Save failed');
     }
-  }, [getProjectHash, styleRefUrl, styleRef, sourceUrl, projectName, clientName, projectBrand, packageTier, modules, advModules, primaryColor, secondaryColor, primaryFont, fontWeight, specialInstructions, currentPromptA, currentPromptB, onSaveResult]);
+  }, [getProjectHash, styleRefUrl, styleRef, sourceUrl, projectName, clientName, projectBrand, packageTier, modules, advModules, aPrimaryColor, aSecondaryColor, aPrimaryFont, aFontWeight, aThemeMode, bPrimaryColor, bSecondaryColor, bPrimaryFont, bFontWeight, bThemeMode, specialInstructions, currentPromptA, currentPromptB, onSaveResult]);
 
   const doClear = useCallback(() => {
     setProjectBrand('SwiftLift'); setSourceUrl(''); setProjectName(''); setClientName('');
     setStyleRef(null); setConvRef(null); setStyleRefUrl(''); setConvRefUrl('');
     setStyleUrlError(''); setConvUrlError('');
     setPackageTier('550'); setModules([]); setAdvModules([]);
-    setPrimaryColor(''); setSecondaryColor('');
-    setPrimaryFont(''); setFontWeight(''); setThemeMode('auto');
+    setAPrimaryColor(''); setASecondaryColor('');
+    setAPrimaryFont(''); setAFontWeight(''); setAThemeMode('auto');
+    setBPrimaryColor(''); setBSecondaryColor('');
+    setBPrimaryFont(''); setBFontWeight(''); setBThemeMode('auto');
     setSpecialInstructions(''); setBrandDetected(false); setBrandDetecting(false);
     setDetectedSources({});
     manualOverrides.current = new Set();
-    // Reset project identity for new project
     currentProjectIdRef.current = crypto.randomUUID();
     lastSavedHashRef.current = '';
     onClear();
@@ -399,6 +473,129 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   useEffect(() => { if (clearSignal > 0) doClear(); }, [clearSignal]);
   useEffect(() => { if (saveSignal > 0) doSave(); }, [saveSignal]);
   useEffect(() => { if (newSignal > 0) { doSave(); doClear(); } }, [newSignal]);
+
+  // Reusable theme override section renderer
+  const renderThemeSection = (
+    prefix: 'a' | 'b',
+    label: string,
+    sublabel: string,
+    pColor: string, setPColor: (v: string) => void,
+    sColor: string, setSColor: (v: string) => void,
+    font: string, setFont: (v: string) => void,
+    weight: string, setWeight: (v: string) => void,
+    mode: 'auto' | 'force_light' | 'force_dark', setMode: (v: 'auto' | 'force_light' | 'force_dark') => void,
+  ) => (
+    <div className="panel-section">
+      <h3 className="panel-section-title">{label}</h3>
+      <p className="text-xs text-muted-foreground mb-3">{sublabel}</p>
+      {prefix === 'a' && brandDetected && (
+        <div className="mb-3 px-3 py-2 rounded-md bg-accent text-accent-foreground text-xs">
+          ✨ Brand styling auto-detected from live website
+        </div>
+      )}
+      {prefix === 'a' && brandDetecting && (
+        <div className="mb-3 px-3 py-2 rounded-md bg-muted text-muted-foreground text-xs flex items-center gap-2">
+          <Loader2 size={12} className="animate-spin" /> Detecting brand from source URL…
+        </div>
+      )}
+      {prefix === 'b' && brandDetected && (
+        <div className="mb-3 px-3 py-2 rounded-md bg-accent text-accent-foreground text-xs">
+          ✨ Premium direction auto-derived from source
+        </div>
+      )}
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="control-label">Primary Color</label>
+            <div className="flex items-center gap-1.5">
+              <label className="relative w-8 h-8 rounded border border-border shrink-0 cursor-pointer overflow-hidden" style={{ background: pColor ? pColor : 'repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%) 50% / 8px 8px' }}>
+                <input type="color" value={pColor || '#000000'} onChange={e => {
+                  manualOverrides.current.add(`${prefix}_primaryColor`);
+                  setPColor(e.target.value);
+                }}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+              </label>
+              <input type="text" value={pColor ? pColor.replace(/^#/, '') : ''} onChange={e => {
+                manualOverrides.current.add(`${prefix}_primaryColor`);
+                const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
+                setPColor(v ? `#${v}` : '');
+              }}
+                placeholder="______" className="control-input flex-1 font-mono text-xs" maxLength={6} />
+            </div>
+            {prefix === 'a' && detectedSources.primaryColor && !manualOverrides.current.has('a_primaryColor') && (
+              <p className="text-[10px] text-muted-foreground mt-1 italic">from {detectedSources.primaryColor}</p>
+            )}
+          </div>
+          <div>
+            <label className="control-label">Secondary Color</label>
+            <div className="flex items-center gap-1.5">
+              <label className="relative w-8 h-8 rounded border border-border shrink-0 cursor-pointer overflow-hidden" style={{ background: sColor ? sColor : 'repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%) 50% / 8px 8px' }}>
+                <input type="color" value={sColor || '#000000'} onChange={e => {
+                  manualOverrides.current.add(`${prefix}_secondaryColor`);
+                  setSColor(e.target.value);
+                }}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+              </label>
+              <input type="text" value={sColor ? sColor.replace(/^#/, '') : ''} onChange={e => {
+                manualOverrides.current.add(`${prefix}_secondaryColor`);
+                const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
+                setSColor(v ? `#${v}` : '');
+              }}
+                placeholder="______" className="control-input flex-1 font-mono text-xs" maxLength={6} />
+            </div>
+            {prefix === 'a' && detectedSources.secondaryColor && !manualOverrides.current.has('a_secondaryColor') && (
+              <p className="text-[10px] text-muted-foreground mt-1 italic">from {detectedSources.secondaryColor}</p>
+            )}
+          </div>
+        </div>
+        <div>
+          <label className="control-label">Primary Font</label>
+          <select value={font} onChange={e => { manualOverrides.current.add(`${prefix}_primaryFont`); setFont(e.target.value); }} className="control-input">
+            <option value="">— No override —</option>
+            {googleFonts.map(f => (
+              <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
+            ))}
+          </select>
+          {prefix === 'a' && detectedSources.primaryFont && !manualOverrides.current.has('a_primaryFont') && (
+            <p className="text-[10px] text-muted-foreground mt-1 italic">from {detectedSources.primaryFont}</p>
+          )}
+          {font && (
+            <p className="mt-2 text-lg text-foreground" style={{ fontFamily: `"${font}", sans-serif` }}>
+              The quick brown fox jumps over the lazy dog
+            </p>
+          )}
+        </div>
+        <div>
+          <label className="control-label">Font Weight</label>
+          <select value={weight} onChange={e => { manualOverrides.current.add(`${prefix}_fontWeight`); setWeight(e.target.value); }} className="control-input">
+            <option value="">— No override —</option>
+            <option value="400">400 — Regular</option>
+            <option value="500">500 — Medium</option>
+            <option value="600">600 — Semi Bold</option>
+            <option value="700">700 — Bold</option>
+            <option value="800">800 — Extra Bold</option>
+            <option value="900">900 — Black</option>
+          </select>
+          {prefix === 'a' && detectedSources.fontWeight && !manualOverrides.current.has('a_fontWeight') && (
+            <p className="text-[10px] text-muted-foreground mt-1 italic">from {detectedSources.fontWeight}</p>
+          )}
+        </div>
+        <div>
+          <label className="control-label">Theme Mode</label>
+          <select value={mode} onChange={e => setMode(e.target.value as any)} className="control-input">
+            <option value="auto">Auto — Follow source / reference</option>
+            <option value="force_light">Force Light</option>
+            <option value="force_dark">Force Dark</option>
+          </select>
+          <p className="text-xs text-muted-foreground mt-1">
+            {mode === 'auto' && 'Inherits theme from the source site or reference design.'}
+            {mode === 'force_light' && 'Forces light backgrounds, light surfaces, and dark text.'}
+            {mode === 'force_dark' && 'Forces dark backgrounds, dark surfaces, and light text.'}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <>
@@ -522,111 +719,29 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           </div>
         </div>
 
-        {/* 4. Brand & Theme Override */}
-        <div className="panel-section">
-          <h3 className="panel-section-title">Brand & Theme Override</h3>
-          {brandDetected && (
-            <div className="mb-3 px-3 py-2 rounded-md bg-accent text-accent-foreground text-xs">
-              ✨ Brand styling auto-detected from live website
-            </div>
-          )}
-          {brandDetecting && (
-            <div className="mb-3 px-3 py-2 rounded-md bg-muted text-muted-foreground text-xs flex items-center gap-2">
-              <Loader2 size={12} className="animate-spin" /> Detecting brand from source URL…
-            </div>
-          )}
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="control-label">Primary Color</label>
-                <div className="flex items-center gap-1.5">
-                  <label className="relative w-8 h-8 rounded border border-border shrink-0 cursor-pointer overflow-hidden" style={{ background: primaryColor ? primaryColor : 'repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%) 50% / 8px 8px' }}>
-                    <input type="color" value={primaryColor || '#000000'} onChange={e => {
-                      manualOverrides.current.add('primaryColor');
-                      setPrimaryColor(e.target.value);
-                    }}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                  </label>
-                  <input type="text" value={primaryColor ? primaryColor.replace(/^#/, '') : ''} onChange={e => {
-                    manualOverrides.current.add('primaryColor');
-                    const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
-                    setPrimaryColor(v ? `#${v}` : '');
-                  }}
-                    placeholder="______" className="control-input flex-1 font-mono text-xs" maxLength={6} />
-                </div>
-                {detectedSources.primaryColor && !manualOverrides.current.has('primaryColor') && (
-                  <p className="text-[10px] text-muted-foreground mt-1 italic">from {detectedSources.primaryColor}</p>
-                )}
-              </div>
-              <div>
-                <label className="control-label">Secondary Color</label>
-                <div className="flex items-center gap-1.5">
-                  <label className="relative w-8 h-8 rounded border border-border shrink-0 cursor-pointer overflow-hidden" style={{ background: secondaryColor ? secondaryColor : 'repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%) 50% / 8px 8px' }}>
-                    <input type="color" value={secondaryColor || '#000000'} onChange={e => {
-                      manualOverrides.current.add('secondaryColor');
-                      setSecondaryColor(e.target.value);
-                    }}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                  </label>
-                  <input type="text" value={secondaryColor ? secondaryColor.replace(/^#/, '') : ''} onChange={e => {
-                    manualOverrides.current.add('secondaryColor');
-                    const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
-                    setSecondaryColor(v ? `#${v}` : '');
-                  }}
-                    placeholder="______" className="control-input flex-1 font-mono text-xs" maxLength={6} />
-                </div>
-                {detectedSources.secondaryColor && !manualOverrides.current.has('secondaryColor') && (
-                  <p className="text-[10px] text-muted-foreground mt-1 italic">from {detectedSources.secondaryColor}</p>
-                )}
-              </div>
-            </div>
-            <div>
-              <label className="control-label">Primary Font</label>
-              <select value={primaryFont} onChange={e => { manualOverrides.current.add('primaryFont'); setPrimaryFont(e.target.value); }} className="control-input">
-                <option value="">— No override —</option>
-                {googleFonts.map(f => (
-                  <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
-                ))}
-              </select>
-              {detectedSources.primaryFont && !manualOverrides.current.has('primaryFont') && (
-                <p className="text-[10px] text-muted-foreground mt-1 italic">from {detectedSources.primaryFont}</p>
-              )}
-              {primaryFont && (
-                <p className="mt-2 text-lg text-foreground" style={{ fontFamily: `"${primaryFont}", sans-serif` }}>
-                  The quick brown fox jumps over the lazy dog
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="control-label">Font Weight</label>
-              <select value={fontWeight} onChange={e => { manualOverrides.current.add('fontWeight'); setFontWeight(e.target.value); }} className="control-input">
-                <option value="">— No override —</option>
-                <option value="400">400 — Regular</option>
-                <option value="500">500 — Medium</option>
-                <option value="600">600 — Semi Bold</option>
-                <option value="700">700 — Bold</option>
-                <option value="800">800 — Extra Bold</option>
-                <option value="900">900 — Black</option>
-              </select>
-              {detectedSources.fontWeight && !manualOverrides.current.has('fontWeight') && (
-                <p className="text-[10px] text-muted-foreground mt-1 italic">from {detectedSources.fontWeight}</p>
-              )}
-            </div>
-            <div>
-              <label className="control-label">Theme Mode</label>
-              <select value={themeMode} onChange={e => setThemeMode(e.target.value as any)} className="control-input">
-                <option value="auto">Auto — Follow source / reference</option>
-                <option value="force_light">Force Light</option>
-                <option value="force_dark">Force Dark</option>
-              </select>
-              <p className="text-xs text-muted-foreground mt-1">
-                {themeMode === 'auto' && 'Inherits theme from the source site or reference design.'}
-                {themeMode === 'force_light' && 'Forces light backgrounds, light surfaces, and dark text.'}
-                {themeMode === 'force_dark' && 'Forces dark backgrounds, dark surfaces, and light text.'}
-              </p>
-            </div>
-          </div>
-        </div>
+        {/* 4A. Prompt A Brand & Theme Override */}
+        {renderThemeSection(
+          'a',
+          'Prompt A Brand & Theme Override',
+          'Controls theme overrides for Prompt A — Standard Layout',
+          aPrimaryColor, setAPrimaryColor,
+          aSecondaryColor, setASecondaryColor,
+          aPrimaryFont, setAPrimaryFont,
+          aFontWeight, setAFontWeight,
+          aThemeMode, setAThemeMode,
+        )}
+
+        {/* 4B. Prompt B Brand & Theme Override */}
+        {renderThemeSection(
+          'b',
+          'Prompt B Brand & Theme Override',
+          'Controls theme overrides for Prompt B — Premium Conversion Layout',
+          bPrimaryColor, setBPrimaryColor,
+          bSecondaryColor, setBSecondaryColor,
+          bPrimaryFont, setBPrimaryFont,
+          bFontWeight, setBFontWeight,
+          bThemeMode, setBThemeMode,
+        )}
 
         {/* 5. Content Modules */}
         <div className="panel-section">
