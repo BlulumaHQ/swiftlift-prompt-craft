@@ -1,9 +1,9 @@
 export const sortOptions = ['Recently Added', 'A–Z', 'Industry'];
 
 export const googleFonts = [
-  'Inter', 'Montserrat', 'Poppins', 'DM Sans', 'Manrope', 'Outfit',
-  'Plus Jakarta Sans', 'Open Sans', 'Lato', 'Nunito Sans',
-  'Playfair Display', 'Lora', 'Cormorant Garamond', 'Merriweather', 'Libre Baskerville'
+  'Inter', 'Montserrat', 'Poppins', 'Plus Jakarta Sans',
+  'Playfair Display', 'Lora', 'Cormorant Garamond', 'Merriweather', 'Libre Baskerville',
+  'Sora', 'Space Grotesk', 'Syne', 'Archivo Black', 'Clash Display', 'General Sans'
 ];
 
 export const contentModules = [
