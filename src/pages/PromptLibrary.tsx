@@ -30,6 +30,9 @@ interface PromptItem {
   version?: number;
   type?: string;
   status?: string;
+  revisionNumber?: number;
+  contentHash?: string;
+  syncOrigin?: string;
 }
 
 export default function PromptLibrary() {
