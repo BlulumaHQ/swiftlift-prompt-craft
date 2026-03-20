@@ -7,7 +7,7 @@ import { LayoutGrid, Sparkles, X, Loader2, CheckCircle2, AlertTriangle } from 'l
 import type { DemoSite } from '@/lib/demoSiteStore';
 import { supabase } from '@/integrations/supabase/client';
 import { getPromptLibrary } from '@/lib/promptLibraryStore';
-import { getCloudPrompts } from '@/lib/promptCloudStore';
+import { getCloudPrompts, computeContentHash } from '@/lib/promptCloudStore';
 
 // Authoritative Group B cloud prompt IDs
 const CLOUD_PROMPT_IDS: Record<string, string> = {
