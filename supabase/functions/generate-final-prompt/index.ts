@@ -829,6 +829,41 @@ Deno.serve(async (req) => {
     );
 
     currentStep = "format_prompt_blocks";
+
+    // ── Auto font selection logic ──
+    function resolveAutoFont(font: string | undefined, industry: string | undefined): { heading: string; body: string } {
+      if (font) {
+        // Display-only fonts: pair with readable body font
+        const displayOnly = ['Archivo Black', 'Clash Display', 'Syne'];
+        const serifDisplay = ['Playfair Display', 'Cormorant Garamond', 'Lora', 'Merriweather', 'Libre Baskerville'];
+        if (displayOnly.includes(font)) {
+          return { heading: font, body: 'Inter' };
+        }
+        if (serifDisplay.includes(font)) {
+          return { heading: font, body: 'Plus Jakarta Sans' };
+        }
+        return { heading: font, body: font };
+      }
+      // Auto-select based on industry
+      const ind = (industry || '').toLowerCase();
+      if (/tech|saas|ai|startup|software|app/.test(ind)) {
+        return { heading: 'Sora', body: 'Inter' };
+      }
+      if (/creative|design|agency|brand|studio|art director/.test(ind)) {
+        return { heading: 'Clash Display', body: 'Sora' };
+      }
+      if (/editorial|luxury|beauty|art|premium|fashion|jewelry/.test(ind)) {
+        return { heading: 'Playfair Display', body: 'Inter' };
+      }
+      if (/landing|conversion|funnel/.test(ind)) {
+        return { heading: 'Archivo Black', body: 'Inter' };
+      }
+      // Default: corporate / professional
+      return { heading: 'Inter', body: 'Inter' };
+    }
+
+    const resolvedFonts = resolveAutoFont(primaryFont, businessType);
+
     const blocks = {
       siteMeta: formatSiteMeta(normalized),
       siteStructure: formatSiteStructure(normalized),
@@ -842,14 +877,29 @@ Deno.serve(async (req) => {
     const brandOverrideParts: string[] = [];
     if (primaryColor) brandOverrideParts.push(`Primary Color: ${primaryColor}`);
     if (secondaryColor) brandOverrideParts.push(`Secondary Color: ${secondaryColor}`);
-    if (primaryFont) brandOverrideParts.push(`Primary Font: ${primaryFont}`);
+    brandOverrideParts.push(`Heading Font: ${resolvedFonts.heading}`);
+    brandOverrideParts.push(`Body Font: ${resolvedFonts.body}`);
     if (fontWeight) brandOverrideParts.push(`Font Weight: ${fontWeight}`);
     if (themeMode && themeMode !== 'auto') {
       brandOverrideParts.push(`Theme Mode: ${themeMode === 'force_light' ? 'Force Light — use light backgrounds, light surfaces, dark text' : 'Force Dark — use dark backgrounds, dark surfaces, light text'}`);
     }
-    const brandOverrideBlock = brandOverrideParts.length > 0
-      ? `\n\n--------------------------------------------------\nBRAND & THEME OVERRIDE\n--------------------------------------------------\n\n${brandOverrideParts.join('\n')}\n\nApply these brand overrides to the final design. Brand colors take priority over extracted design system colors. Theme mode affects page background, section backgrounds, surface/card tones, and text contrast — but does NOT override brand colors.`
-      : '';
+
+    // Font usage restrictions
+    brandOverrideParts.push(`\nFont Usage Rules:`);
+    brandOverrideParts.push(`- Maximum 2 font families total`);
+    brandOverrideParts.push(`- Display fonts (Archivo Black, Clash Display, Syne) are for hero titles and major headings ONLY`);
+    brandOverrideParts.push(`- Body text must use a highly readable font (Inter, Plus Jakarta Sans, Poppins, or Sora)`);
+    brandOverrideParts.push(`- Do NOT use Archivo Black, Clash Display, or Syne for body text`);
+
+    // Hero title sizing baseline
+    brandOverrideParts.push(`\nHero Title Typography Baseline:`);
+    brandOverrideParts.push(`- Desktop hero title: 64px minimum, font-weight 700–900, line-height 1.0–1.1`);
+    brandOverrideParts.push(`- Tablet hero title: 52px minimum, font-weight 700–900, line-height 1.0–1.1`);
+    brandOverrideParts.push(`- Mobile hero title: 38px minimum, font-weight 700–900, line-height 1.05–1.15`);
+    brandOverrideParts.push(`- Hero title must be the largest text element on the page`);
+    brandOverrideParts.push(`- Prefer tight, impactful line-height — avoid paragraph-like hero sizing`);
+
+    const brandOverrideBlock = `\n\n--------------------------------------------------\nBRAND & THEME OVERRIDE\n--------------------------------------------------\n\n${brandOverrideParts.join('\n')}\n\nApply these brand overrides to the final design. Brand colors take priority over extracted design system colors. Theme mode affects page background, section backgrounds, surface/card tones, and text contrast — but does NOT override brand colors.`;
 
     const contentModuleNames: Record<string, string> = {
       portfolio: 'Portfolio / Projects',
