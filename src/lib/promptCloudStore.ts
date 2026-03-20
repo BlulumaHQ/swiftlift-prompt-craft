@@ -55,7 +55,7 @@ export async function getCloudPrompts(): Promise<CloudPrompt[]> {
   return (data || []) as unknown as CloudPrompt[];
 }
 
-export async function saveCloudPrompt(prompt: Omit<CloudPrompt, 'id' | 'created_at' | 'updated_at'> & { id?: string }): Promise<CloudPrompt> {
+export async function saveCloudPrompt(prompt: Omit<CloudPrompt, 'id' | 'created_at' | 'updated_at' | 'revision_number' | 'content_hash' | 'sync_origin'> & { id?: string; revision_number?: number; content_hash?: string; sync_origin?: string }): Promise<CloudPrompt> {
   const filePath = prompt.file_path || `core/${slugify(prompt.prompt_name)}_v${prompt.version}.md`;
   const contentHash = computeContentHash(prompt.content);
 
