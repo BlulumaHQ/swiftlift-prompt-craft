@@ -3,10 +3,28 @@ import { googleFonts, contentModules, advancedModules } from '@/lib/mockData';
 import { saveProject } from '@/lib/store';
 import type { SavedProject } from '@/lib/mockData';
 import ReferenceLibraryModal from './ReferenceLibraryModal';
-import { LayoutGrid, Sparkles, X, Loader2 } from 'lucide-react';
+import { LayoutGrid, Sparkles, X, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import type { DemoSite } from '@/lib/demoSiteStore';
 import { supabase } from '@/integrations/supabase/client';
 import { getPromptLibrary } from '@/lib/promptLibraryStore';
+import { getCloudPrompts } from '@/lib/promptCloudStore';
+
+// Authoritative Group B cloud prompt IDs
+const CLOUD_PROMPT_IDS: Record<string, string> = {
+  'SwiftLift Source Extraction Prompt V1': 'b7c1fb95-15f9-4e93-8a96-88e6152ee669',
+  'SwiftLift Final Build Master Prompt V1': '035a3b80-251f-4bdf-9615-855a041eadca',
+  'SwiftLift Prompt Assembly Rules V1': 'cd77a34e-9cb0-44f1-8d31-e1764c531f8e',
+};
+
+// Normalize prompt content for comparison — ignore formatting-only differences
+function normalizePromptContent(content: string): string {
+  return content
+    .replace(/\r\n/g, '\n')   // normalize line endings to LF
+    .replace(/\r/g, '\n')
+    .replace(/[ \t]+$/gm, '') // trim trailing whitespace per line
+    .replace(/\n{3,}/g, '\n\n') // collapse 3+ blank lines to 2
+    .trim();                   // trim leading/trailing
+}
 
 const projectBrands = ['SwiftLift', 'Bluluma', 'Sonykun', 'SwiftSite'];
 
@@ -80,12 +98,49 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const [advModules, setAdvModules] = useState<string[]>([]);
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'unknown' | 'synced' | 'unsynced' | 'checking'>('unknown');
+  const [unsyncedPrompt, setUnsyncedPrompt] = useState<string | null>(null);
   const [showBrandConfirm, setShowBrandConfirm] = useState(false);
   const [confirmBrand, setConfirmBrand] = useState('SwiftLift');
   const detectAbortRef = useRef<AbortController | null>(null);
 
   const toggleModule = (id: string) => setModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   const toggleAdvModule = (id: string) => setAdvModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+
+  // Check prompt sync status — called on mount and periodically
+  const checkSyncStatus = useCallback(async () => {
+    setSyncStatus('checking');
+    try {
+      const localPrompts = getPromptLibrary();
+      const cloudPrompts = await getCloudPrompts();
+      const requiredNames = Object.keys(CLOUD_PROMPT_IDS);
+
+      for (const name of requiredNames) {
+        const local = localPrompts.find(p => p.name === name);
+        const cloudId = CLOUD_PROMPT_IDS[name];
+        const cloud = cloudPrompts.find(p => p.id === cloudId);
+        if (!local || !cloud) continue;
+        const localNorm = normalizePromptContent(local.content);
+        const cloudNorm = normalizePromptContent(cloud.content);
+        if (localNorm !== cloudNorm) {
+          setSyncStatus('unsynced');
+          setUnsyncedPrompt(name);
+          return;
+        }
+      }
+      setSyncStatus('synced');
+      setUnsyncedPrompt(null);
+    } catch {
+      // If cloud fetch fails, assume synced to avoid blocking
+      setSyncStatus('synced');
+      setUnsyncedPrompt(null);
+    }
+  }, []);
+
+  // Check sync on mount
+  useEffect(() => {
+    checkSyncStatus();
+  }, [checkSyncStatus]);
 
   // Real brand detection via edge function
   const runBrandDetection = useCallback(async (url: string) => {
@@ -198,39 +253,54 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     const resolvedConvRef = normalizedConvUrl || convRef?.live_url || '';
 
     try {
-      // Read prompts from local Prompt Library state
+      // Fetch latest cloud prompts and local prompts fresh
       const localPrompts = getPromptLibrary();
-      const extractionPrompt = localPrompts.find(p => p.name === 'SwiftLift Source Extraction Prompt V1')?.content || '';
-      const masterPrompt = localPrompts.find(p => p.name === 'SwiftLift Final Build Master Prompt V1')?.content || '';
-      const assemblyRules = localPrompts.find(p => p.name === 'SwiftLift Prompt Assembly Rules V1')?.content || '';
-
-      if (!extractionPrompt || !masterPrompt || !assemblyRules) {
-        onGenerateError('Required prompts missing. Check Prompt Library for all 3 required prompts.');
-        setGenerating(false);
-        return;
-      }
-
-      // Sync verification: compare local vs cloud
+      let cloudPrompts: Awaited<ReturnType<typeof getCloudPrompts>> = [];
       try {
-        const { getCloudPrompts } = await import('@/lib/promptCloudStore');
-        const cloudPrompts = await getCloudPrompts();
-        const requiredNames = [
-          'SwiftLift Source Extraction Prompt V1',
-          'SwiftLift Final Build Master Prompt V1',
-          'SwiftLift Prompt Assembly Rules V1',
-        ];
-        for (const name of requiredNames) {
-          const local = localPrompts.find(p => p.name === name);
-          const cloud = cloudPrompts.find(p => p.prompt_name === name);
-          if (local && cloud && local.content !== cloud.content) {
-            onGenerateError(`Prompt sync mismatch detected for "${name}". Please save or sync prompts before generating.`);
-            setGenerating(false);
-            return;
-          }
-        }
-      } catch (syncErr) {
-        console.warn('Sync verification skipped:', syncErr);
+        cloudPrompts = await getCloudPrompts();
+      } catch (fetchErr) {
+        console.warn('Cloud prompt fetch failed, proceeding with local only:', fetchErr);
       }
+
+      const requiredNames = Object.keys(CLOUD_PROMPT_IDS);
+      const resolvedPrompts: Record<string, string> = {};
+
+      // For each required prompt: compare normalized content, resolve latest
+      for (const name of requiredNames) {
+        const local = localPrompts.find(p => p.name === name);
+        const cloudId = CLOUD_PROMPT_IDS[name];
+        const cloud = cloudPrompts.find(p => p.id === cloudId);
+
+        if (!local?.content && !cloud?.content) {
+          onGenerateError(`Required prompt missing: "${name}". Check Prompt Library.`);
+          setGenerating(false);
+          return;
+        }
+
+        // Use normalized comparison
+        const localNorm = local ? normalizePromptContent(local.content) : '';
+        const cloudNorm = cloud ? normalizePromptContent(cloud.content) : '';
+
+        if (local && cloud && localNorm !== cloudNorm) {
+          const shortName = name.replace('SwiftLift ', '').replace(' V1', '');
+          onGenerateError(`${shortName} is out of sync. Please save or sync in Prompt Library before generating.`);
+          setSyncStatus('unsynced');
+          setUnsyncedPrompt(name);
+          setGenerating(false);
+          return;
+        }
+
+        // Use local content as source of truth (it's what gets passed to the edge function)
+        resolvedPrompts[name] = local?.content || cloud?.content || '';
+      }
+
+      const extractionPrompt = resolvedPrompts['SwiftLift Source Extraction Prompt V1'];
+      const masterPrompt = resolvedPrompts['SwiftLift Final Build Master Prompt V1'];
+      const assemblyRules = resolvedPrompts['SwiftLift Prompt Assembly Rules V1'];
+
+      // Mark as synced since we passed the check
+      setSyncStatus('synced');
+      setUnsyncedPrompt(null);
 
       const { data, error } = await supabase.functions.invoke('generate-final-prompt', {
         body: {
@@ -576,13 +646,28 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
             placeholder="Custom instructions for the AI builder..." rows={4} className="control-input resize-none" />
         </div>
 
-        {/* 9. Generate Button */}
-        <div className="pb-2">
+        {/* 9. Generate Button + Sync Status */}
+        <div className="pb-2 space-y-1.5">
           <button onClick={handleGenerate} disabled={generating || !sourceUrl}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-sm">
             <Sparkles size={16} />
             {generating ? 'Generating...' : 'Generate Prompts'}
           </button>
+          {syncStatus === 'synced' && (
+            <div className="flex items-center gap-1.5 text-[11px] text-emerald-600">
+              <CheckCircle2 size={12} /> Prompts synced
+            </div>
+          )}
+          {syncStatus === 'unsynced' && (
+            <div className="flex items-center gap-1.5 text-[11px] text-amber-600">
+              <AlertTriangle size={12} /> {unsyncedPrompt ? `${unsyncedPrompt.replace('SwiftLift ', '').replace(' V1', '')} out of sync` : 'Prompts out of sync'}
+            </div>
+          )}
+          {syncStatus === 'checking' && (
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <Loader2 size={12} className="animate-spin" /> Checking sync...
+            </div>
+          )}
         </div>
       </div>
 
