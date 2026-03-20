@@ -3,10 +3,28 @@ import { googleFonts, contentModules, advancedModules } from '@/lib/mockData';
 import { saveProject } from '@/lib/store';
 import type { SavedProject } from '@/lib/mockData';
 import ReferenceLibraryModal from './ReferenceLibraryModal';
-import { LayoutGrid, Sparkles, X, Loader2 } from 'lucide-react';
+import { LayoutGrid, Sparkles, X, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import type { DemoSite } from '@/lib/demoSiteStore';
 import { supabase } from '@/integrations/supabase/client';
 import { getPromptLibrary } from '@/lib/promptLibraryStore';
+import { getCloudPrompts } from '@/lib/promptCloudStore';
+
+// Authoritative Group B cloud prompt IDs
+const CLOUD_PROMPT_IDS: Record<string, string> = {
+  'SwiftLift Source Extraction Prompt V1': 'b7c1fb95-15f9-4e93-8a96-88e6152ee669',
+  'SwiftLift Final Build Master Prompt V1': '035a3b80-251f-4bdf-9615-855a041eadca',
+  'SwiftLift Prompt Assembly Rules V1': 'cd77a34e-9cb0-44f1-8d31-e1764c531f8e',
+};
+
+// Normalize prompt content for comparison — ignore formatting-only differences
+function normalizePromptContent(content: string): string {
+  return content
+    .replace(/\r\n/g, '\n')   // normalize line endings to LF
+    .replace(/\r/g, '\n')
+    .replace(/[ \t]+$/gm, '') // trim trailing whitespace per line
+    .replace(/\n{3,}/g, '\n\n') // collapse 3+ blank lines to 2
+    .trim();                   // trim leading/trailing
+}
 
 const projectBrands = ['SwiftLift', 'Bluluma', 'Sonykun', 'SwiftSite'];
 
