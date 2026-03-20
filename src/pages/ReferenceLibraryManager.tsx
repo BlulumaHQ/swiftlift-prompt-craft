@@ -6,31 +6,55 @@ import {
 import { Plus, Trash2, X, Search, ExternalLink, Upload, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-const industries = [
-  'Dental', 'Construction', 'Restaurant', 'Real Estate',
-  'Professional Services', 'Luxury Service', 'One Page Design', 'Other'
-];
-
 type ReferenceRole = 'style' | 'conversion_layout';
-
-const categoryFilters = ['All', ...industries];
-const roleFilters: Array<{ value: 'all' | ReferenceRole; label: string }> = [
-  { value: 'all', label: 'All' },
-  { value: 'style', label: 'Style' },
-  { value: 'conversion_layout', label: 'Conversion Layout' },
-];
-
 type SortOption = 'recent' | 'az' | 'industry';
+
+/** Parse the pipe-separated notes field into a structured object */
+function parseNotes(notes: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  if (!notes) return result;
+  notes.split('|').forEach(segment => {
+    const colonIdx = segment.indexOf(':');
+    if (colonIdx > 0) {
+      const key = segment.slice(0, colonIdx).trim();
+      const value = segment.slice(colonIdx + 1).trim();
+      result[key] = value;
+    }
+  });
+  return result;
+}
+
+/** Extract unique values for a given notes key across all items */
+function extractUniqueNotesValues(items: DemoSite[], key: string): string[] {
+  const set = new Set<string>();
+  items.forEach(item => {
+    const parsed = parseNotes(item.notes);
+    const val = parsed[key];
+    if (val) set.add(val);
+  });
+  return Array.from(set).sort();
+}
 
 function generatePreviewPlaceholder(industry: string): string {
   const colors: Record<string, string> = {
-    'Dental': '2B6CB0', 'Construction': 'DD6B20', 'Restaurant': 'C53030',
-    'Real Estate': '2C5282', 'Professional Services': '4A5568',
-    'Luxury Service': '1A202C', 'One Page Design': '6B46C1', 'Other': '718096'
+    'dental-healthcare': '2B6CB0', 'construction': 'DD6B20', 'food-retail': 'C53030',
+    'real-estate': '2C5282', 'capital-investment': '1A202C', 'manufacturing-b2b': '4A5568',
   };
   const color = colors[industry] || '718096';
   return `https://placehold.co/600x400/${color}/ffffff?text=${encodeURIComponent(industry)}`;
 }
+
+const conversionColors: Record<string, string> = {
+  high: 'bg-primary/15 text-primary',
+  medium: 'bg-accent text-accent-foreground',
+  low: 'bg-muted text-muted-foreground',
+};
+
+const categoryColors: Record<string, string> = {
+  business: 'bg-secondary text-secondary-foreground',
+  style: 'bg-primary/10 text-primary',
+  conversion: 'bg-accent text-accent-foreground',
+};
 
 export default function ReferenceLibraryManager() {
   const { toast } = useToast();
@@ -39,14 +63,15 @@ export default function ReferenceLibraryManager() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterIndustry, setFilterIndustry] = useState('All');
   const [filterCategory, setFilterCategory] = useState('All');
-  const [filterRole, setFilterRole] = useState<'all' | ReferenceRole>('all');
+  const [filterConversion, setFilterConversion] = useState('All');
   const [sortBy, setSortBy] = useState<SortOption>('recent');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
   const [newRef, setNewRef] = useState({
-    name: '', industry: 'Professional Services', liveUrl: '', role: 'style' as ReferenceRole, notes: ''
+    name: '', industry: 'construction', liveUrl: '', role: 'style' as ReferenceRole, notes: ''
   });
   const [desktopFile, setDesktopFile] = useState<File | undefined>();
   const [mobileFile, setMobileFile] = useState<File | undefined>();
@@ -68,13 +93,23 @@ export default function ReferenceLibraryManager() {
     setLoading(false);
   }
 
+  // Dynamic filter options from real data
+  const uniqueIndustries = useMemo(() => extractUniqueNotesValues(items, 'category').length > 0
+    ? Array.from(new Set(items.map(i => i.industry).filter(Boolean))).sort()
+    : [], [items]);
+
+  const uniqueCategories = useMemo(() => extractUniqueNotesValues(items, 'category'), [items]);
+  const uniqueConversions = useMemo(() => extractUniqueNotesValues(items, 'conversion_level'), [items]);
+
   const filtered = useMemo(() => {
     let result = items.filter(r => {
       const q = searchQuery.toLowerCase();
-      const matchesSearch = !q || r.site_name.toLowerCase().includes(q) || r.industry.toLowerCase().includes(q);
-      const matchesCategory = filterCategory === 'All' || r.industry === filterCategory;
-      const matchesRole = filterRole === 'all' || r.reference_role === filterRole;
-      return matchesSearch && matchesCategory && matchesRole;
+      const parsed = parseNotes(r.notes);
+      const matchesSearch = !q || r.site_name.toLowerCase().includes(q) || r.industry.toLowerCase().includes(q) || (parsed.style_tags || '').toLowerCase().includes(q);
+      const matchesIndustry = filterIndustry === 'All' || r.industry === filterIndustry;
+      const matchesCategory = filterCategory === 'All' || parsed.category === filterCategory;
+      const matchesConversion = filterConversion === 'All' || parsed.conversion_level === filterConversion;
+      return matchesSearch && matchesIndustry && matchesCategory && matchesConversion;
     });
     switch (sortBy) {
       case 'recent': result.sort((a, b) => b.created_at.localeCompare(a.created_at)); break;
@@ -82,7 +117,7 @@ export default function ReferenceLibraryManager() {
       case 'industry': result.sort((a, b) => a.industry.localeCompare(b.industry)); break;
     }
     return result;
-  }, [items, searchQuery, filterCategory, filterRole, sortBy]);
+  }, [items, searchQuery, filterIndustry, filterCategory, filterConversion, sortBy]);
 
   const handleAdd = async () => {
     if (!newRef.name || !newRef.liveUrl) return;
@@ -95,7 +130,7 @@ export default function ReferenceLibraryManager() {
       }, desktopFile, mobileFile);
       toast({ title: 'Reference added to cloud' });
       setShowAddModal(false);
-      setNewRef({ name: '', industry: 'Professional Services', liveUrl: '', role: 'style', notes: '' });
+      setNewRef({ name: '', industry: 'construction', liveUrl: '', role: 'style', notes: '' });
       setDesktopFile(undefined); setMobileFile(undefined);
       await loadAll();
     } catch (err: any) {
@@ -142,20 +177,12 @@ export default function ReferenceLibraryManager() {
     }
   };
 
-  const roleBadge = (role: string) => (
-    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-      role === 'style' ? 'bg-primary/10 text-primary' : 'bg-accent text-accent-foreground'
-    }`}>
-      {role === 'style' ? 'Style' : 'Conversion Layout'}
-    </span>
-  );
-
   return (
     <div className="flex flex-col h-screen">
       <NavHeader title="References Demo Sites" />
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
             <h2 className="text-xl sm:text-2xl font-bold text-foreground">Reference Demo Sites</h2>
             <div className="flex items-center gap-2">
@@ -170,7 +197,7 @@ export default function ReferenceLibraryManager() {
             </div>
           </div>
 
-          {/* Search, Filter, Sort */}
+          {/* Search & Sort */}
           <div className="space-y-3 mb-6">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <div className="relative flex-1">
@@ -185,19 +212,41 @@ export default function ReferenceLibraryManager() {
                 <option value="industry">Industry</option>
               </select>
             </div>
-            <div className="flex gap-1 sm:gap-1.5 flex-wrap">
-              {roleFilters.map(r => (
-                <button key={r.value} onClick={() => setFilterRole(r.value)}
-                  className={`px-2 sm:px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-medium transition-colors ${
-                    filterRole === r.value ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-secondary'
-                  }`}>{r.label}</button>
-              ))}
-              <span className="w-px bg-border mx-0.5 sm:mx-1" />
-              {categoryFilters.map(c => (
+
+            {/* Category filter */}
+            <div className="flex gap-1 sm:gap-1.5 flex-wrap items-center">
+              <span className="text-[10px] sm:text-xs font-medium text-muted-foreground mr-1">Category:</span>
+              {['All', ...uniqueCategories].map(c => (
                 <button key={c} onClick={() => setFilterCategory(c)}
-                  className={`px-2 sm:px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-medium transition-colors ${
+                  className={`px-2 sm:px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-medium transition-colors capitalize ${
                     filterCategory === c ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-secondary'
                   }`}>{c}</button>
+              ))}
+            </div>
+
+            {/* Conversion level filter */}
+            <div className="flex gap-1 sm:gap-1.5 flex-wrap items-center">
+              <span className="text-[10px] sm:text-xs font-medium text-muted-foreground mr-1">Conversion:</span>
+              {['All', ...uniqueConversions].map(c => (
+                <button key={c} onClick={() => setFilterConversion(c)}
+                  className={`px-2 sm:px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-medium transition-colors capitalize ${
+                    filterConversion === c ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-secondary'
+                  }`}>{c}</button>
+              ))}
+            </div>
+
+            {/* Industry filter */}
+            <div className="flex gap-1 sm:gap-1.5 flex-wrap items-center">
+              <span className="text-[10px] sm:text-xs font-medium text-muted-foreground mr-1">Industry:</span>
+              <button onClick={() => setFilterIndustry('All')}
+                className={`px-2 sm:px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-medium transition-colors ${
+                  filterIndustry === 'All' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-secondary'
+                }`}>All</button>
+              {uniqueIndustries.map(ind => (
+                <button key={ind} onClick={() => setFilterIndustry(ind)}
+                  className={`px-2 sm:px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-medium transition-colors ${
+                    filterIndustry === ind ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-secondary'
+                  }`}>{ind}</button>
               ))}
             </div>
           </div>
@@ -207,45 +256,59 @@ export default function ReferenceLibraryManager() {
               <Loader2 size={16} className="animate-spin" /> Loading...
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filtered.map(ref => (
-                <div key={ref.id} className="rounded-lg border border-border bg-card overflow-hidden group relative">
-                  <div className="aspect-[4/3] bg-muted overflow-hidden">
-                    <img src={ref.preview_image || ref.desktop_screenshot_url || generatePreviewPlaceholder(ref.industry)} alt={ref.site_name} className="w-full h-full object-cover" />
-                  </div>
-                  <div className="p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-foreground truncate">{ref.site_name}</h3>
-                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                          <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-secondary text-secondary-foreground">{ref.industry}</span>
-                          {roleBadge(ref.reference_role)}
-                        </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {filtered.map(ref => {
+                const parsed = parseNotes(ref.notes);
+                const category = parsed.category || '';
+                const conversionLevel = parsed.conversion_level || '';
+                return (
+                  <div key={ref.id} className="rounded-lg border border-border bg-card overflow-hidden group relative flex flex-col items-stretch">
+                    <div className="aspect-[4/7] bg-muted overflow-hidden">
+                      <img
+                        src={ref.preview_image || ref.desktop_screenshot_url || generatePreviewPlaceholder(ref.industry)}
+                        alt={ref.site_name}
+                        className="w-full h-full object-cover object-top"
+                      />
+                    </div>
+                    <div className="p-3">
+                      <h3 className="font-semibold text-foreground text-sm truncate">{ref.site_name}</h3>
+                      <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary text-secondary-foreground">{ref.industry}</span>
+                        {category && (
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium capitalize ${categoryColors[category] || 'bg-muted text-muted-foreground'}`}>
+                            {category}
+                          </span>
+                        )}
+                        {conversionLevel && (
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium capitalize ${conversionColors[conversionLevel] || 'bg-muted text-muted-foreground'}`}>
+                            Conversion: {conversionLevel}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1.5 truncate">{ref.live_url}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <button onClick={() => window.open(ref.live_url, '_blank')}
+                          className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
+                          <ExternalLink size={10} /> Live View
+                        </button>
+                        {deleteConfirm === ref.id ? (
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => handleDelete(ref)}
+                              className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors">Confirm</button>
+                            <button onClick={() => setDeleteConfirm(null)}
+                              className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">Cancel</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setDeleteConfirm(ref.id)}
+                            className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2 truncate">{ref.live_url}</p>
-                    <div className="flex items-center gap-2 mt-3">
-                      <button onClick={() => window.open(ref.live_url, '_blank')}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">
-                        <ExternalLink size={12} /> Live View
-                      </button>
-                      {deleteConfirm === ref.id ? (
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => handleDelete(ref)}
-                            className="px-2 py-1 rounded text-xs font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors">Confirm</button>
-                          <button onClick={() => setDeleteConfirm(null)}
-                            className="px-2 py-1 rounded text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors">Cancel</button>
-                        </div>
-                      ) : (
-                        <button onClick={() => setDeleteConfirm(ref.id)}
-                          className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -274,9 +337,8 @@ export default function ReferenceLibraryManager() {
                 <input type="url" value={newRef.liveUrl} onChange={e => setNewRef({ ...newRef, liveUrl: e.target.value })}
                   placeholder="https://example-reference.com" className="control-input" /></div>
               <div><label className="control-label">Industry</label>
-                <select value={newRef.industry} onChange={e => setNewRef({ ...newRef, industry: e.target.value })} className="control-input">
-                  {industries.map(i => <option key={i} value={i}>{i}</option>)}
-                </select></div>
+                <input type="text" value={newRef.industry} onChange={e => setNewRef({ ...newRef, industry: e.target.value })}
+                  placeholder="e.g., dental-healthcare" className="control-input" /></div>
               <div><label className="control-label">Reference Role</label>
                 <select value={newRef.role} onChange={e => setNewRef({ ...newRef, role: e.target.value as ReferenceRole })} className="control-input">
                   <option value="style">Style</option>
@@ -327,12 +389,9 @@ export default function ReferenceLibraryManager() {
                 className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground"><X size={18} /></button>
             </div>
             <div className="p-4 sm:p-6 space-y-4">
-              <div>
-                <label className="control-label">JSON Metadata File</label>
-                <input type="file" accept=".json" onChange={e => setBulkJsonFile(e.target.files?.[0] || null)}
-                  className="text-xs w-full file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-secondary file:text-secondary-foreground" />
-                <p className="text-xs text-muted-foreground mt-1">Array of objects with site_name, live_url, industry, reference_role.</p>
-              </div>
+              <p className="text-sm text-muted-foreground">Upload a JSON file containing reference entries.</p>
+              <input type="file" accept=".json" onChange={e => setBulkJsonFile(e.target.files?.[0] || null)}
+                className="text-xs w-full file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-secondary file:text-secondary-foreground" />
               {bulkStatus && <p className="text-xs text-muted-foreground">{bulkStatus}</p>}
               <div className="flex gap-2 pt-2">
                 <button onClick={() => { setShowBulkModal(false); setBulkStatus(''); setBulkJsonFile(null); }}
