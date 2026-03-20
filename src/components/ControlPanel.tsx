@@ -249,45 +249,34 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     const resolvedConvRef = normalizedConvUrl || convRef?.live_url || '';
 
     try {
-      // Fetch latest cloud prompts and local prompts fresh
-      const localPrompts = getPromptLibrary();
+      // Fetch latest cloud prompts as the single source of truth
       let cloudPrompts: Awaited<ReturnType<typeof getCloudPrompts>> = [];
       try {
         cloudPrompts = await getCloudPrompts();
       } catch (fetchErr) {
-        console.warn('Cloud prompt fetch failed, proceeding with local only:', fetchErr);
+        console.warn('Cloud prompt fetch failed:', fetchErr);
       }
 
       const requiredNames = Object.keys(CLOUD_PROMPT_IDS);
       const resolvedPrompts: Record<string, string> = {};
 
-      // For each required prompt: compare normalized content, resolve latest
       for (const name of requiredNames) {
-        const local = localPrompts.find(p => p.name === name);
         const cloudId = CLOUD_PROMPT_IDS[name];
         const cloud = cloudPrompts.find(p => p.id === cloudId);
 
-        if (!local?.content && !cloud?.content) {
-          onGenerateError(`Required prompt missing: "${name}". Check Prompt Library.`);
-          setGenerating(false);
-          return;
+        if (!cloud?.content) {
+          // Fallback to local if cloud is missing
+          const localPrompts = getPromptLibrary();
+          const local = localPrompts.find(p => p.name === name);
+          if (!local?.content) {
+            onGenerateError(`Required prompt missing: "${name}". Check Prompt Library.`);
+            setGenerating(false);
+            return;
+          }
+          resolvedPrompts[name] = local.content;
+        } else {
+          resolvedPrompts[name] = cloud.content;
         }
-
-        // Use normalized comparison
-        const localNorm = local ? normalizePromptContent(local.content) : '';
-        const cloudNorm = cloud ? normalizePromptContent(cloud.content) : '';
-
-        if (local && cloud && localNorm !== cloudNorm) {
-          const shortName = name.replace('SwiftLift ', '').replace(' V1', '');
-          onGenerateError(`${shortName} is out of sync. Please save or sync in Prompt Library before generating.`);
-          setSyncStatus('unsynced');
-          setUnsyncedPrompt(name);
-          setGenerating(false);
-          return;
-        }
-
-        // Use local content as source of truth (it's what gets passed to the edge function)
-        resolvedPrompts[name] = local?.content || cloud?.content || '';
       }
 
       const extractionPrompt = resolvedPrompts['SwiftLift Source Extraction Prompt V1'];
