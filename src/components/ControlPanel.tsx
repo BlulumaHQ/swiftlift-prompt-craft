@@ -646,13 +646,28 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
             placeholder="Custom instructions for the AI builder..." rows={4} className="control-input resize-none" />
         </div>
 
-        {/* 9. Generate Button */}
-        <div className="pb-2">
+        {/* 9. Generate Button + Sync Status */}
+        <div className="pb-2 space-y-1.5">
           <button onClick={handleGenerate} disabled={generating || !sourceUrl}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-sm">
             <Sparkles size={16} />
             {generating ? 'Generating...' : 'Generate Prompts'}
           </button>
+          {syncStatus === 'synced' && (
+            <div className="flex items-center gap-1.5 text-[11px] text-emerald-600">
+              <CheckCircle2 size={12} /> Prompts synced
+            </div>
+          )}
+          {syncStatus === 'unsynced' && (
+            <div className="flex items-center gap-1.5 text-[11px] text-amber-600">
+              <AlertTriangle size={12} /> {unsyncedPrompt ? `${unsyncedPrompt.replace('SwiftLift ', '').replace(' V1', '')} out of sync` : 'Prompts out of sync'}
+            </div>
+          )}
+          {syncStatus === 'checking' && (
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <Loader2 size={12} className="animate-spin" /> Checking sync...
+            </div>
+          )}
         </div>
       </div>
 
