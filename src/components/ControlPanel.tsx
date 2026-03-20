@@ -25,9 +25,12 @@ interface Props {
   onGenerateStart: (tier: '350' | '550') => void;
   onGenerateError: (error: string) => void;
   onClear: () => void;
+  onSaveResult: (success: boolean, message?: string) => void;
   clearSignal: number;
   saveSignal: number;
   newSignal: number;
+  currentPromptA: string;
+  currentPromptB: string;
 }
 
 function getProjectName(sourceUrl: string): string {
