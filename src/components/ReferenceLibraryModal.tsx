@@ -94,13 +94,38 @@ export default function ReferenceLibraryModal({ open, onClose, onSelect, roleFil
       const matchesIndustry = filterIndustry === 'All' || r.industry === filterIndustry;
       const matchesCategory = filterCategory === 'All' || parsed.category === filterCategory;
       const matchesConversion = filterConversion === 'All' || parsed.conversion_level === filterConversion;
-      const matchesRole = !roleFilter || r.reference_role === roleFilter;
+      // Role matching: for conversion_layout, show all references as fallback (don't hard-filter to empty)
+      let matchesRole = true;
+      if (roleFilter === 'style') {
+        matchesRole = r.reference_role === 'style';
+      }
+      // For conversion_layout or no roleFilter, show everything
       return matchesSearch && matchesIndustry && matchesCategory && matchesConversion && matchesRole;
     });
+    // For conversion_layout: prioritize explicit conversion items at top
+    if (roleFilter === 'conversion_layout') {
+      const convItems = items.filter(r => r.reference_role === 'conversion_layout');
+      const fallbackItems = items.filter(r => r.reference_role !== 'conversion_layout');
+      items = [...convItems, ...fallbackItems];
+    }
     switch (sortBy) {
-      case 'recent': items.sort((a, b) => b.created_at.localeCompare(a.created_at)); break;
+      case 'recent': {
+        const convItems = roleFilter === 'conversion_layout' ? items.filter(r => r.reference_role === 'conversion_layout') : [];
+        const rest = roleFilter === 'conversion_layout' ? items.filter(r => r.reference_role !== 'conversion_layout') : items;
+        rest.sort((a, b) => b.created_at.localeCompare(a.created_at));
+        if (roleFilter === 'conversion_layout') {
+          convItems.sort((a, b) => b.created_at.localeCompare(a.created_at));
+          items = [...convItems, ...rest];
+        } else {
+          items = rest;
+        }
+        break;
+      }
       case 'az': items.sort((a, b) => a.site_name.localeCompare(b.site_name)); break;
       case 'industry': items.sort((a, b) => a.industry.localeCompare(b.industry)); break;
+    }
+    if (import.meta.env.DEV) {
+      console.debug('[ReferenceModal]', { roleFilter, total: references.length, explicitConversion: references.filter(r => r.reference_role === 'conversion_layout').length, rendered: items.length });
     }
     return items;
   }, [references, search, filterIndustry, filterCategory, filterConversion, sortBy, roleFilter]);
@@ -226,9 +251,9 @@ export default function ReferenceLibraryModal({ open, onClose, onSelect, roleFil
           </div>
           {filtered.length === 0 && (
             <p className="text-center text-muted-foreground py-12 text-sm">
-              {roleFilter
-                ? `No ${roleFilter === 'style' ? 'style' : 'conversion layout'} references found. Add one from the Reference Library page.`
-                : 'No references found matching your criteria.'}
+              {references.length === 0
+                ? 'No references found. Add some from the Reference Library page.'
+                : 'No references found matching your filters. Try adjusting your search or filters.'}
             </p>
           )}
         </div>
