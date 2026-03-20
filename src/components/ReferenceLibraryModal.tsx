@@ -216,7 +216,7 @@ export default function ReferenceLibraryModal({ open, onClose, onSelect, roleFil
                       )}
                     </div>
                     <button onClick={() => { onSelect(ref); onClose(); }}
-                      className="w-full px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                      className="w-full mt-auto px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
                       Select
                     </button>
                   </div>
