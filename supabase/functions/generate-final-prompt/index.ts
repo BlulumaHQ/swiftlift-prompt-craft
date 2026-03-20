@@ -1089,6 +1089,44 @@ The active footer credit must reflect the Selected Brand above.
     assembledA = insertFooterSafetyBeforeFinalInstruction(assembledA);
     assembledB = insertFooterSafetyBeforeFinalInstruction(assembledB);
 
+    // ── Deduplicate FOOTER ATTRIBUTION SAFETY blocks ──
+    // The Master Prompt may already contain this section; the injection above
+    // may add a second copy. Keep only the first occurrence.
+    function deduplicateFooterSafety(prompt: string): string {
+      const sectionHeader = 'FOOTER ATTRIBUTION SAFETY';
+      const firstIdx = prompt.indexOf(sectionHeader);
+      if (firstIdx === -1) return prompt;
+      const secondIdx = prompt.indexOf(sectionHeader, firstIdx + sectionHeader.length);
+      if (secondIdx === -1) return prompt; // only one occurrence, nothing to do
+
+      // Find the start of the second block's divider line (the "----" line before it)
+      const dividerPattern = '--------------------------------------------------';
+      let blockStart = prompt.lastIndexOf(dividerPattern, secondIdx);
+      // Walk back past any preceding whitespace/newlines to find the true start
+      while (blockStart > 0 && (prompt[blockStart - 1] === '\n' || prompt[blockStart - 1] === '\r' || prompt[blockStart - 1] === ' ')) {
+        blockStart--;
+      }
+
+      // Find the end of the second block: next divider or end of string
+      const afterHeader = secondIdx + sectionHeader.length;
+      const nextDivider = prompt.indexOf(dividerPattern, afterHeader + 1);
+      let blockEnd: number;
+      if (nextDivider !== -1) {
+        // Walk back to trim trailing whitespace before the next divider
+        blockEnd = nextDivider;
+        while (blockEnd > afterHeader && (prompt[blockEnd - 1] === '\n' || prompt[blockEnd - 1] === '\r')) {
+          blockEnd--;
+        }
+      } else {
+        blockEnd = prompt.length;
+      }
+
+      return prompt.substring(0, blockStart) + prompt.substring(blockEnd);
+    }
+
+    assembledA = deduplicateFooterSafety(assembledA);
+    assembledB = deduplicateFooterSafety(assembledB);
+
     // Final output formatting cleanup pass
     function cleanOutputFormatting(prompt: string): string {
       // Fix merged section dividers (no line break before dashes)
