@@ -251,9 +251,9 @@ export default function ReferenceLibraryModal({ open, onClose, onSelect, roleFil
           </div>
           {filtered.length === 0 && (
             <p className="text-center text-muted-foreground py-12 text-sm">
-              {roleFilter
-                ? `No ${roleFilter === 'style' ? 'style' : 'conversion layout'} references found. Add one from the Reference Library page.`
-                : 'No references found matching your criteria.'}
+              {references.length === 0
+                ? 'No references found. Add some from the Reference Library page.'
+                : 'No references found matching your filters. Try adjusting your search or filters.'}
             </p>
           )}
         </div>
