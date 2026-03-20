@@ -7,7 +7,7 @@ import { LayoutGrid, Sparkles, X, Loader2, CheckCircle2, AlertTriangle } from 'l
 import type { DemoSite } from '@/lib/demoSiteStore';
 import { supabase } from '@/integrations/supabase/client';
 import { getPromptLibrary } from '@/lib/promptLibraryStore';
-import { getCloudPrompts } from '@/lib/promptCloudStore';
+import { getCloudPrompts, computeContentHash } from '@/lib/promptCloudStore';
 
 // Authoritative Group B cloud prompt IDs
 const CLOUD_PROMPT_IDS: Record<string, string> = {
@@ -16,15 +16,7 @@ const CLOUD_PROMPT_IDS: Record<string, string> = {
   'SwiftLift Prompt Assembly Rules V1': 'cd77a34e-9cb0-44f1-8d31-e1764c531f8e',
 };
 
-// Normalize prompt content for comparison — ignore formatting-only differences
-function normalizePromptContent(content: string): string {
-  return content
-    .replace(/\r\n/g, '\n')   // normalize line endings to LF
-    .replace(/\r/g, '\n')
-    .replace(/[ \t]+$/gm, '') // trim trailing whitespace per line
-    .replace(/\n{3,}/g, '\n\n') // collapse 3+ blank lines to 2
-    .trim();                   // trim leading/trailing
-}
+// Content hash-based sync — no longer uses text content normalization for comparison
 
 const projectBrands = ['SwiftLift', 'Bluluma', 'Sonykun', 'SwiftSite'];
 
@@ -107,7 +99,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const toggleModule = (id: string) => setModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   const toggleAdvModule = (id: string) => setAdvModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
-  // Check prompt sync status — verify all 3 cloud prompts exist and have content
+  // Check prompt sync status — verify all 3 cloud prompts exist and have valid metadata
   const checkSyncStatus = useCallback(async () => {
     setSyncStatus('checking');
     try {
@@ -116,11 +108,19 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
 
       for (const name of requiredNames) {
         const cloudId = CLOUD_PROMPT_IDS[name];
-        const cloud = cloudPrompts.find(p => p.id === cloudId);
-        if (!cloud || !normalizePromptContent(cloud.content)) {
+        const cloud = cloudPrompts.find(p => p.id === cloudId) as any;
+        if (!cloud || !cloud.content) {
           setSyncStatus('unsynced');
           const shortName = name.replace('SwiftLift ', '').replace(' V1', '');
           setUnsyncedPrompt(shortName + ' missing from cloud');
+          return;
+        }
+        // Verify content_hash is present and matches actual content
+        const actualHash = computeContentHash(cloud.content);
+        if (cloud.content_hash && cloud.content_hash !== actualHash) {
+          setSyncStatus('unsynced');
+          const shortName = name.replace('SwiftLift ', '').replace(' V1', '');
+          setUnsyncedPrompt(shortName + ' content integrity mismatch');
           return;
         }
       }

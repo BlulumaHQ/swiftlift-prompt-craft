@@ -30,6 +30,9 @@ interface PromptItem {
   version?: number;
   type?: string;
   status?: string;
+  revisionNumber?: number;
+  contentHash?: string;
+  syncOrigin?: string;
 }
 
 export default function PromptLibrary() {
@@ -68,6 +71,7 @@ export default function PromptLibrary() {
       cloudItems = cloudPrompts.map(p => ({
         id: `cloud-${p.id}`, name: p.prompt_name, content: p.content, category: p.category,
         source: 'cloud' as const, cloudId: p.id, filePath: p.file_path, version: p.version,
+        revisionNumber: p.revision_number, contentHash: p.content_hash, syncOrigin: p.sync_origin,
       }));
     } catch (err) {
       console.warn('Could not load cloud prompts:', err);
@@ -130,13 +134,13 @@ export default function PromptLibrary() {
         category: selectedItem.category,
       });
 
+      // Verify save via metadata — check content_hash matches
       const verifyCloud = await getCloudPrompts();
       const savedCloud = verifyCloud.find(c => c.prompt_name === editName);
-      const localPrompts = getPromptLibrary();
-      const savedLocal = localPrompts.find(p => p.name === editName);
+      const newHash = (await import('@/lib/promptCloudStore')).computeContentHash(editContent);
 
-      if (savedCloud && savedLocal && savedCloud.content === savedLocal.content) {
-        toast({ title: 'Saved & synced (local + cloud)' });
+      if (savedCloud && savedCloud.content_hash === newHash) {
+        toast({ title: `Saved & synced — revision #${savedCloud.revision_number}` });
       } else {
         toast({ title: 'Saved', description: 'Warning: sync verification could not confirm match.', variant: 'destructive' });
       }

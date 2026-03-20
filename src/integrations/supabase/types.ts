@@ -202,30 +202,39 @@ export type Database = {
         Row: {
           category: string
           content: string
+          content_hash: string
           created_at: string
           file_path: string
           id: string
           prompt_name: string
+          revision_number: number
+          sync_origin: string
           updated_at: string
           version: number
         }
         Insert: {
           category?: string
           content?: string
+          content_hash?: string
           created_at?: string
           file_path?: string
           id?: string
           prompt_name: string
+          revision_number?: number
+          sync_origin?: string
           updated_at?: string
           version?: number
         }
         Update: {
           category?: string
           content?: string
+          content_hash?: string
           created_at?: string
           file_path?: string
           id?: string
           prompt_name?: string
+          revision_number?: number
+          sync_origin?: string
           updated_at?: string
           version?: number
         }
