@@ -253,39 +253,54 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     const resolvedConvRef = normalizedConvUrl || convRef?.live_url || '';
 
     try {
-      // Read prompts from local Prompt Library state
+      // Fetch latest cloud prompts and local prompts fresh
       const localPrompts = getPromptLibrary();
-      const extractionPrompt = localPrompts.find(p => p.name === 'SwiftLift Source Extraction Prompt V1')?.content || '';
-      const masterPrompt = localPrompts.find(p => p.name === 'SwiftLift Final Build Master Prompt V1')?.content || '';
-      const assemblyRules = localPrompts.find(p => p.name === 'SwiftLift Prompt Assembly Rules V1')?.content || '';
-
-      if (!extractionPrompt || !masterPrompt || !assemblyRules) {
-        onGenerateError('Required prompts missing. Check Prompt Library for all 3 required prompts.');
-        setGenerating(false);
-        return;
-      }
-
-      // Sync verification: compare local vs cloud
+      let cloudPrompts: Awaited<ReturnType<typeof getCloudPrompts>> = [];
       try {
-        const { getCloudPrompts } = await import('@/lib/promptCloudStore');
-        const cloudPrompts = await getCloudPrompts();
-        const requiredNames = [
-          'SwiftLift Source Extraction Prompt V1',
-          'SwiftLift Final Build Master Prompt V1',
-          'SwiftLift Prompt Assembly Rules V1',
-        ];
-        for (const name of requiredNames) {
-          const local = localPrompts.find(p => p.name === name);
-          const cloud = cloudPrompts.find(p => p.prompt_name === name);
-          if (local && cloud && local.content !== cloud.content) {
-            onGenerateError(`Prompt sync mismatch detected for "${name}". Please save or sync prompts before generating.`);
-            setGenerating(false);
-            return;
-          }
-        }
-      } catch (syncErr) {
-        console.warn('Sync verification skipped:', syncErr);
+        cloudPrompts = await getCloudPrompts();
+      } catch (fetchErr) {
+        console.warn('Cloud prompt fetch failed, proceeding with local only:', fetchErr);
       }
+
+      const requiredNames = Object.keys(CLOUD_PROMPT_IDS);
+      const resolvedPrompts: Record<string, string> = {};
+
+      // For each required prompt: compare normalized content, resolve latest
+      for (const name of requiredNames) {
+        const local = localPrompts.find(p => p.name === name);
+        const cloudId = CLOUD_PROMPT_IDS[name];
+        const cloud = cloudPrompts.find(p => p.id === cloudId);
+
+        if (!local?.content && !cloud?.content) {
+          onGenerateError(`Required prompt missing: "${name}". Check Prompt Library.`);
+          setGenerating(false);
+          return;
+        }
+
+        // Use normalized comparison
+        const localNorm = local ? normalizePromptContent(local.content) : '';
+        const cloudNorm = cloud ? normalizePromptContent(cloud.content) : '';
+
+        if (local && cloud && localNorm !== cloudNorm) {
+          const shortName = name.replace('SwiftLift ', '').replace(' V1', '');
+          onGenerateError(`${shortName} is out of sync. Please save or sync in Prompt Library before generating.`);
+          setSyncStatus('unsynced');
+          setUnsyncedPrompt(name);
+          setGenerating(false);
+          return;
+        }
+
+        // Use local content as source of truth (it's what gets passed to the edge function)
+        resolvedPrompts[name] = local?.content || cloud?.content || '';
+      }
+
+      const extractionPrompt = resolvedPrompts['SwiftLift Source Extraction Prompt V1'];
+      const masterPrompt = resolvedPrompts['SwiftLift Final Build Master Prompt V1'];
+      const assemblyRules = resolvedPrompts['SwiftLift Prompt Assembly Rules V1'];
+
+      // Mark as synced since we passed the check
+      setSyncStatus('synced');
+      setUnsyncedPrompt(null);
 
       const { data, error } = await supabase.functions.invoke('generate-final-prompt', {
         body: {
