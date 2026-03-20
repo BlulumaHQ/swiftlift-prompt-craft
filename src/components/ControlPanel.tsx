@@ -340,22 +340,47 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     executeGenerate();
   };
 
-  const doSave = () => {
-    const resolvedStyleRef = normalizeUrl(styleRefUrl) || styleRef?.live_url || '';
-    const project: SavedProject = {
-      id: crypto.randomUUID(),
-      name: projectName || getProjectName(sourceUrl),
-      sourceUrl, referenceLayout: styleRef?.reference_name || '', referenceUrl: resolvedStyleRef, packageTier,
-      modules, addons: [], primaryColor, secondaryColor, primaryFont,
-      specialInstructions, promptA: '', promptB: '',
-      dateCreated: new Date().toISOString().slice(0, 10),
-      producedBy: projectBrand, projectName, clientName,
-      fontWeight, advancedModules: advModules,
-    };
-    saveProject(project);
-  };
+  // Stable project ID — reused across saves to prevent duplicates
+  const currentProjectIdRef = useRef<string>(crypto.randomUUID());
+  const lastSavedHashRef = useRef<string>('');
 
-  const doClear = () => {
+  const getProjectHash = useCallback(() => {
+    return JSON.stringify({
+      sourceUrl, projectName, clientName, packageTier,
+      modules, advModules, primaryColor, secondaryColor, primaryFont,
+      fontWeight, specialInstructions, promptA: currentPromptA, promptB: currentPromptB,
+    });
+  }, [sourceUrl, projectName, clientName, packageTier, modules, advModules, primaryColor, secondaryColor, primaryFont, fontWeight, specialInstructions, currentPromptA, currentPromptB]);
+
+  const doSave = useCallback(() => {
+    try {
+      const currentHash = getProjectHash();
+      // Skip if nothing changed since last save
+      if (currentHash === lastSavedHashRef.current) {
+        onSaveResult(true, 'No new changes to save');
+        return;
+      }
+
+      const resolvedStyleRef = normalizeUrl(styleRefUrl) || styleRef?.live_url || '';
+      const project: SavedProject = {
+        id: currentProjectIdRef.current,
+        name: projectName || getProjectName(sourceUrl),
+        sourceUrl, referenceLayout: styleRef?.reference_name || '', referenceUrl: resolvedStyleRef, packageTier,
+        modules, addons: [], primaryColor, secondaryColor, primaryFont,
+        specialInstructions, promptA: currentPromptA, promptB: currentPromptB,
+        dateCreated: new Date().toISOString().slice(0, 10),
+        producedBy: projectBrand, projectName, clientName,
+        fontWeight, advancedModules: advModules,
+      };
+      saveProject(project);
+      lastSavedHashRef.current = currentHash;
+      onSaveResult(true);
+    } catch (err: any) {
+      onSaveResult(false, err.message || 'Save failed');
+    }
+  }, [getProjectHash, styleRefUrl, styleRef, sourceUrl, projectName, clientName, projectBrand, packageTier, modules, advModules, primaryColor, secondaryColor, primaryFont, fontWeight, specialInstructions, currentPromptA, currentPromptB, onSaveResult]);
+
+  const doClear = useCallback(() => {
     setProjectBrand('SwiftLift'); setSourceUrl(''); setProjectName(''); setClientName('');
     setStyleRef(null); setConvRef(null); setStyleRefUrl(''); setConvRefUrl('');
     setStyleUrlError(''); setConvUrlError('');
@@ -365,8 +390,11 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     setSpecialInstructions(''); setBrandDetected(false); setBrandDetecting(false);
     setDetectedSources({});
     manualOverrides.current = new Set();
+    // Reset project identity for new project
+    currentProjectIdRef.current = crypto.randomUUID();
+    lastSavedHashRef.current = '';
     onClear();
-  };
+  }, [onClear]);
 
   useEffect(() => { if (clearSignal > 0) doClear(); }, [clearSignal]);
   useEffect(() => { if (saveSignal > 0) doSave(); }, [saveSignal]);
