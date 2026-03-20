@@ -107,24 +107,20 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const toggleModule = (id: string) => setModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   const toggleAdvModule = (id: string) => setAdvModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
-  // Check prompt sync status — called on mount and periodically
+  // Check prompt sync status — verify all 3 cloud prompts exist and have content
   const checkSyncStatus = useCallback(async () => {
     setSyncStatus('checking');
     try {
-      const localPrompts = getPromptLibrary();
       const cloudPrompts = await getCloudPrompts();
       const requiredNames = Object.keys(CLOUD_PROMPT_IDS);
 
       for (const name of requiredNames) {
-        const local = localPrompts.find(p => p.name === name);
         const cloudId = CLOUD_PROMPT_IDS[name];
         const cloud = cloudPrompts.find(p => p.id === cloudId);
-        if (!local || !cloud) continue;
-        const localNorm = normalizePromptContent(local.content);
-        const cloudNorm = normalizePromptContent(cloud.content);
-        if (localNorm !== cloudNorm) {
+        if (!cloud || !normalizePromptContent(cloud.content)) {
           setSyncStatus('unsynced');
-          setUnsyncedPrompt(name);
+          const shortName = name.replace('SwiftLift ', '').replace(' V1', '');
+          setUnsyncedPrompt(shortName + ' missing from cloud');
           return;
         }
       }
