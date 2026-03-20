@@ -16,15 +16,7 @@ const CLOUD_PROMPT_IDS: Record<string, string> = {
   'SwiftLift Prompt Assembly Rules V1': 'cd77a34e-9cb0-44f1-8d31-e1764c531f8e',
 };
 
-// Normalize prompt content for comparison — ignore formatting-only differences
-function normalizePromptContent(content: string): string {
-  return content
-    .replace(/\r\n/g, '\n')   // normalize line endings to LF
-    .replace(/\r/g, '\n')
-    .replace(/[ \t]+$/gm, '') // trim trailing whitespace per line
-    .replace(/\n{3,}/g, '\n\n') // collapse 3+ blank lines to 2
-    .trim();                   // trim leading/trailing
-}
+// Content hash-based sync — no longer uses text content normalization for comparison
 
 const projectBrands = ['SwiftLift', 'Bluluma', 'Sonykun', 'SwiftSite'];
 
