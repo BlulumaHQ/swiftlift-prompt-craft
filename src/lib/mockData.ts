@@ -50,4 +50,16 @@ export interface SavedProject {
   accentColor?: string;
   fontWeight?: string;
   advancedModules?: string[];
+  // Prompt A theme overrides
+  promptAPrimaryColor?: string;
+  promptASecondaryColor?: string;
+  promptAPrimaryFont?: string;
+  promptAFontWeight?: string;
+  promptAThemeMode?: string;
+  // Prompt B theme overrides
+  promptBPrimaryColor?: string;
+  promptBSecondaryColor?: string;
+  promptBPrimaryFont?: string;
+  promptBFontWeight?: string;
+  promptBThemeMode?: string;
 }
