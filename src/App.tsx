@@ -13,6 +13,7 @@ import QualityControl from "./pages/QualityControl";
 import LockPreview from "./pages/LockPreview";
 import ClientAssets from "./pages/ClientAssets";
 import NotFound from "./pages/NotFound";
+import SupabaseDebug from "./pages/SupabaseDebug";
 
 const queryClient = new QueryClient();
 
