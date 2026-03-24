@@ -33,6 +33,7 @@ const App = () => (
           <Route path="/quality-control" element={<QualityControl />} />
           <Route path="/lock-preview" element={<LockPreview />} />
           <Route path="/client-assets" element={<ClientAssets />} />
+          <Route path="/debug-supabase" element={<SupabaseDebug />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
