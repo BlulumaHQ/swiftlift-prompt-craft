@@ -492,6 +492,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           promptBLayoutOverride,
           enabledModules: normalizedModules,
           advancedModules: advModules,
+          referenceAnalysis: analysisResult?.analysis || null,
           localPrompts: {
             extractionPrompt,
             masterPrompt,
