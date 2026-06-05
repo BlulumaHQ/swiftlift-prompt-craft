@@ -880,75 +880,211 @@ Deno.serve(async (req) => {
       extractionNotes: formatExtractionNotes(normalized),
     };
 
-    const brandOverrideParts: string[] = [];
-    if (primaryColor) brandOverrideParts.push(`Primary Color: ${primaryColor}`);
-    if (secondaryColor) brandOverrideParts.push(`Secondary Color: ${secondaryColor}`);
-    brandOverrideParts.push(`Heading Font: ${resolvedFonts.heading}`);
-    brandOverrideParts.push(`Body Font: ${resolvedFonts.body}`);
-    if (fontWeight) brandOverrideParts.push(`Font Weight: ${fontWeight}`);
-    if (themeMode && themeMode !== 'auto') {
-      brandOverrideParts.push(`Theme Mode: ${themeMode === 'force_light' ? 'Force Light — use light backgrounds, light surfaces, dark text' : 'Force Dark — use dark backgrounds, dark surfaces, light text'}`);
+    // ── Build per-prompt brand & theme override blocks ──
+    // Prompt B falls back to Prompt A values when its own fields are empty.
+    const bPrimaryColorEff = promptBPrimaryColor || primaryColor || "";
+    const bSecondaryColorEff = promptBSecondaryColor || secondaryColor || "";
+    const bPrimaryFontEff = promptBPrimaryFont || primaryFont || "";
+    const bFontWeightEff = promptBFontWeight || fontWeight || "";
+    const bThemeModeEff = (promptBThemeMode && promptBThemeMode !== 'auto')
+      ? promptBThemeMode
+      : (themeMode || 'auto');
+
+    const resolvedFontsA = resolveAutoFont(primaryFont, businessType);
+    const resolvedFontsB = resolveAutoFont(bPrimaryFontEff, businessType);
+
+    function buildBrandOverrideBlock(
+      label: 'PROMPT A' | 'PROMPT B',
+      pColor: string, sColor: string, fonts: { heading: string; body: string },
+      fWeight: string, tMode: string,
+    ): string {
+      const parts: string[] = [];
+      if (pColor) parts.push(`Primary Color: ${pColor}`);
+      if (sColor) parts.push(`Secondary Color: ${sColor}`);
+      parts.push(`Heading Font: ${fonts.heading}`);
+      parts.push(`Body Font: ${fonts.body}`);
+      if (fWeight) parts.push(`Font Weight: ${fWeight}`);
+      if (tMode && tMode !== 'auto') {
+        parts.push(`Theme Mode: ${tMode === 'force_light' ? 'Force Light — use light backgrounds, light surfaces, dark text' : 'Force Dark — use dark backgrounds, dark surfaces, light text'}`);
+      }
+      parts.push(`\nFont Usage Rules:`);
+      parts.push(`- Maximum 2 font families total`);
+      parts.push(`- Display fonts (Archivo Black, Clash Display, Syne) are for hero titles and major headings ONLY`);
+      parts.push(`- Body text must use a highly readable font (Inter, Plus Jakarta Sans, Poppins, or Sora)`);
+      parts.push(`- Do NOT use Archivo Black, Clash Display, or Syne for body text`);
+      parts.push(`\nHero Title Typography Baseline:`);
+      parts.push(`- Desktop hero title: 64px minimum, font-weight 700–900, line-height 1.0–1.1`);
+      parts.push(`- Tablet hero title: 52px minimum, font-weight 700–900, line-height 1.0–1.1`);
+      parts.push(`- Mobile hero title: 38px minimum, font-weight 700–900, line-height 1.05–1.15`);
+      parts.push(`- Hero title must be the largest text element on the page`);
+      parts.push(`- Prefer tight, impactful line-height — avoid paragraph-like hero sizing`);
+      return `\n\n--------------------------------------------------\nBRAND & THEME OVERRIDE — ${label}\n--------------------------------------------------\n\n${parts.join('\n')}\n\nApply these brand overrides to the final design. Brand colors take priority over extracted design system colors. Theme mode affects page background, section backgrounds, surface/card tones, and text contrast — but does NOT override brand colors.`;
     }
 
-    // Font usage restrictions
-    brandOverrideParts.push(`\nFont Usage Rules:`);
-    brandOverrideParts.push(`- Maximum 2 font families total`);
-    brandOverrideParts.push(`- Display fonts (Archivo Black, Clash Display, Syne) are for hero titles and major headings ONLY`);
-    brandOverrideParts.push(`- Body text must use a highly readable font (Inter, Plus Jakarta Sans, Poppins, or Sora)`);
-    brandOverrideParts.push(`- Do NOT use Archivo Black, Clash Display, or Syne for body text`);
+    const brandOverrideBlockA = buildBrandOverrideBlock(
+      'PROMPT A', primaryColor || "", secondaryColor || "", resolvedFontsA,
+      fontWeight || "", themeMode || 'auto',
+    );
+    const brandOverrideBlockB = buildBrandOverrideBlock(
+      'PROMPT B', bPrimaryColorEff, bSecondaryColorEff, resolvedFontsB,
+      bFontWeightEff, bThemeModeEff,
+    );
 
-    // Hero title sizing baseline
-    brandOverrideParts.push(`\nHero Title Typography Baseline:`);
-    brandOverrideParts.push(`- Desktop hero title: 64px minimum, font-weight 700–900, line-height 1.0–1.1`);
-    brandOverrideParts.push(`- Tablet hero title: 52px minimum, font-weight 700–900, line-height 1.0–1.1`);
-    brandOverrideParts.push(`- Mobile hero title: 38px minimum, font-weight 700–900, line-height 1.05–1.15`);
-    brandOverrideParts.push(`- Hero title must be the largest text element on the page`);
-    brandOverrideParts.push(`- Prefer tight, impactful line-height — avoid paragraph-like hero sizing`);
-
-    const brandOverrideBlock = `\n\n--------------------------------------------------\nBRAND & THEME OVERRIDE\n--------------------------------------------------\n\n${brandOverrideParts.join('\n')}\n\nApply these brand overrides to the final design. Brand colors take priority over extracted design system colors. Theme mode affects page background, section backgrounds, surface/card tones, and text contrast — but does NOT override brand colors.`;
-
-    const contentModuleNames: Record<string, string> = {
-      portfolio: 'Portfolio / Projects',
-      blog: 'Blog',
-      gallery: 'Gallery',
+    // ── Content Modules (BluLuma CMS demo dataset) ──
+    // Legacy ID backward compatibility
+    const legacyModuleMap: Record<string, string> = {
+      portfolio_login: 'portfolio_demo_cms',
+      portfolio_nologin: 'portfolio_demo_cms',
+      blog_login: 'blog_demo_cms',
+      blog_nologin: 'blog_demo_cms',
+      gallery: 'gallery_demo_cms',
     };
-    const activeContentModules = (enabledModules || []).filter((m: string) => ['portfolio', 'blog', 'gallery'].includes(m));
+    const normalizedEnabledModules: string[] = Array.from(new Set(
+      (enabledModules || []).map((m: string) => legacyModuleMap[m] || m)
+    ));
+
+    const cmsModuleBlocks: Record<string, string> = {
+      portfolio_demo_cms: `PORTFOLIO / PROJECTS MODULE — BLULUMA DEMO CMS
+
+- Build the Portfolio / Projects layout and page structure.
+- Use BluLuma CMS demo portfolio data only.
+- Do not generate random project names, fake client names, fake case studies, fake locations, or fake results.
+- Connect the layout to the CMS-ready Portfolio schema.
+- Use client_id = "bluluma_demo".
+- Use content_type = "portfolio".
+- Display 6 demo portfolio items.
+- Each card must support: title, category, excerpt, featured_image, slug.
+- Project detail pages must be template-based and CMS-ready.
+- The final website must allow the client_id to be changed later without rebuilding the layout.`,
+      blog_demo_cms: `BLOG MODULE — BLULUMA DEMO CMS
+
+- Build the Blog listing layout and Article detail page template.
+- Use BluLuma CMS demo blog data only.
+- Do not generate random blog posts, fake authors, fake article content, or fake publication dates.
+- Connect the layout to the CMS-ready Blog schema.
+- Use client_id = "bluluma_demo".
+- Use content_type = "blog".
+- Display 6 demo blog posts.
+- Each card must support: title, excerpt, featured_image, published_date, slug.
+- Article pages must be template-based and CMS-ready.
+- The final website must allow the client_id to be changed later without rebuilding the layout.`,
+      gallery_demo_cms: `GALLERY MODULE — BLULUMA DEMO CMS
+
+- Build the Gallery layout using BluLuma CMS demo gallery data only.
+- Use client_id = "bluluma_demo".
+- Use content_type = "gallery".
+- Do not generate random gallery images or fake captions.
+- The gallery must support image grid, image title, caption, alt text, and lightbox.`,
+      team_demo_cms: `TEAM MODULE — BLULUMA DEMO CMS
+
+- Build the Team layout using BluLuma CMS demo team data only.
+- Use client_id = "bluluma_demo".
+- Use content_type = "team".
+- Do not generate random team members.
+- Each team card must support: name, role, bio, featured_image.`,
+      testimonials_demo_cms: `TESTIMONIALS MODULE — BLULUMA DEMO CMS
+
+- Build the Testimonials layout using BluLuma CMS demo testimonials data only.
+- Use client_id = "bluluma_demo".
+- Use content_type = "testimonials".
+- Do not generate random testimonials.
+- Each testimonial must support: client_name, quote, rating, company_name.`,
+      faq_demo_cms: `FAQ MODULE — BLULUMA DEMO CMS
+
+- Build the FAQ layout using BluLuma CMS demo FAQ data only.
+- Use client_id = "bluluma_demo".
+- Use content_type = "faq".
+- Do not generate random FAQ questions.
+- Each FAQ item must support: question, answer, category, sort_order.`,
+      services_demo_cms: `SERVICES MODULE — BLULUMA DEMO CMS
+
+- Build the Services layout using BluLuma CMS demo services data only.
+- Use client_id = "bluluma_demo".
+- Use content_type = "services".
+- Do not generate random services.
+- Each service item must support: title, description, icon, featured_image, slug.`,
+      multilanguage: `MULTI-LANGUAGE MODULE
+
+- Build the website with a language-ready structure.
+- Use localStorage or an equivalent simple frontend method for language switching.
+- Do not use external translation APIs.
+- Do not generate low-quality machine translation.
+- Keep the structure ready for English and Traditional Chinese content.`,
+    };
+
+    const activeModuleSections = normalizedEnabledModules
+      .map((m) => cmsModuleBlocks[m])
+      .filter(Boolean);
+
     let contentModuleBlock = '';
-    if (activeContentModules.length > 0) {
-      const moduleList = activeContentModules.map((m: string) => contentModuleNames[m] || m).join(', ');
+    if (activeModuleSections.length > 0) {
       contentModuleBlock = `\n\n--------------------------------------------------
-CONTENT MODULE DESIGN CONTINUITY
+CONTENT MODULES — BLULUMA CMS DEMO DATASET
 --------------------------------------------------
 
-Enabled Content Modules: ${moduleList}
+These modules must be built using BluLuma CMS demo data only.
+Do NOT randomly generate sample content for these modules.
+All CMS modules use client_id = "bluluma_demo" and a template-based, CMS-ready layout.
 
-CRITICAL RULE: Generated content modules must visually follow the existing website design system.
-
-They must inherit:
-- Typography (heading hierarchy, paragraph spacing, font families)
-- Spacing (section padding, element gaps, margins)
-- Grid layout (column structure, responsive breakpoints)
-- Button style (shape, colors, hover states)
-- Card style (borders, shadows, padding, radius)
-- Color palette (primary, secondary, accent usage)
-- Image aspect ratios
-- Hover interactions
-
-Do NOT introduce a new design system for these modules.
-New pages must look like they were originally part of the website.
-
-${activeContentModules.includes('portfolio') ? `PORTFOLIO MODULE:
-- Generate a Portfolio listing page and individual Project detail pages.
-- Portfolio cards must reuse the website's existing card style.
-- Project pages must use the same typography hierarchy and spacing system.
-` : ''}${activeContentModules.includes('blog') ? `BLOG MODULE:
-- Generate a Blog listing page and an Article page template.
-- Typography must follow the website's heading hierarchy and paragraph spacing.
-` : ''}${activeContentModules.includes('gallery') ? `GALLERY MODULE:
-- Generate an image grid layout and a lightbox image viewer.
-- Gallery must inherit image border radius, spacing, overlay style, and hover effects.
-` : ''}`;
+${activeModuleSections.join('\n\n')}`;
     }
+
+    // ── Advanced Modules ──
+    const advModuleBlocks: Record<string, string> = {
+      lead_capture: `LEAD CAPTURE UPGRADE
+
+- Add stronger lead capture sections.
+- Include early contact form placement.
+- Include CTA buttons in hero, middle section, and final CTA.
+- Do not invent fake offers.`,
+      conversion_layout: `CONVERSION LAYOUT
+
+- Strengthen section hierarchy and CTA visibility.
+- Keep it as a layout upgrade only.
+- Do not add marketing strategy text or CRO analysis.`,
+      trust_badges: `TRUST BADGE SECTION
+
+- Add a trust badge section.
+- Use generic badge labels only if source data does not provide real badges.
+- Do not invent certifications, awards, or official memberships.`,
+      service_comparison: `SERVICE COMPARISON
+
+- Add a service comparison layout if the source website has multiple services or packages.
+- Do not invent pricing unless source data includes pricing.`,
+      case_study: `CASE STUDY SECTION
+
+- Add a case study section layout.
+- If Portfolio Demo CMS is selected, connect case study cards to portfolio_demo_cms.
+- Do not invent fake business results.`,
+      full_seo: `FULL SEO PACKAGE
+
+- Add SEO-ready page structure.
+- Include proper heading hierarchy.
+- Include metadata-ready structure.
+- Do not keyword stuff.
+- Do not generate fake SEO claims.`,
+    };
+
+    const activeAdvSections = (advancedModules || [])
+      .map((m: string) => advModuleBlocks[m])
+      .filter(Boolean);
+
+    let advancedModuleBlock = '';
+    if (activeAdvSections.length > 0) {
+      advancedModuleBlock = `\n\n--------------------------------------------------
+ADVANCED MODULES
+--------------------------------------------------
+
+${activeAdvSections.join('\n\n')}`;
+    }
+
+    // ── Per-prompt Layout Override blocks ──
+    const layoutOverrideBlockA = (promptALayoutOverride && promptALayoutOverride.trim())
+      ? `\n\n--------------------------------------------------\nPROMPT A LAYOUT OVERRIDE\n--------------------------------------------------\n\n${promptALayoutOverride.trim()}`
+      : '';
+    const layoutOverrideBlockB = (promptBLayoutOverride && promptBLayoutOverride.trim())
+      ? `\n\n--------------------------------------------------\nPROMPT B LAYOUT OVERRIDE\n--------------------------------------------------\n\n${promptBLayoutOverride.trim()}`
+      : '';
 
     const convUrl = conversionLayoutUrl || referenceUrl || "";
 
