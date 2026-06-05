@@ -563,6 +563,12 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
         promptAPrimaryFont: aPrimaryFont, promptAFontWeight: aFontWeight, promptAThemeMode: aThemeMode,
         promptBPrimaryColor: bPrimaryColor, promptBSecondaryColor: bSecondaryColor,
         promptBPrimaryFont: bPrimaryFont, promptBFontWeight: bFontWeight, promptBThemeMode: bThemeMode,
+        // Reference design analysis
+        referenceAnalysis: analysisResult?.analysis,
+        promptAThemeRecommendation: analysisResult?.promptA,
+        promptBThemeRecommendation: analysisResult?.promptB,
+        analysisConfidence: analysisResult?.confidence,
+        themeLockedA, themeLockedB,
       };
       saveProject(project);
       lastSavedHashRef.current = currentHash;
@@ -584,6 +590,8 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     setSpecialInstructions(''); setPromptALayoutOverride(''); setPromptBLayoutOverride('');
     setBrandDetected(false); setBrandDetecting(false);
     setDetectedSources({});
+    setAnalysisResult(null); setAnalyzeError(''); setAnalyzing(false);
+    setThemeLockedA(false); setThemeLockedB(false);
     manualOverrides.current = new Set();
     currentProjectIdRef.current = crypto.randomUUID();
     lastSavedHashRef.current = '';
