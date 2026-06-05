@@ -7,12 +7,14 @@ export const googleFonts = [
 ];
 
 export const contentModules = [
-  { id: 'portfolio_login', label: 'Portfolio / Projects — With Login' },
-  { id: 'portfolio_nologin', label: 'Portfolio / Projects — Without Login' },
-  { id: 'blog_login', label: 'Blog — With Login' },
-  { id: 'blog_nologin', label: 'Blog — Without Login' },
-  { id: 'gallery', label: 'Gallery' },
+  { id: 'portfolio_demo_cms', label: 'Portfolio / Projects — BluLuma Demo CMS' },
+  { id: 'blog_demo_cms', label: 'Blog — BluLuma Demo CMS' },
+  { id: 'gallery_demo_cms', label: 'Gallery — BluLuma Demo CMS' },
   { id: 'multilanguage', label: 'Multi-language' },
+  { id: 'team_demo_cms', label: 'Team — BluLuma Demo CMS' },
+  { id: 'testimonials_demo_cms', label: 'Testimonials — BluLuma Demo CMS' },
+  { id: 'faq_demo_cms', label: 'FAQ — BluLuma Demo CMS' },
+  { id: 'services_demo_cms', label: 'Services — BluLuma Demo CMS' },
 ];
 
 export const advancedModules = [

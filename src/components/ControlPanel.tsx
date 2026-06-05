@@ -159,6 +159,8 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const [modules, setModules] = useState<string[]>([]);
   const [advModules, setAdvModules] = useState<string[]>([]);
   const [specialInstructions, setSpecialInstructions] = useState('');
+  const [promptALayoutOverride, setPromptALayoutOverride] = useState('');
+  const [promptBLayoutOverride, setPromptBLayoutOverride] = useState('');
   const [generating, setGenerating] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'unknown' | 'synced' | 'unsynced' | 'checking'>('unknown');
   const [unsyncedPrompt, setUnsyncedPrompt] = useState<string | null>(null);
@@ -352,6 +354,16 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
       setSyncStatus('synced');
       setUnsyncedPrompt(null);
 
+      // Map legacy module IDs to new CMS IDs for backward compat
+      const legacyModuleMap: Record<string, string> = {
+        portfolio_login: 'portfolio_demo_cms',
+        portfolio_nologin: 'portfolio_demo_cms',
+        blog_login: 'blog_demo_cms',
+        blog_nologin: 'blog_demo_cms',
+        gallery: 'gallery_demo_cms',
+      };
+      const normalizedModules = Array.from(new Set(modules.map(m => legacyModuleMap[m] || m)));
+
       const { data, error } = await supabase.functions.invoke('generate-final-prompt', {
         body: {
           sourceUrl,
@@ -373,7 +385,11 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           promptBSecondaryColor: bSecondaryColor,
           promptBPrimaryFont: bPrimaryFont,
           promptBFontWeight: bFontWeight,
-          enabledModules: modules,
+          // Layout overrides
+          promptALayoutOverride,
+          promptBLayoutOverride,
+          enabledModules: normalizedModules,
+          advancedModules: advModules,
           localPrompts: {
             extractionPrompt,
             masterPrompt,
@@ -462,7 +478,8 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     setAPrimaryFont(''); setAFontWeight(''); setAThemeMode('auto');
     setBPrimaryColor(''); setBSecondaryColor('');
     setBPrimaryFont(''); setBFontWeight(''); setBThemeMode('auto');
-    setSpecialInstructions(''); setBrandDetected(false); setBrandDetecting(false);
+    setSpecialInstructions(''); setPromptALayoutOverride(''); setPromptBLayoutOverride('');
+    setBrandDetected(false); setBrandDetecting(false);
     setDetectedSources({});
     manualOverrides.current = new Set();
     currentProjectIdRef.current = crypto.randomUUID();
@@ -731,6 +748,13 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           aThemeMode, setAThemeMode,
         )}
 
+        {/* 4A-2. Prompt A Layout Override */}
+        <div className="panel-section">
+          <h3 className="panel-section-title">Prompt A Layout Override</h3>
+          <textarea value={promptALayoutOverride} onChange={e => setPromptALayoutOverride(e.target.value)}
+            placeholder="Layout-specific instructions for Prompt A only (section order, hero style, nav variant, etc.)" rows={4} className="control-input resize-none" />
+        </div>
+
         {/* 4B. Prompt B Brand & Theme Override */}
         {renderThemeSection(
           'b',
@@ -742,6 +766,13 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           bFontWeight, setBFontWeight,
           bThemeMode, setBThemeMode,
         )}
+
+        {/* 4B-2. Prompt B Layout Override */}
+        <div className="panel-section">
+          <h3 className="panel-section-title">Prompt B Layout Override</h3>
+          <textarea value={promptBLayoutOverride} onChange={e => setPromptBLayoutOverride(e.target.value)}
+            placeholder="Layout-specific instructions for Prompt B only (conversion sticky CTA variant, hero form, section flow, etc.)" rows={4} className="control-input resize-none" />
+        </div>
 
         {/* 5. Content Modules */}
         <div className="panel-section">
@@ -770,11 +801,11 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           </div>
         </div>
 
-        {/* 7. Special Instructions */}
+        {/* 7. Global Project Instructions */}
         <div className="panel-section">
-          <h3 className="panel-section-title">Special Instructions</h3>
+          <h3 className="panel-section-title">Global Project Instructions</h3>
           <textarea value={specialInstructions} onChange={e => setSpecialInstructions(e.target.value)}
-            placeholder="Custom instructions for the AI builder..." rows={4} className="control-input resize-none" />
+            placeholder="Add global rules for this project, such as client requirements, forbidden styles, required language, CMS rules, form rules, footer rules, or deployment notes. Do not use this field for Prompt A / Prompt B layout override." rows={4} className="control-input resize-none" />
         </div>
 
         {/* 9. Generate Button + Sync Status */}
