@@ -478,7 +478,8 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     setAPrimaryFont(''); setAFontWeight(''); setAThemeMode('auto');
     setBPrimaryColor(''); setBSecondaryColor('');
     setBPrimaryFont(''); setBFontWeight(''); setBThemeMode('auto');
-    setSpecialInstructions(''); setBrandDetected(false); setBrandDetecting(false);
+    setSpecialInstructions(''); setPromptALayoutOverride(''); setPromptBLayoutOverride('');
+    setBrandDetected(false); setBrandDetecting(false);
     setDetectedSources({});
     manualOverrides.current = new Set();
     currentProjectIdRef.current = crypto.randomUUID();
