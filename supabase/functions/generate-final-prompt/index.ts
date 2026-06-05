@@ -764,7 +764,13 @@ Deno.serve(async (req) => {
     }
 
     currentStep = "parse_request";
-    const { sourceUrl, referenceUrl, conversionLayoutUrl, businessType, userNotes, packageTier, projectBrand, themeMode, primaryColor, secondaryColor, primaryFont, fontWeight, enabledModules, localPrompts } = await req.json();
+    const {
+      sourceUrl, referenceUrl, conversionLayoutUrl, businessType, userNotes, packageTier, projectBrand,
+      themeMode, primaryColor, secondaryColor, primaryFont, fontWeight,
+      promptBThemeMode, promptBPrimaryColor, promptBSecondaryColor, promptBPrimaryFont, promptBFontWeight,
+      promptALayoutOverride, promptBLayoutOverride,
+      enabledModules, advancedModules, localPrompts,
+    } = await req.json();
 
     if (!sourceUrl) {
       throw new StepError("parse_request", "Source URL is required.", 400);
