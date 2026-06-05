@@ -731,7 +731,8 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <>
