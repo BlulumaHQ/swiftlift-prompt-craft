@@ -159,6 +159,8 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const [modules, setModules] = useState<string[]>([]);
   const [advModules, setAdvModules] = useState<string[]>([]);
   const [specialInstructions, setSpecialInstructions] = useState('');
+  const [promptALayoutOverride, setPromptALayoutOverride] = useState('');
+  const [promptBLayoutOverride, setPromptBLayoutOverride] = useState('');
   const [generating, setGenerating] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'unknown' | 'synced' | 'unsynced' | 'checking'>('unknown');
   const [unsyncedPrompt, setUnsyncedPrompt] = useState<string | null>(null);
