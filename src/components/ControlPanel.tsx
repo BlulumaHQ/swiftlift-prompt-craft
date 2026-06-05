@@ -8,6 +8,7 @@ import type { DemoSite } from '@/lib/demoSiteStore';
 import { supabase } from '@/integrations/supabase/client';
 import { getPromptLibrary } from '@/lib/promptLibraryStore';
 import { getCloudPrompts, computeContentHash } from '@/lib/promptCloudStore';
+import { analyzeReference, type AnalysisResult, type ReferenceAnalysis } from '@/lib/referenceAnalyzer';
 
 // Authoritative Group B cloud prompt IDs
 const CLOUD_PROMPT_IDS: Record<string, string> = {
@@ -17,6 +18,18 @@ const CLOUD_PROMPT_IDS: Record<string, string> = {
 };
 
 const projectBrands = ['SwiftLift', 'Bluluma', 'Sonykun', 'SwiftSite'];
+
+function SummaryItem({ label, value, swatch }: { label: string; value: string; swatch?: string }) {
+  return (
+    <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-muted/50 border border-border">
+      {swatch && <span className="w-3 h-3 rounded shrink-0 border border-border" style={{ background: swatch }} />}
+      <div className="flex flex-col min-w-0">
+        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
+        <span className="text-[11px] font-medium text-foreground truncate">{value}</span>
+      </div>
+    </div>
+  );
+}
 
 interface Props {
   onPromptsGenerated: (promptA: string, promptB: string, tier: '350' | '550') => void;
@@ -168,8 +181,109 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const [confirmBrand, setConfirmBrand] = useState('SwiftLift');
   const detectAbortRef = useRef<AbortController | null>(null);
 
+  // Reference Design Analysis
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState('');
+  const [themeLockedA, setThemeLockedA] = useState(false);
+  const [themeLockedB, setThemeLockedB] = useState(false);
+
   const toggleModule = (id: string) => setModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   const toggleAdvModule = (id: string) => setAdvModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+
+  // ── Reference Design Analyzer ──
+  const applyRecommendation = (target: 'A' | 'B', force: boolean) => {
+    if (!analysisResult) return;
+    const rec = target === 'A' ? analysisResult.promptA : analysisResult.promptB;
+    if (target === 'A') {
+      if (themeLockedA) return;
+      setAPrimaryColor(rec.primaryColor);
+      setASecondaryColor(rec.secondaryColor);
+      setAPrimaryFont(rec.primaryFont);
+      setAFontWeight(rec.fontWeight);
+      setAThemeMode(rec.themeMode);
+      ['primaryColor', 'secondaryColor', 'primaryFont', 'fontWeight'].forEach(k =>
+        manualOverrides.current.delete(`a_${k}`));
+    } else {
+      if (themeLockedB) return;
+      setBPrimaryColor(rec.primaryColor);
+      setBSecondaryColor(rec.secondaryColor);
+      setBPrimaryFont(rec.primaryFont);
+      setBFontWeight(rec.fontWeight);
+      setBThemeMode(rec.themeMode);
+      ['primaryColor', 'secondaryColor', 'primaryFont', 'fontWeight'].forEach(k =>
+        manualOverrides.current.delete(`b_${k}`));
+    }
+  };
+
+  const hasExistingA = !!(aPrimaryColor || aSecondaryColor || aPrimaryFont || aFontWeight);
+  const hasExistingB = !!(bPrimaryColor || bSecondaryColor || bPrimaryFont || bFontWeight);
+
+  const runAnalysis = async () => {
+    setAnalyzeError('');
+    setAnalyzing(true);
+    try {
+      const refUrl = normalizeUrl(styleRefUrl) || styleRef?.live_url || '';
+      const convUrl = normalizeUrl(convRefUrl) || convRef?.live_url || '';
+      const result = await analyzeReference({
+        referenceUrl: refUrl || convUrl,
+        demoSiteUrl: styleRef?.live_url || convRef?.live_url || '',
+      });
+      if (!result) {
+        setAnalyzeError('No usable reference source. Add a Reference URL or select a Demo Site.');
+        setAnalysisResult(null);
+        setAnalyzing(false);
+        return;
+      }
+      setAnalysisResult(result);
+
+      // Apply Prompt A
+      if (!themeLockedA) {
+        if (hasExistingA) {
+          if (window.confirm('Replace existing Prompt A theme settings?')) {
+            applyRecommendationFromResult(result, 'A');
+          }
+        } else {
+          applyRecommendationFromResult(result, 'A');
+        }
+      }
+      // Apply Prompt B
+      if (!themeLockedB) {
+        if (hasExistingB) {
+          if (window.confirm('Replace existing Prompt B theme settings?')) {
+            applyRecommendationFromResult(result, 'B');
+          }
+        } else {
+          applyRecommendationFromResult(result, 'B');
+        }
+      }
+    } catch (err: any) {
+      setAnalyzeError(err.message || 'Analysis failed');
+    }
+    setAnalyzing(false);
+  };
+
+  const applyRecommendationFromResult = (result: AnalysisResult, target: 'A' | 'B') => {
+    const rec = target === 'A' ? result.promptA : result.promptB;
+    if (target === 'A') {
+      setAPrimaryColor(rec.primaryColor);
+      setASecondaryColor(rec.secondaryColor);
+      setAPrimaryFont(rec.primaryFont);
+      setAFontWeight(rec.fontWeight);
+      setAThemeMode(rec.themeMode);
+      ['primaryColor', 'secondaryColor', 'primaryFont', 'fontWeight'].forEach(k =>
+        manualOverrides.current.delete(`a_${k}`));
+    } else {
+      setBPrimaryColor(rec.primaryColor);
+      setBSecondaryColor(rec.secondaryColor);
+      setBPrimaryFont(rec.primaryFont);
+      setBFontWeight(rec.fontWeight);
+      setBThemeMode(rec.themeMode);
+      ['primaryColor', 'secondaryColor', 'primaryFont', 'fontWeight'].forEach(k =>
+        manualOverrides.current.delete(`b_${k}`));
+    }
+  };
+
 
   // Check prompt sync status
   const checkSyncStatus = useCallback(async () => {
@@ -390,6 +504,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           promptBLayoutOverride,
           enabledModules: normalizedModules,
           advancedModules: advModules,
+          referenceAnalysis: analysisResult?.analysis || null,
           localPrompts: {
             extractionPrompt,
             masterPrompt,
@@ -460,6 +575,12 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
         promptAPrimaryFont: aPrimaryFont, promptAFontWeight: aFontWeight, promptAThemeMode: aThemeMode,
         promptBPrimaryColor: bPrimaryColor, promptBSecondaryColor: bSecondaryColor,
         promptBPrimaryFont: bPrimaryFont, promptBFontWeight: bFontWeight, promptBThemeMode: bThemeMode,
+        // Reference design analysis
+        referenceAnalysis: analysisResult?.analysis,
+        promptAThemeRecommendation: analysisResult?.promptA,
+        promptBThemeRecommendation: analysisResult?.promptB,
+        analysisConfidence: analysisResult?.confidence,
+        themeLockedA, themeLockedB,
       };
       saveProject(project);
       lastSavedHashRef.current = currentHash;
@@ -481,6 +602,8 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     setSpecialInstructions(''); setPromptALayoutOverride(''); setPromptBLayoutOverride('');
     setBrandDetected(false); setBrandDetecting(false);
     setDetectedSources({});
+    setAnalysisResult(null); setAnalyzeError(''); setAnalyzing(false);
+    setThemeLockedA(false); setThemeLockedB(false);
     manualOverrides.current = new Set();
     currentProjectIdRef.current = crypto.randomUUID();
     lastSavedHashRef.current = '';
@@ -501,10 +624,18 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     font: string, setFont: (v: string) => void,
     weight: string, setWeight: (v: string) => void,
     mode: 'auto' | 'force_light' | 'force_dark', setMode: (v: 'auto' | 'force_light' | 'force_dark') => void,
-  ) => (
+  ) => {
+    const locked = prefix === 'a' ? themeLockedA : themeLockedB;
+    const setLocked = prefix === 'a' ? setThemeLockedA : setThemeLockedB;
+    return (
     <div className="panel-section">
       <h3 className="panel-section-title">{label}</h3>
       <p className="text-xs text-muted-foreground mb-3">{sublabel}</p>
+      <label className="flex items-center gap-2 mb-3 text-xs cursor-pointer select-none">
+        <input type="checkbox" checked={locked} onChange={e => setLocked(e.target.checked)} className="rounded accent-primary" />
+        <span className="text-foreground">Lock Prompt {prefix.toUpperCase()} Theme</span>
+        <span className="text-muted-foreground">(prevent auto-overwrite)</span>
+      </label>
       {prefix === 'a' && brandDetected && (
         <div className="mb-3 px-3 py-2 rounded-md bg-accent text-accent-foreground text-xs">
           ✨ Brand styling auto-detected from live website
@@ -612,7 +743,8 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <>
@@ -708,6 +840,57 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
             </div>
           </div>
         </div>
+
+        {/* 2b. Reference Design Analysis */}
+        <div className="panel-section">
+          <h3 className="panel-section-title">Reference Design Analysis</h3>
+          <p className="text-xs text-muted-foreground mb-3">
+            Analyze the reference URL, demo site, or screenshot to auto-generate Theme A and Theme B suggestions.
+          </p>
+          <button
+            onClick={runAnalysis}
+            disabled={analyzing}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors disabled:opacity-50"
+          >
+            {analyzing ? <><Loader2 size={14} className="animate-spin" /> Analyzing…</> : <><Sparkles size={14} /> Analyze Reference Design</>}
+          </button>
+          {analyzeError && <p className="text-xs text-destructive mt-2">{analyzeError}</p>}
+
+          {analysisResult && (
+            <>
+              <div className="mt-4 pt-4 border-t border-border">
+                <h4 className="text-xs font-semibold text-foreground mb-2">Reference Design Summary</h4>
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <SummaryItem label="Primary" swatch={analysisResult.analysis.primaryColor} value={analysisResult.analysis.primaryColor} />
+                  <SummaryItem label="Secondary" swatch={analysisResult.analysis.secondaryColor} value={analysisResult.analysis.secondaryColor} />
+                  <SummaryItem label="Font Direction" value={analysisResult.analysis.fontDirection} />
+                  <SummaryItem label="Font Weight" value={analysisResult.analysis.fontWeight} />
+                  <SummaryItem label="Design Style" value={analysisResult.analysis.designStyle} />
+                  <SummaryItem label="Tone" value={analysisResult.analysis.tone} />
+                  <SummaryItem label="Spacing" value={analysisResult.analysis.spacingStyle} />
+                  <SummaryItem label="Card Style" value={analysisResult.analysis.cardStyle} />
+                  <SummaryItem label="Button Style" value={analysisResult.analysis.buttonStyle} />
+                </div>
+              </div>
+              <div className="mt-3 pt-3 border-t border-border">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium text-foreground">Reference Analysis Confidence</span>
+                  <span className="text-xs font-semibold text-foreground">{analysisResult.confidence}%</span>
+                </div>
+                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all"
+                    style={{ width: `${analysisResult.confidence}%` }}
+                  />
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1.5">
+                  Source: {analysisResult.analysis.sourceUsed === 'url' ? 'URL analyzed' : analysisResult.analysis.sourceUsed === 'screenshot' ? 'Screenshot only' : 'No usable reference'}
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+
 
         {/* 3. Package Tier */}
         <div className="panel-section">

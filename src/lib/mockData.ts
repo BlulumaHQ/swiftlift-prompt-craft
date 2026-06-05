@@ -64,4 +64,11 @@ export interface SavedProject {
   promptBPrimaryFont?: string;
   promptBFontWeight?: string;
   promptBThemeMode?: string;
+  // Reference design analysis (optional — added in v2)
+  referenceAnalysis?: any;
+  promptAThemeRecommendation?: any;
+  promptBThemeRecommendation?: any;
+  analysisConfidence?: number;
+  themeLockedA?: boolean;
+  themeLockedB?: boolean;
 }
