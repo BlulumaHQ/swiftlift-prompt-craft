@@ -801,11 +801,11 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           </div>
         </div>
 
-        {/* 7. Special Instructions */}
+        {/* 7. Global Project Instructions */}
         <div className="panel-section">
-          <h3 className="panel-section-title">Special Instructions</h3>
+          <h3 className="panel-section-title">Global Project Instructions</h3>
           <textarea value={specialInstructions} onChange={e => setSpecialInstructions(e.target.value)}
-            placeholder="Custom instructions for the AI builder..." rows={4} className="control-input resize-none" />
+            placeholder="Add global rules for this project, such as client requirements, forbidden styles, required language, CMS rules, form rules, footer rules, or deployment notes. Do not use this field for Prompt A / Prompt B layout override." rows={4} className="control-input resize-none" />
         </div>
 
         {/* 9. Generate Button + Sync Status */}
