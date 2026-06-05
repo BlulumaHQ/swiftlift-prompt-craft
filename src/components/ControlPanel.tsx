@@ -19,6 +19,18 @@ const CLOUD_PROMPT_IDS: Record<string, string> = {
 
 const projectBrands = ['SwiftLift', 'Bluluma', 'Sonykun', 'SwiftSite'];
 
+function SummaryItem({ label, value, swatch }: { label: string; value: string; swatch?: string }) {
+  return (
+    <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-muted/50 border border-border">
+      {swatch && <span className="w-3 h-3 rounded shrink-0 border border-border" style={{ background: swatch }} />}
+      <div className="flex flex-col min-w-0">
+        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
+        <span className="text-[11px] font-medium text-foreground truncate">{value}</span>
+      </div>
+    </div>
+  );
+}
+
 interface Props {
   onPromptsGenerated: (promptA: string, promptB: string, tier: '350' | '550') => void;
   onGenerateStart: (tier: '350' | '550') => void;
