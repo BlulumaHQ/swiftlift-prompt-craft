@@ -748,6 +748,13 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           aThemeMode, setAThemeMode,
         )}
 
+        {/* 4A-2. Prompt A Layout Override */}
+        <div className="panel-section">
+          <h3 className="panel-section-title">Prompt A Layout Override</h3>
+          <textarea value={promptALayoutOverride} onChange={e => setPromptALayoutOverride(e.target.value)}
+            placeholder="Layout-specific instructions for Prompt A only (section order, hero style, nav variant, etc.)" rows={4} className="control-input resize-none" />
+        </div>
+
         {/* 4B. Prompt B Brand & Theme Override */}
         {renderThemeSection(
           'b',
@@ -759,6 +766,13 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           bFontWeight, setBFontWeight,
           bThemeMode, setBThemeMode,
         )}
+
+        {/* 4B-2. Prompt B Layout Override */}
+        <div className="panel-section">
+          <h3 className="panel-section-title">Prompt B Layout Override</h3>
+          <textarea value={promptBLayoutOverride} onChange={e => setPromptBLayoutOverride(e.target.value)}
+            placeholder="Layout-specific instructions for Prompt B only (conversion sticky CTA variant, hero form, section flow, etc.)" rows={4} className="control-input resize-none" />
+        </div>
 
         {/* 5. Content Modules */}
         <div className="panel-section">
