@@ -868,7 +868,8 @@ Deno.serve(async (req) => {
       return { heading: 'Inter', body: 'Inter' };
     }
 
-    const resolvedFonts = resolveAutoFont(primaryFont, businessType);
+
+
 
     const blocks = {
       siteMeta: formatSiteMeta(normalized),
