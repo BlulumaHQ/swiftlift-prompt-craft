@@ -770,6 +770,7 @@ Deno.serve(async (req) => {
       promptBThemeMode, promptBPrimaryColor, promptBSecondaryColor, promptBPrimaryFont, promptBFontWeight,
       promptALayoutOverride, promptBLayoutOverride,
       enabledModules, advancedModules, localPrompts,
+      referenceAnalysis,
     } = await req.json();
 
     if (!sourceUrl) {
@@ -1087,6 +1088,19 @@ ${activeAdvSections.join('\n\n')}`;
       ? `\n\n--------------------------------------------------\nPROMPT B LAYOUT OVERRIDE\n--------------------------------------------------\n\n${promptBLayoutOverride.trim()}`
       : '';
 
+    // ── Reference Design Analysis blocks ──
+    function buildAnalysisBlock(target: 'A' | 'B'): string {
+      if (!referenceAnalysis || typeof referenceAnalysis !== 'object') return '';
+      const a = referenceAnalysis;
+      if (!a.designStyle && !a.tone && !a.spacingStyle && !a.cardStyle && !a.buttonStyle) return '';
+      const direction = target === 'A'
+        ? 'Maintain strong visual alignment with the reference website.'
+        : 'Maintain the same brand identity while enhancing premium presentation and conversion-focused hierarchy.';
+      return `\n\n--------------------------------------------------\nREFERENCE DESIGN ANALYSIS\n--------------------------------------------------\n\nDesign Style: ${a.designStyle || '(none)'}\nTone: ${a.tone || '(none)'}\nSpacing: ${a.spacingStyle || '(none)'}\nCard Style: ${a.cardStyle || '(none)'}\nButton Style: ${a.buttonStyle || '(none)'}\n\nPrompt ${target} Theme Direction:\n${direction}`;
+    }
+    const analysisBlockA = buildAnalysisBlock('A');
+    const analysisBlockB = buildAnalysisBlock('B');
+
     const convUrl = conversionLayoutUrl || referenceUrl || "";
 
     const fullScrapedData = [
@@ -1281,7 +1295,7 @@ The active footer credit must reflect the Selected Brand above.
 
     const promptA = cleanOutputFormatting(
       `SWIFTLIFT BUILD PROMPT — ${tierLabelA}\nSource: ${ensureHttpUrl(sourceUrl)}\n\n` +
-      brandHeaderBlock + layoutHeaderA + assembledA + brandOverrideBlockA + layoutOverrideBlockA + contentModuleBlock + advancedModuleBlock
+      brandHeaderBlock + layoutHeaderA + assembledA + brandOverrideBlockA + analysisBlockA + layoutOverrideBlockA + contentModuleBlock + advancedModuleBlock
     );
 
     const conversionDirective = `--------------------------------------------------
@@ -1349,7 +1363,7 @@ IMPORTANT: Do NOT add conversion strategy, CRO analysis, sales funnel planning, 
     const promptB = cleanOutputFormatting(
       `SWIFTLIFT BUILD PROMPT — ${tierLabelB}\nSource: ${ensureHttpUrl(sourceUrl)}\n\n` +
       brandHeaderBlock + layoutHeaderB + conversionDirective +
-      assembledB + brandOverrideBlockB + layoutOverrideBlockB + contentModuleBlock + advancedModuleBlock
+      assembledB + brandOverrideBlockB + analysisBlockB + layoutOverrideBlockB + contentModuleBlock + advancedModuleBlock
     );
 
     console.log("Prompts assembled from database prompts. A length:", promptA.length, "B length:", promptB.length, "Assembly rules length:", assemblyRules?.length || 0);
