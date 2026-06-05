@@ -612,10 +612,18 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
     font: string, setFont: (v: string) => void,
     weight: string, setWeight: (v: string) => void,
     mode: 'auto' | 'force_light' | 'force_dark', setMode: (v: 'auto' | 'force_light' | 'force_dark') => void,
-  ) => (
+  ) => {
+    const locked = prefix === 'a' ? themeLockedA : themeLockedB;
+    const setLocked = prefix === 'a' ? setThemeLockedA : setThemeLockedB;
+    return (
     <div className="panel-section">
       <h3 className="panel-section-title">{label}</h3>
       <p className="text-xs text-muted-foreground mb-3">{sublabel}</p>
+      <label className="flex items-center gap-2 mb-3 text-xs cursor-pointer select-none">
+        <input type="checkbox" checked={locked} onChange={e => setLocked(e.target.checked)} className="rounded accent-primary" />
+        <span className="text-foreground">Lock Prompt {prefix.toUpperCase()} Theme</span>
+        <span className="text-muted-foreground">(prevent auto-overwrite)</span>
+      </label>
       {prefix === 'a' && brandDetected && (
         <div className="mb-3 px-3 py-2 rounded-md bg-accent text-accent-foreground text-xs">
           ✨ Brand styling auto-detected from live website
