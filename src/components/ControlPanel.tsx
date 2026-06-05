@@ -354,6 +354,16 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
       setSyncStatus('synced');
       setUnsyncedPrompt(null);
 
+      // Map legacy module IDs to new CMS IDs for backward compat
+      const legacyModuleMap: Record<string, string> = {
+        portfolio_login: 'portfolio_demo_cms',
+        portfolio_nologin: 'portfolio_demo_cms',
+        blog_login: 'blog_demo_cms',
+        blog_nologin: 'blog_demo_cms',
+        gallery: 'gallery_demo_cms',
+      };
+      const normalizedModules = Array.from(new Set(modules.map(m => legacyModuleMap[m] || m)));
+
       const { data, error } = await supabase.functions.invoke('generate-final-prompt', {
         body: {
           sourceUrl,
@@ -375,7 +385,11 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           promptBSecondaryColor: bSecondaryColor,
           promptBPrimaryFont: bPrimaryFont,
           promptBFontWeight: bFontWeight,
-          enabledModules: modules,
+          // Layout overrides
+          promptALayoutOverride,
+          promptBLayoutOverride,
+          enabledModules: normalizedModules,
+          advancedModules: advModules,
           localPrompts: {
             extractionPrompt,
             masterPrompt,
