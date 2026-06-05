@@ -8,6 +8,7 @@ import type { DemoSite } from '@/lib/demoSiteStore';
 import { supabase } from '@/integrations/supabase/client';
 import { getPromptLibrary } from '@/lib/promptLibraryStore';
 import { getCloudPrompts, computeContentHash } from '@/lib/promptCloudStore';
+import { analyzeReference, type AnalysisResult, type ReferenceAnalysis } from '@/lib/referenceAnalyzer';
 
 // Authoritative Group B cloud prompt IDs
 const CLOUD_PROMPT_IDS: Record<string, string> = {
@@ -167,6 +168,13 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const [showBrandConfirm, setShowBrandConfirm] = useState(false);
   const [confirmBrand, setConfirmBrand] = useState('SwiftLift');
   const detectAbortRef = useRef<AbortController | null>(null);
+
+  // Reference Design Analysis
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState('');
+  const [themeLockedA, setThemeLockedA] = useState(false);
+  const [themeLockedB, setThemeLockedB] = useState(false);
 
   const toggleModule = (id: string) => setModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   const toggleAdvModule = (id: string) => setAdvModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
