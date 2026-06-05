@@ -179,6 +179,100 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const toggleModule = (id: string) => setModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   const toggleAdvModule = (id: string) => setAdvModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
+  // ── Reference Design Analyzer ──
+  const applyRecommendation = (target: 'A' | 'B', force: boolean) => {
+    if (!analysisResult) return;
+    const rec = target === 'A' ? analysisResult.promptA : analysisResult.promptB;
+    if (target === 'A') {
+      if (themeLockedA) return;
+      setAPrimaryColor(rec.primaryColor);
+      setASecondaryColor(rec.secondaryColor);
+      setAPrimaryFont(rec.primaryFont);
+      setAFontWeight(rec.fontWeight);
+      setAThemeMode(rec.themeMode);
+      ['primaryColor', 'secondaryColor', 'primaryFont', 'fontWeight'].forEach(k =>
+        manualOverrides.current.delete(`a_${k}`));
+    } else {
+      if (themeLockedB) return;
+      setBPrimaryColor(rec.primaryColor);
+      setBSecondaryColor(rec.secondaryColor);
+      setBPrimaryFont(rec.primaryFont);
+      setBFontWeight(rec.fontWeight);
+      setBThemeMode(rec.themeMode);
+      ['primaryColor', 'secondaryColor', 'primaryFont', 'fontWeight'].forEach(k =>
+        manualOverrides.current.delete(`b_${k}`));
+    }
+  };
+
+  const hasExistingA = !!(aPrimaryColor || aSecondaryColor || aPrimaryFont || aFontWeight);
+  const hasExistingB = !!(bPrimaryColor || bSecondaryColor || bPrimaryFont || bFontWeight);
+
+  const runAnalysis = async () => {
+    setAnalyzeError('');
+    setAnalyzing(true);
+    try {
+      const refUrl = normalizeUrl(styleRefUrl) || styleRef?.live_url || '';
+      const convUrl = normalizeUrl(convRefUrl) || convRef?.live_url || '';
+      const result = await analyzeReference({
+        referenceUrl: refUrl || convUrl,
+        demoSiteUrl: styleRef?.live_url || convRef?.live_url || '',
+      });
+      if (!result) {
+        setAnalyzeError('No usable reference source. Add a Reference URL or select a Demo Site.');
+        setAnalysisResult(null);
+        setAnalyzing(false);
+        return;
+      }
+      setAnalysisResult(result);
+
+      // Apply Prompt A
+      if (!themeLockedA) {
+        if (hasExistingA) {
+          if (window.confirm('Replace existing Prompt A theme settings?')) {
+            applyRecommendationFromResult(result, 'A');
+          }
+        } else {
+          applyRecommendationFromResult(result, 'A');
+        }
+      }
+      // Apply Prompt B
+      if (!themeLockedB) {
+        if (hasExistingB) {
+          if (window.confirm('Replace existing Prompt B theme settings?')) {
+            applyRecommendationFromResult(result, 'B');
+          }
+        } else {
+          applyRecommendationFromResult(result, 'B');
+        }
+      }
+    } catch (err: any) {
+      setAnalyzeError(err.message || 'Analysis failed');
+    }
+    setAnalyzing(false);
+  };
+
+  const applyRecommendationFromResult = (result: AnalysisResult, target: 'A' | 'B') => {
+    const rec = target === 'A' ? result.promptA : result.promptB;
+    if (target === 'A') {
+      setAPrimaryColor(rec.primaryColor);
+      setASecondaryColor(rec.secondaryColor);
+      setAPrimaryFont(rec.primaryFont);
+      setAFontWeight(rec.fontWeight);
+      setAThemeMode(rec.themeMode);
+      ['primaryColor', 'secondaryColor', 'primaryFont', 'fontWeight'].forEach(k =>
+        manualOverrides.current.delete(`a_${k}`));
+    } else {
+      setBPrimaryColor(rec.primaryColor);
+      setBSecondaryColor(rec.secondaryColor);
+      setBPrimaryFont(rec.primaryFont);
+      setBFontWeight(rec.fontWeight);
+      setBThemeMode(rec.themeMode);
+      ['primaryColor', 'secondaryColor', 'primaryFont', 'fontWeight'].forEach(k =>
+        manualOverrides.current.delete(`b_${k}`));
+    }
+  };
+
+
   // Check prompt sync status
   const checkSyncStatus = useCallback(async () => {
     setSyncStatus('checking');
