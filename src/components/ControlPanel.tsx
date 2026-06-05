@@ -829,6 +829,57 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           </div>
         </div>
 
+        {/* 2b. Reference Design Analysis */}
+        <div className="panel-section">
+          <h3 className="panel-section-title">Reference Design Analysis</h3>
+          <p className="text-xs text-muted-foreground mb-3">
+            Analyze the reference URL, demo site, or screenshot to auto-generate Theme A and Theme B suggestions.
+          </p>
+          <button
+            onClick={runAnalysis}
+            disabled={analyzing}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors disabled:opacity-50"
+          >
+            {analyzing ? <><Loader2 size={14} className="animate-spin" /> Analyzing…</> : <><Sparkles size={14} /> Analyze Reference Design</>}
+          </button>
+          {analyzeError && <p className="text-xs text-destructive mt-2">{analyzeError}</p>}
+
+          {analysisResult && (
+            <>
+              <div className="mt-4 pt-4 border-t border-border">
+                <h4 className="text-xs font-semibold text-foreground mb-2">Reference Design Summary</h4>
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <SummaryItem label="Primary" swatch={analysisResult.analysis.primaryColor} value={analysisResult.analysis.primaryColor} />
+                  <SummaryItem label="Secondary" swatch={analysisResult.analysis.secondaryColor} value={analysisResult.analysis.secondaryColor} />
+                  <SummaryItem label="Font Direction" value={analysisResult.analysis.fontDirection} />
+                  <SummaryItem label="Font Weight" value={analysisResult.analysis.fontWeight} />
+                  <SummaryItem label="Design Style" value={analysisResult.analysis.designStyle} />
+                  <SummaryItem label="Tone" value={analysisResult.analysis.tone} />
+                  <SummaryItem label="Spacing" value={analysisResult.analysis.spacingStyle} />
+                  <SummaryItem label="Card Style" value={analysisResult.analysis.cardStyle} />
+                  <SummaryItem label="Button Style" value={analysisResult.analysis.buttonStyle} />
+                </div>
+              </div>
+              <div className="mt-3 pt-3 border-t border-border">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium text-foreground">Reference Analysis Confidence</span>
+                  <span className="text-xs font-semibold text-foreground">{analysisResult.confidence}%</span>
+                </div>
+                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all"
+                    style={{ width: `${analysisResult.confidence}%` }}
+                  />
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1.5">
+                  Source: {analysisResult.analysis.sourceUsed === 'url' ? 'URL analyzed' : analysisResult.analysis.sourceUsed === 'screenshot' ? 'Screenshot only' : 'No usable reference'}
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+
+
         {/* 3. Package Tier */}
         <div className="panel-section">
           <h3 className="panel-section-title">Package Tier</h3>
