@@ -1348,7 +1348,7 @@ IMPORTANT: Do NOT add conversion strategy, CRO analysis, sales funnel planning, 
     const promptB = cleanOutputFormatting(
       `SWIFTLIFT BUILD PROMPT — ${tierLabelB}\nSource: ${ensureHttpUrl(sourceUrl)}\n\n` +
       brandHeaderBlock + layoutHeaderB + conversionDirective +
-      assembledB + brandOverrideBlock + contentModuleBlock
+      assembledB + brandOverrideBlockB + layoutOverrideBlockB + contentModuleBlock + advancedModuleBlock
     );
 
     console.log("Prompts assembled from database prompts. A length:", promptA.length, "B length:", promptB.length, "Assembly rules length:", assemblyRules?.length || 0);
