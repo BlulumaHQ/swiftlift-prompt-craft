@@ -1280,7 +1280,7 @@ The active footer credit must reflect the Selected Brand above.
 
     const promptA = cleanOutputFormatting(
       `SWIFTLIFT BUILD PROMPT — ${tierLabelA}\nSource: ${ensureHttpUrl(sourceUrl)}\n\n` +
-      brandHeaderBlock + layoutHeaderA + assembledA + brandOverrideBlock + contentModuleBlock
+      brandHeaderBlock + layoutHeaderA + assembledA + brandOverrideBlockA + layoutOverrideBlockA + contentModuleBlock + advancedModuleBlock
     );
 
     const conversionDirective = `--------------------------------------------------
