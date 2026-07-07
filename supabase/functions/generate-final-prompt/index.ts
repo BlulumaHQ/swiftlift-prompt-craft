@@ -739,6 +739,7 @@ function assemblePrompt(
     ["DEMO_SITE_SCREENSHOTS", "(none)"],
     ["CONVERSION_REFERENCE_URLS", "(none)"],
     ["CONVERSION_REFERENCE_SCREENSHOTS", "(none)"],
+    ["STYLE_SEED", styleSeedContent || "(none)"],
   ];
 
   for (const [key, value] of replacements) {
