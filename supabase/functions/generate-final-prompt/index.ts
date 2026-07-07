@@ -773,7 +773,11 @@ Deno.serve(async (req) => {
       promptALayoutOverride, promptBLayoutOverride,
       enabledModules, advancedModules, localPrompts,
       referenceAnalysis,
+      styleSeedCode: rawStyleSeedCode,
     } = await req.json();
+    const styleSeedCode: string = (typeof rawStyleSeedCode === 'string' && rawStyleSeedCode.trim())
+      ? rawStyleSeedCode.trim()
+      : 'AUTO';
 
     if (!sourceUrl) {
       throw new StepError("parse_request", "Source URL is required.", 400);
