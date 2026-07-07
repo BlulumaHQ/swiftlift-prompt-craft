@@ -481,7 +481,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
       }
 
       const extractionPrompt = resolvedPrompts['SwiftLift Source Extraction Prompt V1'];
-      const masterPrompt = resolvedPrompts['SwiftLift Final Build Master Prompt V1'];
+      const masterPrompt = resolvedPrompts['SwiftLift Final Build Master Prompt V2'];
       const assemblyRules = resolvedPrompts['SwiftLift Prompt Assembly Rules V1'];
 
       setSyncStatus('synced');
