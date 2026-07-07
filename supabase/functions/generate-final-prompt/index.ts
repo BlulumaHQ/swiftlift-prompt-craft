@@ -1203,8 +1203,8 @@ ${activeAdvSections.join('\n\n')}`;
     };
 
     currentStep = "assemble_prompts";
-    let assembledA = assemblePrompt(masterPrompt, blocks, runtimeValuesA, userNotes || "");
-    let assembledB = assemblePrompt(masterPrompt, blocks, runtimeValuesB, userNotes || "");
+    let assembledA = assemblePrompt(masterPrompt, blocks, runtimeValuesA, userNotes || "", styleSeed.content);
+    let assembledB = assemblePrompt(masterPrompt, blocks, runtimeValuesB, userNotes || "", styleSeed.content);
 
     // Final token sweep — replace any remaining unresolved template tokens
     assembledA = finalTokenSweep(assembledA);
