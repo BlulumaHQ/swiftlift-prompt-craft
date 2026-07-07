@@ -19,6 +19,15 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 const SYSTEM_PROMPT_IDS = ['generator_app_build_v1'];
 
+// Authoritative prompts: the cloud database is the source of truth for these.
+// Any local→cloud sync path MUST skip them so a stale local copy can never
+// overwrite the current DB version (e.g. Master Prompt V2).
+const AUTHORITATIVE_PROMPT_NAMES = new Set<string>([
+  'SwiftLift Source Extraction Prompt V1',
+  'SwiftLift Final Build Master Prompt V2',
+  'SwiftLift Prompt Assembly Rules V1',
+]);
+
 interface PromptItem {
   id: string;
   name: string;
