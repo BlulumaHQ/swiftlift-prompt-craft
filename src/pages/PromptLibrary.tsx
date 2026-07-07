@@ -19,6 +19,15 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 const SYSTEM_PROMPT_IDS = ['generator_app_build_v1'];
 
+// Authoritative prompts: the cloud database is the source of truth for these.
+// Any local→cloud sync path MUST skip them so a stale local copy can never
+// overwrite the current DB version (e.g. Master Prompt V2).
+const AUTHORITATIVE_PROMPT_NAMES = new Set<string>([
+  'SwiftLift Source Extraction Prompt V1',
+  'SwiftLift Final Build Master Prompt V2',
+  'SwiftLift Prompt Assembly Rules V1',
+]);
+
 interface PromptItem {
   id: string;
   name: string;
@@ -231,7 +240,9 @@ export default function PromptLibrary() {
     try {
       const existingCloud = await getCloudPrompts();
       const cloudByName = new Map(existingCloud.map(c => [c.prompt_name, c]));
-      const localPrompts = getPromptLibrary().filter(p => !SYSTEM_PROMPT_IDS.includes(p.id));
+      const localPrompts = getPromptLibrary().filter(p =>
+        !SYSTEM_PROMPT_IDS.includes(p.id) && !AUTHORITATIVE_PROMPT_NAMES.has(p.name)
+      );
       for (const p of localPrompts) {
         const existing = cloudByName.get(p.name);
         await saveCloudPrompt({

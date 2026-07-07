@@ -35,7 +35,7 @@ export const sectionLabels = categoryLabels;
 const defaultPrompts: PromptBlock[] = [
   {
     id: 'final_build_master_v1',
-    name: 'SwiftLift Final Build Master Prompt V1',
+    name: 'SwiftLift Final Build Master Prompt V2',
     category: 'core',
     mode: 'prompts',
     type: 'Output Prompt',

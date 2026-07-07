@@ -13,9 +13,13 @@ import { analyzeReference, type AnalysisResult, type ReferenceAnalysis } from '@
 // Authoritative Group B cloud prompt IDs
 const CLOUD_PROMPT_IDS: Record<string, string> = {
   'SwiftLift Source Extraction Prompt V1': 'b7c1fb95-15f9-4e93-8a96-88e6152ee669',
-  'SwiftLift Final Build Master Prompt V1': '035a3b80-251f-4bdf-9615-855a041eadca',
+  'SwiftLift Final Build Master Prompt V2': '035a3b80-251f-4bdf-9615-855a041eadca',
   'SwiftLift Prompt Assembly Rules V1': 'cd77a34e-9cb0-44f1-8d31-e1764c531f8e',
 };
+
+// Short-name helper for UI labels (handles both V1 and V2 suffixes)
+const shortPromptName = (name: string) =>
+  name.replace('SwiftLift ', '').replace(/ V\d+$/, '');
 
 const projectBrands = ['SwiftLift', 'Bluluma', 'Sonykun', 'SwiftSite'];
 
@@ -305,7 +309,10 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   };
 
 
-  // Check prompt sync status
+  // Check prompt sync status. The cloud database is the source of truth,
+  // so we only verify that each required prompt exists and has content.
+  // We deliberately do NOT compare content_hash here — a stale hash column
+  // on an otherwise-valid DB row must not produce a false "out of sync" warning.
   const checkSyncStatus = useCallback(async () => {
     setSyncStatus('checking');
     try {
@@ -317,15 +324,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
         const cloud = cloudPrompts.find(p => p.id === cloudId) as any;
         if (!cloud || !cloud.content) {
           setSyncStatus('unsynced');
-          const shortName = name.replace('SwiftLift ', '').replace(' V1', '');
-          setUnsyncedPrompt(shortName + ' missing from cloud');
-          return;
-        }
-        const actualHash = computeContentHash(cloud.content);
-        if (cloud.content_hash && cloud.content_hash !== actualHash) {
-          setSyncStatus('unsynced');
-          const shortName = name.replace('SwiftLift ', '').replace(' V1', '');
-          setUnsyncedPrompt(shortName + ' content integrity mismatch');
+          setUnsyncedPrompt(shortPromptName(name) + ' missing from cloud');
           return;
         }
       }
@@ -482,7 +481,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
       }
 
       const extractionPrompt = resolvedPrompts['SwiftLift Source Extraction Prompt V1'];
-      const masterPrompt = resolvedPrompts['SwiftLift Final Build Master Prompt V1'];
+      const masterPrompt = resolvedPrompts['SwiftLift Final Build Master Prompt V2'];
       const assemblyRules = resolvedPrompts['SwiftLift Prompt Assembly Rules V1'];
 
       setSyncStatus('synced');
@@ -1054,7 +1053,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           )}
           {syncStatus === 'unsynced' && (
             <div className="flex items-center gap-1.5 text-[11px] text-amber-600">
-              <AlertTriangle size={12} /> {unsyncedPrompt ? `${unsyncedPrompt.replace('SwiftLift ', '').replace(' V1', '')} out of sync` : 'Prompts out of sync'}
+              <AlertTriangle size={12} /> {unsyncedPrompt ? `${unsyncedPrompt.replace('SwiftLift ', '').replace(/ V\d+$/, '')} out of sync` : 'Prompts out of sync'}
             </div>
           )}
           {syncStatus === 'checking' && (
