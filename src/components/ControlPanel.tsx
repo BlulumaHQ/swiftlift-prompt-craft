@@ -525,6 +525,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           enabledModules: normalizedModules,
           advancedModules: advModules,
           referenceAnalysis: analysisResult?.analysis || null,
+          styleSeedCode,
           localPrompts: {
             extractionPrompt,
             masterPrompt,
@@ -536,6 +537,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
       if (error) {
         onGenerateError(error.message || 'Edge function call failed');
       } else if (data?.success) {
+        if (data.styleSeedName) setLastUsedSeedName(data.styleSeedName);
         onPromptsGenerated(data.promptA, data.promptB, packageTier);
       } else {
         onGenerateError(data?.error || 'Generation failed');
