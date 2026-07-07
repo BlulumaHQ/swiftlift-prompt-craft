@@ -188,6 +188,26 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const [themeLockedA, setThemeLockedA] = useState(false);
   const [themeLockedB, setThemeLockedB] = useState(false);
 
+  // Style Seed selection
+  const [styleSeedCode, setStyleSeedCode] = useState<string>('AUTO');
+  const [styleSeedOptions, setStyleSeedOptions] = useState<Array<{ seed_code: string; seed_name: string; vertical_tags: string | null }>>([]);
+  const [lastUsedSeedName, setLastUsedSeedName] = useState<string>('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('style_seeds')
+        .select('seed_code, seed_name, vertical_tags')
+        .eq('active', true)
+        .order('seed_code');
+      if (!cancelled && !error && data) {
+        setStyleSeedOptions(data as any);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const toggleModule = (id: string) => setModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   const toggleAdvModule = (id: string) => setAdvModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
