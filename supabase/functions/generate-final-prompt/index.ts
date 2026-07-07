@@ -36,7 +36,7 @@ async function fetchRequiredPrompts(): Promise<{
   // Active prompt row IDs (Group B — the synced, authoritative rows)
   const activePromptIds: Record<string, string> = {
     "SwiftLift Source Extraction Prompt V1": "b7c1fb95-15f9-4e93-8a96-88e6152ee669",
-    "SwiftLift Final Build Master Prompt V1": "035a3b80-251f-4bdf-9615-855a041eadca",
+    "SwiftLift Final Build Master Prompt V2": "035a3b80-251f-4bdf-9615-855a041eadca",
     "SwiftLift Prompt Assembly Rules V1": "cd77a34e-9cb0-44f1-8d31-e1764c531f8e",
   };
 
