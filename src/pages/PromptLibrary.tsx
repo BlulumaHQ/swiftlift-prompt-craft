@@ -240,7 +240,9 @@ export default function PromptLibrary() {
     try {
       const existingCloud = await getCloudPrompts();
       const cloudByName = new Map(existingCloud.map(c => [c.prompt_name, c]));
-      const localPrompts = getPromptLibrary().filter(p => !SYSTEM_PROMPT_IDS.includes(p.id));
+      const localPrompts = getPromptLibrary().filter(p =>
+        !SYSTEM_PROMPT_IDS.includes(p.id) && !AUTHORITATIVE_PROMPT_NAMES.has(p.name)
+      );
       for (const p of localPrompts) {
         const existing = cloudByName.get(p.name);
         await saveCloudPrompt({
