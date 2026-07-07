@@ -1412,7 +1412,7 @@ IMPORTANT: Do NOT add conversion strategy, CRO analysis, sales funnel planning, 
     console.log("Prompts assembled from database prompts. A length:", promptA.length, "B length:", promptB.length, "Assembly rules length:", assemblyRules?.length || 0);
 
     return new Response(
-      JSON.stringify({ success: true, promptA, promptB }),
+      JSON.stringify({ success: true, promptA, promptB, styleSeedCode: styleSeed.seed_code, styleSeedName: styleSeed.seed_name }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
