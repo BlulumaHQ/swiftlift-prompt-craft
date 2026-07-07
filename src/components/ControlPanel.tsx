@@ -941,6 +941,33 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           </div>
         </div>
 
+        {/* 3b. Style Seed */}
+        <div className="panel-section">
+          <h3 className="panel-section-title">Style Seed</h3>
+          <p className="text-xs text-muted-foreground mb-2">
+            Visual identity direction for this build. AUTO rotates a random active seed.
+          </p>
+          <select
+            value={styleSeedCode}
+            onChange={(e) => setStyleSeedCode(e.target.value)}
+            className="control-input"
+          >
+            <option value="AUTO">AUTO (rotate randomly)</option>
+            {styleSeedOptions.map(s => (
+              <option key={s.seed_code} value={s.seed_code}>
+                {s.seed_name}{s.vertical_tags ? ` (${s.vertical_tags})` : ''}
+              </option>
+            ))}
+          </select>
+          {lastUsedSeedName && (
+            <p className="text-[11px] text-muted-foreground mt-2">
+              Last generation used → Style Seed: <span className="font-medium text-foreground">{lastUsedSeedName}</span>
+            </p>
+          )}
+        </div>
+
+
+
         {/* 4A. Prompt A Brand & Theme Override */}
         {renderThemeSection(
           'a',
