@@ -714,6 +714,7 @@ function assemblePrompt(
     layoutMode: string;
   },
   userNotes: string,
+  styleSeedContent: string = "",
 ): string {
   let result = template;
 
