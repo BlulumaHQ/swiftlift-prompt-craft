@@ -1053,7 +1053,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           )}
           {syncStatus === 'unsynced' && (
             <div className="flex items-center gap-1.5 text-[11px] text-amber-600">
-              <AlertTriangle size={12} /> {unsyncedPrompt ? `${unsyncedPrompt.replace('SwiftLift ', '').replace(' V1', '')} out of sync` : 'Prompts out of sync'}
+              <AlertTriangle size={12} /> {unsyncedPrompt ? `${unsyncedPrompt.replace('SwiftLift ', '').replace(/ V\d+$/, '')} out of sync` : 'Prompts out of sync'}
             </div>
           )}
           {syncStatus === 'checking' && (
