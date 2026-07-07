@@ -188,6 +188,26 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
   const [themeLockedA, setThemeLockedA] = useState(false);
   const [themeLockedB, setThemeLockedB] = useState(false);
 
+  // Style Seed selection
+  const [styleSeedCode, setStyleSeedCode] = useState<string>('AUTO');
+  const [styleSeedOptions, setStyleSeedOptions] = useState<Array<{ seed_code: string; seed_name: string; vertical_tags: string | null }>>([]);
+  const [lastUsedSeedName, setLastUsedSeedName] = useState<string>('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('style_seeds')
+        .select('seed_code, seed_name, vertical_tags')
+        .eq('active', true)
+        .order('seed_code');
+      if (!cancelled && !error && data) {
+        setStyleSeedOptions(data as any);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const toggleModule = (id: string) => setModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   const toggleAdvModule = (id: string) => setAdvModules(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
@@ -505,6 +525,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
           enabledModules: normalizedModules,
           advancedModules: advModules,
           referenceAnalysis: analysisResult?.analysis || null,
+          styleSeedCode,
           localPrompts: {
             extractionPrompt,
             masterPrompt,
@@ -516,6 +537,7 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
       if (error) {
         onGenerateError(error.message || 'Edge function call failed');
       } else if (data?.success) {
+        if (data.styleSeedName) setLastUsedSeedName(data.styleSeedName);
         onPromptsGenerated(data.promptA, data.promptB, packageTier);
       } else {
         onGenerateError(data?.error || 'Generation failed');
@@ -918,6 +940,33 @@ export default function ControlPanel({ onPromptsGenerated, onGenerateStart, onGe
             ))}
           </div>
         </div>
+
+        {/* 3b. Style Seed */}
+        <div className="panel-section">
+          <h3 className="panel-section-title">Style Seed</h3>
+          <p className="text-xs text-muted-foreground mb-2">
+            Visual identity direction for this build. AUTO rotates a random active seed.
+          </p>
+          <select
+            value={styleSeedCode}
+            onChange={(e) => setStyleSeedCode(e.target.value)}
+            className="control-input"
+          >
+            <option value="AUTO">AUTO (rotate randomly)</option>
+            {styleSeedOptions.map(s => (
+              <option key={s.seed_code} value={s.seed_code}>
+                {s.seed_name}{s.vertical_tags ? ` (${s.vertical_tags})` : ''}
+              </option>
+            ))}
+          </select>
+          {lastUsedSeedName && (
+            <p className="text-[11px] text-muted-foreground mt-2">
+              Last generation used → Style Seed: <span className="font-medium text-foreground">{lastUsedSeedName}</span>
+            </p>
+          )}
+        </div>
+
+
 
         {/* 4A. Prompt A Brand & Theme Override */}
         {renderThemeSection(

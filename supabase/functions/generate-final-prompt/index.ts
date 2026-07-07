@@ -36,7 +36,7 @@ async function fetchRequiredPrompts(): Promise<{
   // Active prompt row IDs (Group B — the synced, authoritative rows)
   const activePromptIds: Record<string, string> = {
     "SwiftLift Source Extraction Prompt V1": "b7c1fb95-15f9-4e93-8a96-88e6152ee669",
-    "SwiftLift Final Build Master Prompt V1": "035a3b80-251f-4bdf-9615-855a041eadca",
+    "SwiftLift Final Build Master Prompt V2": "035a3b80-251f-4bdf-9615-855a041eadca",
     "SwiftLift Prompt Assembly Rules V1": "cd77a34e-9cb0-44f1-8d31-e1764c531f8e",
   };
 
@@ -714,6 +714,7 @@ function assemblePrompt(
     layoutMode: string;
   },
   userNotes: string,
+  styleSeedContent: string = "",
 ): string {
   let result = template;
 
@@ -738,6 +739,7 @@ function assemblePrompt(
     ["DEMO_SITE_SCREENSHOTS", "(none)"],
     ["CONVERSION_REFERENCE_URLS", "(none)"],
     ["CONVERSION_REFERENCE_SCREENSHOTS", "(none)"],
+    ["STYLE_SEED", styleSeedContent || "(none)"],
   ];
 
   for (const [key, value] of replacements) {
@@ -771,7 +773,11 @@ Deno.serve(async (req) => {
       promptALayoutOverride, promptBLayoutOverride,
       enabledModules, advancedModules, localPrompts,
       referenceAnalysis,
+      styleSeedCode: rawStyleSeedCode,
     } = await req.json();
+    const styleSeedCode: string = (typeof rawStyleSeedCode === 'string' && rawStyleSeedCode.trim())
+      ? rawStyleSeedCode.trim()
+      : 'AUTO';
 
     if (!sourceUrl) {
       throw new StepError("parse_request", "Source URL is required.", 400);
@@ -802,6 +808,43 @@ Deno.serve(async (req) => {
       assemblyRules = dbPrompts.assemblyRules;
       console.log("Prompts loaded from database successfully.");
     }
+
+    currentStep = "load_style_seed";
+    const seedSupabaseUrl = Deno.env.get("SUPABASE_URL");
+    const seedSupabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!seedSupabaseUrl || !seedSupabaseKey) {
+      throw new StepError("load_style_seed", "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured.", 500);
+    }
+    const seedClient = createClient(seedSupabaseUrl, seedSupabaseKey);
+    let styleSeed: { seed_code: string; seed_name: string; content: string };
+    if (styleSeedCode && styleSeedCode !== 'AUTO') {
+      const { data: seedRow, error: seedErr } = await seedClient
+        .from('style_seeds')
+        .select('seed_code, seed_name, content')
+        .eq('active', true)
+        .eq('seed_code', styleSeedCode)
+        .maybeSingle();
+      if (seedErr) {
+        throw new StepError("load_style_seed", `Failed to load style seed: ${seedErr.message}`, 500);
+      }
+      if (!seedRow) {
+        throw new StepError("load_style_seed", `Style seed not found or inactive: ${styleSeedCode}`, 404);
+      }
+      styleSeed = seedRow as any;
+    } else {
+      const { data: allSeeds, error: allErr } = await seedClient
+        .from('style_seeds')
+        .select('seed_code, seed_name, content')
+        .eq('active', true);
+      if (allErr) {
+        throw new StepError("load_style_seed", `Failed to load style seeds: ${allErr.message}`, 500);
+      }
+      if (!allSeeds || allSeeds.length === 0) {
+        throw new StepError("load_style_seed", "No active style seeds available.", 404);
+      }
+      styleSeed = allSeeds[Math.floor(Math.random() * allSeeds.length)] as any;
+    }
+    console.log("Selected style seed:", styleSeed.seed_code, styleSeed.seed_name);
 
     currentStep = "fetch_source";
     const sourceContext = await fetchSourceWebsiteContext(sourceUrl);
@@ -1160,8 +1203,8 @@ ${activeAdvSections.join('\n\n')}`;
     };
 
     currentStep = "assemble_prompts";
-    let assembledA = assemblePrompt(masterPrompt, blocks, runtimeValuesA, userNotes || "");
-    let assembledB = assemblePrompt(masterPrompt, blocks, runtimeValuesB, userNotes || "");
+    let assembledA = assemblePrompt(masterPrompt, blocks, runtimeValuesA, userNotes || "", styleSeed.content);
+    let assembledB = assemblePrompt(masterPrompt, blocks, runtimeValuesB, userNotes || "", styleSeed.content);
 
     // Final token sweep — replace any remaining unresolved template tokens
     assembledA = finalTokenSweep(assembledA);
@@ -1369,7 +1412,7 @@ IMPORTANT: Do NOT add conversion strategy, CRO analysis, sales funnel planning, 
     console.log("Prompts assembled from database prompts. A length:", promptA.length, "B length:", promptB.length, "Assembly rules length:", assemblyRules?.length || 0);
 
     return new Response(
-      JSON.stringify({ success: true, promptA, promptB }),
+      JSON.stringify({ success: true, promptA, promptB, styleSeedCode: styleSeed.seed_code, styleSeedName: styleSeed.seed_name }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
