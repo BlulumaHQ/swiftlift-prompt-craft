@@ -240,6 +240,36 @@ export type Database = {
         }
         Relationships: []
       }
+      style_seeds: {
+        Row: {
+          active: boolean
+          content: string
+          created_at: string
+          id: string
+          seed_code: string
+          seed_name: string
+          vertical_tags: string | null
+        }
+        Insert: {
+          active?: boolean
+          content: string
+          created_at?: string
+          id?: string
+          seed_code: string
+          seed_name: string
+          vertical_tags?: string | null
+        }
+        Update: {
+          active?: boolean
+          content?: string
+          created_at?: string
+          id?: string
+          seed_code?: string
+          seed_name?: string
+          vertical_tags?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
