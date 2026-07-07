@@ -809,6 +809,43 @@ Deno.serve(async (req) => {
       console.log("Prompts loaded from database successfully.");
     }
 
+    currentStep = "load_style_seed";
+    const seedSupabaseUrl = Deno.env.get("SUPABASE_URL");
+    const seedSupabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!seedSupabaseUrl || !seedSupabaseKey) {
+      throw new StepError("load_style_seed", "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured.", 500);
+    }
+    const seedClient = createClient(seedSupabaseUrl, seedSupabaseKey);
+    let styleSeed: { seed_code: string; seed_name: string; content: string };
+    if (styleSeedCode && styleSeedCode !== 'AUTO') {
+      const { data: seedRow, error: seedErr } = await seedClient
+        .from('style_seeds')
+        .select('seed_code, seed_name, content')
+        .eq('active', true)
+        .eq('seed_code', styleSeedCode)
+        .maybeSingle();
+      if (seedErr) {
+        throw new StepError("load_style_seed", `Failed to load style seed: ${seedErr.message}`, 500);
+      }
+      if (!seedRow) {
+        throw new StepError("load_style_seed", `Style seed not found or inactive: ${styleSeedCode}`, 404);
+      }
+      styleSeed = seedRow as any;
+    } else {
+      const { data: allSeeds, error: allErr } = await seedClient
+        .from('style_seeds')
+        .select('seed_code, seed_name, content')
+        .eq('active', true);
+      if (allErr) {
+        throw new StepError("load_style_seed", `Failed to load style seeds: ${allErr.message}`, 500);
+      }
+      if (!allSeeds || allSeeds.length === 0) {
+        throw new StepError("load_style_seed", "No active style seeds available.", 404);
+      }
+      styleSeed = allSeeds[Math.floor(Math.random() * allSeeds.length)] as any;
+    }
+    console.log("Selected style seed:", styleSeed.seed_code, styleSeed.seed_name);
+
     currentStep = "fetch_source";
     const sourceContext = await fetchSourceWebsiteContext(sourceUrl);
 
